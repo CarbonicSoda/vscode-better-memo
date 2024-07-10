@@ -20,8 +20,7 @@ export class MemoFetcher {
 
 	private readonly FetchDocumentError = new Error("Error when fetching documents");
 
-	public async startScanning() {
-		this.stopScanning();
+	public async startScanning(viewProvider: memoExplorerViewProvider) {
 		this.documentToMemoMap.clear();
 
 		this._fetchWorkspaceConfig();
@@ -30,6 +29,7 @@ export class MemoFetcher {
 		this._documentWatcher = vscode.workspace.onDidSaveTextDocument((document) => {
 			if (this.watchedDocuments.includes(document)) {
 				this._scanDocument(document);
+				viewProvider.updateWebviewView(document);
 			}
 		});
 	}
@@ -57,19 +57,17 @@ export class MemoFetcher {
 			throw new FetcherError(this.FetchDocumentError, err);
 		}
 	}
-	
+
 	private _scanDocument(document: vscode.TextDocument) {
 		const content = document.getText();
-		let documentMemos = [];
+		let memos = [];
 		for (let match of content.matchAll(this.MemoMatchPattern)) {
 			const [tag, content] = [match.groups!["tag"], match.groups!["content"]];
 			this.tags.add(tag);
-			documentMemos.push(
-				new MemoEntry(content, tag, document, document.positionAt(match.index!).line),
-			);
+			memos.push(new MemoEntry(content, tag, document, document.positionAt(match.index!).line));
 		}
-		if (documentMemos.length !== 0) {
-			this.documentToMemoMap.set(document, documentMemos);
+		if (memos.length !== 0) {
+			this.documentToMemoMap.set(document, memos);
 		}
 	}
 }
@@ -83,7 +81,9 @@ class MemoEntry {
 	) {}
 
 	getHtmlListItem() {
-		return `<li>${this.tag} $${this.content} - ${this.parent.fileName.match(/[^\/]+$/)![0]} Ln ${this.line}</li>`;
+		return `<li>[${this.tag}] {${this.parent.fileName.match(/[^\/\\]+$/)![0]} Ln ${this.line + 1}} ${
+			this.content
+		}</li>`;
 	}
 }
 
@@ -92,7 +92,7 @@ export class memoExplorerViewProvider implements vscode.WebviewViewProvider {
 
 	private _view?: vscode.WebviewView;
 
-	public resolveWebviewView(
+	public async resolveWebviewView(
 		webviewView: vscode.WebviewView,
 		context: vscode.WebviewViewResolveContext,
 		_token: vscode.CancellationToken,
@@ -104,25 +104,24 @@ export class memoExplorerViewProvider implements vscode.WebviewViewProvider {
 			localResourceRoots: [this._extensionUri],
 		};
 
-		webviewView.webview.html = this._getHtmlForWebview();
-
+		await this._memoFetcher.startScanning(this);
+		this.updateWebviewView();
 		webviewView.onDidChangeVisibility(() => {
-			if (!webviewView.visible) {return;}
-
+			this.updateWebviewView();
 		});
-		// webviewView.webview.onDidReceiveMessage(data => {
-		// 	switch (data.type) {
-		// 		case 'colorSelected':
-		// 			{
-		// 				vscode.window.activeTextEditor?.insertSnippet(new vscode.SnippetString(`#${data.value}`));
-		// 				break;
-		// 			}
-		// 	}
-		// });
+	}
+	public updateWebviewView(documentChanged?: vscode.TextDocument) {
+		if (!(this._view && this._view.visible)) {
+			return;
+		}
+		this._view.webview.html = this._getHtmlForWebview();
 	}
 
 	private _getHtmlForWebview() {
-		const memoList = `<ul>${this._memoFetcher.getMemos().map((memo) => memo.getHtmlListItem()).join("")}</ul>`;
+		const memoList = `<ul>${this._memoFetcher
+			.getMemos()
+			.map((memo) => memo.getHtmlListItem())
+			.join("")}</ul>`;
 		return `<!DOCTYPE html>
 			<html lang="en">
 			<head>

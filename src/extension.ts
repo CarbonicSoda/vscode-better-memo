@@ -2,10 +2,10 @@ import * as vscode from "vscode";
 import {MemoFetcher, memoExplorerViewProvider} from "./engine";
 
 export function activate(context: vscode.ExtensionContext) {
-	const engine = new MemoFetcher();
-	engine.startScanning();
+	const fetcher = new MemoFetcher();
 	const webviewViewProvider = new memoExplorerViewProvider(
 		context.extensionUri,
+		fetcher
 	);
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider(
