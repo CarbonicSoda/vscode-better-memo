@@ -1,0 +1,84 @@
+{
+  "name": "better-memo",
+  "displayName": "Better Memo",
+  "description": "pass",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "extensionKind": [
+    "ui",
+    "workspace"
+  ],
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "memoExplorer",
+          "title": "Memo Explorer",
+          "icon": ""
+        }
+      ]
+    },
+    "views": {
+      "memoExplorer": [
+        {
+          "type": "webview",
+          "id": "betterMemo.memoExplorer",
+          "name": "Memo Explorer"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Better Memo",
+      "properties": {
+        "better-memo.watch": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "*"
+          ]
+        },
+        "better-memo.ignore": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "a.txt",
+            "b.txt"
+          ]
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.91.0",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "18.x",
+    "@typescript-eslint/eslint-plugin": "^7.7.1",
+    "@typescript-eslint/parser": "^7.7.1",
+    "eslint": "^8.57.0",
+    "typescript": "^5.4.5",
+    "@vscode/test-cli": "^0.0.9",
+    "@vscode/test-electron": "^2.3.9"
+  }
+}
