@@ -46,7 +46,7 @@
             "type": "string"
           },
           "default": [
-            "*"
+            "**/*"
           ]
         },
         "better-memo.ignore": {
@@ -55,10 +55,13 @@
             "type": "string"
           },
           "default": [
-            "a.txt",
-            "b.txt"
+            "**/node_modules"
           ]
-        }
+        },
+	"better-memo.scanDelay": {
+		"type": "integer",
+		"default": 1500
+	}
       }
     }
   },
