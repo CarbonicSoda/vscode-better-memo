@@ -1,31 +1,43 @@
-const explorerRoot = document.querySelector("#explorer-root");
-const _memos = new Map();
+class ExplorerMaid {
+	vscode = acquireVsCodeApi();
+	explorerRoot = document.querySelector("#explorer-root");
+	events = [];
 
-window.addEventListener("message", (ev) => {
-	const data = ev.data;
-	switch (data.command) {
-		case "update":
-			updateView(data._changes);
-			break;
+	init() {
+		this.events.push(
+			window.addEventListener("message", (ev) => {
+				const message = ev.data;
+				switch (message.command) {
+					case "load":
+						this.loadContent(message._memos, message._state);
+						break;
+					case "update":
+						this.updateContent(message._changes);
+						break;
+				}
+			}),
+		);
 	}
-});
 
-function updateView(changes) {
-	changes = JSON.parse(changes);
-	console.log(changes);
-	explorerRoot.innerHTML = "";
-	for (const change of changes) explorerRoot.innerHTML += `<p>${change.content}</p>`;
+	getHtml() {}
+
+	loadContent(memos, explorerState) {}
+	updateContent(changes) {}
+	// getChild(key) {
+	// 	const child = new Set();
+	// 	for (const memo of this.memos) child.add(memo[key]);
+
+	// 	let childList = [...childList.values()].sort();
+	// 	switch (key) {
+	// 		case "file":
+	// 			childList.map((file) => file);
+	// 	}
+
+	// 	return;
+	// }
+
+	updateState() {
+		state = {};
+		vscode.postMessage({ command: "updateState", newState: state });
+	}
 }
-
-// function getChild(key) {
-// 	const child = new Set();
-// 	for (const memo of _memos) child.add(memo[key]);
-
-// 	let childList = [...childList.values()].sort();
-// 	switch (key) {
-// 		case "file":
-// 			childList.map((file) => file)
-// 	}
-
-// 	return ;
-// }
