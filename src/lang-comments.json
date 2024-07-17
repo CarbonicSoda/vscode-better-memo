@@ -1,0 +1,190 @@
+{
+	"bat": {
+		"open": "@REM "
+	},
+	"c": {
+		"open": "//"
+	},
+	"csharp": {
+		"open": "//"
+	},
+	"cpp": {
+		"open": "//"
+	},
+	"clojure": {
+		"open": ";;"
+	},
+	"snippets": {
+		"open": "//"
+	},
+	"coffeescript": {
+		"open": "#"
+	},
+	"dockercompose": {
+		"open": "#"
+	},
+	"css": {
+		"open": "/*",
+		"close": "*/"
+	},
+	"cuda-cpp": {
+		"open": "//"
+	},
+	"dart": {
+		"open": "//"
+	},
+	"diff": {
+		"open": "#"
+	},
+	"dockerfile": {
+		"open": "#"
+	},
+	"fsharp": {
+		"open": "//"
+	},
+	"git-commit": {
+		"open": "#"
+	},
+	"ignore": {
+		"open": "#"
+	},
+	"git-rebase": {
+		"open": "#"
+	},
+	"go": {
+		"open": "//"
+	},
+	"groovy": {
+		"open": "//"
+	},
+	"handlebars": {
+		"open": "{{!--",
+		"close": "--}}"
+	},
+	"hlsl": {
+		"open": "//"
+	},
+	"html": {
+		"open": "<!--",
+		"close": "-->"
+	},
+	"ini": {
+		"open": ";"
+	},
+	"java": {
+		"open": "//"
+	},
+	"javascript": {
+		"open": "//"
+	},
+	"javascriptreact": {
+		"open": "//"
+	},
+	"jsonl": {
+		"open": "//"
+	},
+	"jsonc": {
+		"open": "//"
+	},
+	"julia": {
+		"open": "#"
+	},
+	"latex": {
+		"open": "%"
+	},
+	"less": {
+		"open": "//"
+	},
+	"lua": {
+		"open": "--"
+	},
+	"makefile": {
+		"open": "#"
+	},
+	"markdown": {
+		"open": "<!--",
+		"close": "-->"
+	},
+	"objective-c": {
+		"open": "//"
+	},
+	"objective-cpp": {
+		"open": "//"
+	},
+	"perl": {
+		"open": "#"
+	},
+	"php": {
+		"open": "<!--",
+		"close": "-->"
+	},
+	"powershell": {
+		"open": "#"
+	},
+	"properties": {
+		"open": ";"
+	},
+	"jade": {
+		"open": "//-"
+	},
+	"python": {
+		"open": "#"
+	},
+	"r": {
+		"open": "#"
+	},
+	"raku": {
+		"open": "#"
+	},
+	"razor": {
+		"open": "<!--",
+		"close": "-->"
+	},
+	"restructuredtext": {
+		"open": ".. "
+	},
+	"ruby": {
+		"open": "#"
+	},
+	"rust": {
+		"open": "//"
+	},
+	"scss": {
+		"open": "//"
+	},
+	"shaderlab": {
+		"open": "//"
+	},
+	"shellscript": {
+		"open": "#"
+	},
+	"sql": {
+		"open": "--"
+	},
+	"swift": {
+		"open": "//"
+	},
+	"tex": {
+		"open": "%"
+	},
+	"typescript": {
+		"open": "//"
+	},
+	"typescriptreact": {
+		"open": "//"
+	},
+	"vb": {
+		"open": "'"
+	},
+	"xml": {
+		"open": "<!--",
+		"close": "-->"
+	},
+	"xsl": {
+		"open": "<!--",
+		"close": "-->"
+	},
+	"yaml": {
+		"open": "#"
+	}
+}
