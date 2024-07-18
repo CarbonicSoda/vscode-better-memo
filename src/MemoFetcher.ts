@@ -1,50 +1,49 @@
-import { window, workspace, Disposable, TextDocument } from "vscode";
+import { window, workspace, TextDocument } from "vscode";
 import * as EE from "./utils/EventEmitter";
+import Janitor from "./utils/Janitor";
 import ConfigMaid from "./utils/ConfigMaid";
+import IntervalMaid from "./utils/IntervalMaid";
 import LangComments from "./lang-comments.json";
 
 export default class MemoFetcher {
 	public tags: Set<string> = new Set();
 	public memos: Map<TextDocument, MemoEntry[]> = new Map();
 
-	private _watchedDocs: TextDocument[] = [];
 	private _memoChanges: Map<TextDocument, MemoEntry[]> = new Map();
-
-	private _intervals: NodeJS.Timeout[] = [];
-	private _disposables: (Disposable | EE.Disposable)[] = [];
-	private _docVersions: Map<TextDocument, number> = new Map();
+	private _watchedDocs: Map<TextDocument, { _version: number; _lang: string }> = new Map();
+	private _janitor = new Janitor();
+	private _intervalMaid = new IntervalMaid();
 
 	public async init() {
-		ConfigMaid.listen("watch", (watch) => `{${watch.join(",")}}`);
-		ConfigMaid.listen("ignore", (ignore) => `{${ignore.join(",")}}`);
-		ConfigMaid.listen("scanDelay");
+		ConfigMaid.listen({
+			watch: (watch) => `{${watch.join(",")}}`,
+			ignore: (ignore) => `{${ignore.join(",")}}`,
+			workspaceScanDelay: null,
+			scanDelay: null,
+		});
 
-		await this._fetchDocs();
-		this._disposables.push(
+		await this._fetchDocs(true);
+		this._janitor.add(
 			workspace.onDidCreateFiles(() => {
-				this._fetchDocs();
+				this._fetchDocs(true);
 			}),
-			workspace.onDidDeleteFiles((ev) => {
-				const deletedFsPaths = ev.files.map((uri) => uri.fsPath);
-				this._watchedDocs = this._watchedDocs.filter(
-					(doc) => !deletedFsPaths.includes(doc.fileName),
-				);
+			workspace.onDidDeleteFiles(() => {
+				this._fetchDocs(true);
 			}),
-		);
 
-		this._watchedDocs.forEach((doc) => this._scanDoc(doc));
-		this._disposables.push(
-			workspace.onDidSaveTextDocument((doc) => {
-				if (this._scanValid(doc, true)) this._scanDoc(doc, true);
+			workspace.onWillSaveTextDocument((ev) => {
+				const doc = ev.document;
+				if (doc.isDirty && this._validForScan(doc)) this._scanDoc(doc, true);
 			}),
 		);
-
-		this._intervals.push(
-			setInterval(() => {
-				const doc = window.activeTextEditor?.document;
-				if (this._scanValid(doc)) this._scanDoc(doc, true);
-			}, ConfigMaid.get("scanDelay")),
-		);
+		this._intervalMaid.add(() => {
+			const doc = window.activeTextEditor?.document;
+			if (!doc) return;
+			if (this._validForScan(doc)) this._scanDoc(doc, true);
+		}, "scanDelay");
+		this._intervalMaid.add(() => {
+			this._fetchDocs(true);
+		}, "workspaceScanDelay");
 
 		EE.EventEmitter.evoke("loadWebviewContent", this.getChanges());
 	}
@@ -57,26 +56,46 @@ export default class MemoFetcher {
 		return changes;
 	}
 	public dispose() {
-		for (const interval of this._intervals) clearInterval(interval);
-		for (const disposable of this._disposables) disposable.dispose();
+		this._janitor.clearAll();
+		this._intervalMaid.dispose();
 	}
 
-	private async _fetchDocs() {
-		this._watchedDocs = await Promise.all(
-			await workspace
-				.findFiles(ConfigMaid.get("watch"), ConfigMaid.get("ignore"))
-				.then((files) => files.map((file) => workspace.openTextDocument(file))),
-		).catch((reason) => {
-			throw new Error(`Better Memo $Error when fetching documents: ${reason}`);
-		});
+	private async _fetchDocs(refreshMemos?: boolean) {
+		const documents: TextDocument[] = (
+			await Promise.all(
+				await workspace
+					.findFiles(ConfigMaid.get("watch"), ConfigMaid.get("ignore"))
+					.then((files) =>
+						files.map((file) =>
+							workspace.openTextDocument(file).then(
+								(doc) => doc,
+								() => null,
+							),
+						),
+					),
+			).catch((err) => {
+				throw new Error(`Error when fetching documents: ${err}`);
+			})
+		).filter((doc) => Object.hasOwn(LangComments, doc?.languageId));
+		this._watchedDocs.clear();
+		for (const doc of documents)
+			this._watchedDocs.set(doc, { _version: doc.version, _lang: doc.languageId });
+
+		if (!refreshMemos) return;
+		for (const doc of this.memos.keys()) if (!this._watchedDocs.has(doc)) this.memos.delete(doc);
+		for (const doc of this._memoChanges.keys())
+			if (!this._watchedDocs.has(doc)) this._memoChanges.delete(doc);
+		for (const doc of this._watchedDocs.keys()) if (!this.memos.has(doc)) this._scanDoc(doc);
 	}
 	private _scanDoc(doc: TextDocument, updateWebview?: boolean) {
 		const content = doc.getText();
-		const commentData = LangComments[<keyof typeof LangComments>doc.languageId];
-		if (!commentData) return;
-		const commentClose = commentData[<keyof typeof commentData>"close"];
+		//@ts-ignore
+		const commentData = LangComments[doc.languageId];
 		const matchPattern = new RegExp(
-			`${commentData.open}\\s*mo\\s+(?<tag>\\S+)\\s+(?<content>.*)${commentClose ?? "$"}`,
+			`${commentData.open}\\s*mo\\s+(?<tag>\\S+)\\s+(?<content>.*)${
+				//@ts-ignore
+				commentData["close"] ?? "$"
+			}`,
 			"gim",
 		);
 
@@ -93,18 +112,18 @@ export default class MemoFetcher {
 				_rawLength: match[0].length,
 			});
 		}
-		if (memos.length === 0) return;
 		this.memos.set(doc, memos);
 		this._memoChanges.set(doc, memos);
+
 		if (updateWebview) EE.EventEmitter.evoke("updateWebviewContent", this.getChanges());
 	}
-	private _scanValid(doc: TextDocument | undefined, didSave?: boolean) {
-		const valid =
-			(didSave ? true : doc?.isDirty) &&
-			doc.version !== this._docVersions.get(doc) &&
-			this._watchedDocs.includes(doc);
-		if (valid) this._docVersions.set(doc, doc.version);
-		return valid;
+	private _validForScan(doc: TextDocument) {
+		const watched = this._watchedDocs.get(doc);
+		const versionChanged = doc.version !== watched._version;
+		const langChanged = doc.languageId !== watched._lang;
+		if (versionChanged) watched._version = doc.version;
+		if (langChanged) watched._lang = doc.languageId;
+		return watched && (versionChanged || langChanged);
 	}
 }
 

@@ -12,6 +12,9 @@ export function activate(context: vscode.ExtensionContext) {
 		console.log("changed:", changes);
 	});
 	_fetcher.init();
+	setInterval(() => {
+		console.log(_fetcher.memos);
+	}, 1000);
 
 	// const webviewViewProvider = new memoExplorerViewProvider(context.extensionUri, fetcher);
 	// context.subscriptions.push(

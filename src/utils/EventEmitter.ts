@@ -9,7 +9,7 @@ export const EventEmitter: {
 	 * @param args arguments to pass to callback functions
 	 */
 	evoke(event: string, ...args: any): void;
-	readonly _events: Map<string, callbackType[]>;
+	_events: Map<string, callbackType[]>;
 } = {
 	_events: new Map(),
 	subscribe(event, callback) {

@@ -59,6 +59,10 @@
 						"**/node_modules"
 					]
 				},
+				"better-memo.workspaceScanDelay": {
+					"type": "integer",
+					"default": 10000
+				},
 				"better-memo.scanDelay": {
 					"type": "integer",
 					"default": 1500
