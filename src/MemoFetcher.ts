@@ -42,7 +42,10 @@ export default class MemoFetcher {
 			this._fetchDocs(true);
 		}, "workspaceScanDelay");
 
-		EE.EventEmitter.evoke("loadWebviewContent", this.getChanges());
+		EE.EventEmitter.dispatch("loadWebviewContent", this.getChanges());
+	}
+	public getMemos() {
+		return [...this.memos.values()].flat();
 	}
 	public getChanges() {
 		const changes: { [fileName: string]: MemoEntry[] } = {};
@@ -112,7 +115,7 @@ export default class MemoFetcher {
 		this.memos.set(doc, memos);
 		this._memoChanges.set(doc, memos);
 
-		if (updateWebview) EE.EventEmitter.evoke("updateWebviewContent", this.getChanges());
+		if (updateWebview) EE.EventEmitter.dispatch("updateWebviewContent", this.getChanges());
 	}
 	private _validForScan(doc: TextDocument) {
 		const watched = this._watchedDocs.get(doc);

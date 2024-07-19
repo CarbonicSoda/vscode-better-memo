@@ -1,43 +1,38 @@
-class ExplorerMaid {
-	vscode = acquireVsCodeApi();
-	explorerRoot = document.querySelector("#explorer-root");
-	events = [];
-
-	init() {
-		this.events.push(
-			window.addEventListener("message", (ev) => {
-				const message = ev.data;
-				switch (message.command) {
-					case "load":
-						this.loadContent(message._memos, message._state);
-						break;
-					case "update":
-						this.updateContent(message._changes);
-						break;
-				}
-			}),
-		);
-	}
-
-	getHtml() {}
-
-	loadContent(memos, explorerState) {}
-	updateContent(changes) {}
-	// getChild(key) {
-	// 	const child = new Set();
-	// 	for (const memo of this.memos) child.add(memo[key]);
-
-	// 	let childList = [...childList.values()].sort();
-	// 	switch (key) {
-	// 		case "file":
-	// 			childList.map((file) => file);
-	// 	}
-
-	// 	return;
-	// }
-
-	updateState() {
-		state = {};
-		vscode.postMessage({ command: "updateState", newState: state });
+const vscode = acquireVsCodeApi();
+const fallbackExplorerDefaultState = {};
+let _explorerState = fallbackExplorerDefaultState;
+function main() {
+	addEventListener("message", handleMessage);
+}
+function handleMessage(ev) {
+	const message = ev.data;
+	switch (message.command) {
+		case "load":
+			_explorerState = vscode.getState() || (message._state ?? fallbackExplorerDefaultState);
+			loadContent(message._memos);
+			break;
+		case "update":
+			updateContent(message._changes);
+			break;
+		case "dispose":
+			dispose();
+			break;
 	}
 }
+
+const explorerRoot = document.querySelector("#explorer-root");
+let _explorerChild = {};
+function loadContent(memos) {
+	console.log(memos);
+}
+function updateContent(changes) {
+	console.log(changes);
+}
+function updateState() {
+	vscode.setState(_explorerState);
+}
+function dispose() {
+	removeEventListener("message", handleMessage);
+}
+
+main();
