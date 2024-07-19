@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import MemoFetcher from "./MemoFetcher";
+import { MemoFetcher } from "./MemoFetcher";
 import MemoViewProvider from "./MemoViewProvider";
 
 let _memoFetcher = new MemoFetcher();

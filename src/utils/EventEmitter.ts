@@ -3,7 +3,7 @@ export const EventEmitter: {
 	 * @param event event name to subscribe to
 	 * @param callback callback function evoked on event dispatch
 	 */
-	subscribe(event: string, callback: callbackType): Disposable;
+	subscribe(event: string, callback: (...args: any) => void): Disposable;
 	/**
 	 * @param event event name to dispatch
 	 * @param args arguments to pass to callback functions
@@ -12,10 +12,11 @@ export const EventEmitter: {
 	/**
 	 * @param event event name to wait for dispatch
 	 * @param callback optional callback function evoked on dispatch
+	 * @returns a promise that resolves to the returned value of callback
 	 */
-	wait(event: string, callback?: callbackType): Promise<void>;
+	wait(event: string, callback?: (...args: any) => any): Promise<any>;
 
-	_events: Map<string, callbackType[]>;
+	_events: Map<string, ((...args: any) => void)[]>;
 } = {
 	subscribe(event, callback) {
 		if (!this._events.has(event)) this._events.set(event, []);
@@ -28,8 +29,7 @@ export const EventEmitter: {
 	async wait(event, callback = () => {}) {
 		return new Promise((resolve) => {
 			const disposable = this.subscribe(event, (...args) => {
-				callback(...args);
-				resolve();
+				resolve(callback(...args));
 				disposable.dispose();
 			});
 		});
@@ -46,4 +46,3 @@ export class Disposable {
 		delete EventEmitter._events.get(this._event)[this._id];
 	}
 }
-type callbackType = (...args: any) => void;

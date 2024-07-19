@@ -5,12 +5,11 @@ import ConfigMaid from "./utils/ConfigMaid";
 import IntervalMaid from "./utils/IntervalMaid";
 import LangComments from "./lang-comments.json";
 
-export default class MemoFetcher {
+export class MemoFetcher {
 	public tags: Set<string> = new Set();
-	public memos: Map<TextDocument, MemoEntry[]> = new Map();
 
-	private _memoChanges: Map<TextDocument, MemoEntry[]> = new Map();
-	private _watchedDocs: Map<TextDocument, { _version: number; _lang: string }> = new Map();
+	private _watchedDocs: Map<TextDocument, { version: number; lang: string }> = new Map();
+	private _docMemos: Map<TextDocument, { memos: MemoEntry[]; changes: MemoEntry[] }> = new Map();
 	private _janitor = new Janitor();
 	private _intervalMaid = new IntervalMaid();
 
@@ -42,17 +41,16 @@ export default class MemoFetcher {
 			this._fetchDocs(true);
 		}, "workspaceScanDelay");
 
-		EE.EventEmitter.dispatch("loadWebviewContent", this.getChanges());
+		EE.EventEmitter.dispatch("loadWebviewContent", this.getMemos());
 	}
 	public getMemos() {
-		return [...this.memos.values()].flat();
+		const memos = [];
+		for (const info of this._docMemos.values()) memos.push(info.memos);
+		return memos.flat();
 	}
 	public getChanges() {
 		const changes: { [fileName: string]: MemoEntry[] } = {};
-		this._memoChanges.forEach((memos, doc) => {
-			changes[doc.fileName] = memos;
-		});
-		this._memoChanges.clear();
+		for (const [doc, info] of this._docMemos.entries()) changes[doc.fileName] = info.memos;
 		return changes;
 	}
 	public dispose() {
@@ -78,32 +76,27 @@ export default class MemoFetcher {
 			})
 		).filter((doc) => Object.hasOwn(LangComments, doc?.languageId));
 		this._watchedDocs.clear();
-		for (const doc of documents)
-			this._watchedDocs.set(doc, { _version: doc.version, _lang: doc.languageId });
-
+		for (const doc of documents) this._watchedDocs.set(doc, { version: doc.version, lang: doc.languageId });
 		if (!refreshMemos) return;
-		for (const doc of this.memos.keys()) if (!this._watchedDocs.has(doc)) this.memos.delete(doc);
-		for (const doc of this._memoChanges.keys())
-			if (!this._watchedDocs.has(doc)) this._memoChanges.delete(doc);
-		for (const doc of this._watchedDocs.keys()) if (!this.memos.has(doc)) this._scanDoc(doc);
+		for (const doc of this._docMemos.keys()) if (!this._watchedDocs.has(doc)) this._docMemos.delete(doc);
+		for (const doc of this._watchedDocs.keys()) if (!this._docMemos.has(doc)) this._scanDoc(doc);
 	}
 	private _scanDoc(doc: TextDocument, updateWebview?: boolean) {
 		const content = doc.getText();
 		//@ts-ignore
 		const commentData = LangComments[doc.languageId];
 		const matchPattern = new RegExp(
-			`${commentData.open}\\s*mo\\s+(?<tag>\\S+)\\s+(?<content>.*)${
+			`${commentData.open}\\s*mo\\s+(?<tag>\\S+)\\s+(?<content>.*?)${
 				//@ts-ignore
 				commentData["close"] ?? "$"
 			}`,
 			"gim",
 		);
-
-		let memos = [];
+		let _memos = [];
 		for (const match of content.matchAll(matchPattern)) {
 			const [tag, content] = [match.groups["tag"], match.groups["content"].trimEnd()];
 			this.tags.add(tag);
-			memos.push({
+			_memos.push({
 				content: content,
 				tag: tag,
 				file: doc,
@@ -112,22 +105,20 @@ export default class MemoFetcher {
 				_rawLength: match[0].length,
 			});
 		}
-		this.memos.set(doc, memos);
-		this._memoChanges.set(doc, memos);
-
+		this._docMemos.set(doc, { memos: _memos, changes: _memos });
 		if (updateWebview) EE.EventEmitter.dispatch("updateWebviewContent", this.getChanges());
 	}
 	private _validForScan(doc: TextDocument) {
 		const watched = this._watchedDocs.get(doc);
-		const versionChanged = doc.version !== watched._version;
-		const langChanged = doc.languageId !== watched._lang;
-		if (versionChanged) watched._version = doc.version;
-		if (langChanged) watched._lang = doc.languageId;
+		const versionChanged = doc.version !== watched.version;
+		const langChanged = doc.languageId !== watched.lang;
+		if (versionChanged) watched.version = doc.version;
+		if (langChanged) watched.lang = doc.languageId;
 		return watched && (versionChanged || langChanged);
 	}
 }
 
-type MemoEntry = {
+export type MemoEntry = {
 	readonly content: string;
 	readonly tag: string;
 	readonly file: TextDocument;

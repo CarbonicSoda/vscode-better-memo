@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import * as EE from "./utils/EventEmitter";
 import Janitor from "./utils/Janitor";
 import ConfigMaid from "./utils/ConfigMaid";
-import MemoFetcher from "./MemoFetcher";
+import { MemoFetcher, MemoEntry } from "./MemoFetcher";
 
 export default class MemoViewProvider implements vscode.WebviewViewProvider {
 	private _view?: vscode.WebviewView;
@@ -11,11 +11,11 @@ export default class MemoViewProvider implements vscode.WebviewViewProvider {
 
 	constructor(private readonly _extensionUri: vscode.Uri, private readonly _memoFetcher: MemoFetcher) {
 		this._janitor.add(
-			EE.EventEmitter.subscribe("loadWebviewContent", () => {
-				this._loadWebviewContent(true);
+			EE.EventEmitter.subscribe("loadWebviewContent", (memos) => {
+				this._loadWebviewContent(memos, true);
 			}),
-			EE.EventEmitter.subscribe("updateWebviewContent", () => {
-				this._updateWebviewContent();
+			EE.EventEmitter.subscribe("updateWebviewContent", (changes) => {
+				this._updateWebviewContent(changes);
 			}),
 		);
 	}
@@ -36,7 +36,7 @@ export default class MemoViewProvider implements vscode.WebviewViewProvider {
 
 		this._janitor.add(
 			view.onDidChangeVisibility(() => {
-				this._loadWebviewContent();
+				this._loadWebviewContent(this._memoFetcher.getMemos());
 			}),
 		);
 
@@ -66,19 +66,21 @@ export default class MemoViewProvider implements vscode.WebviewViewProvider {
 			</body>
 			</html>`;
 	}
-	private async _loadWebviewContent(preload?: boolean, defaultState?: ExplorerState) {
+	private async _loadWebviewContent(memos: MemoEntry[], preload?: boolean, defaultState?: ExplorerState) {
 		if (!(this._view?.visible || preload)) return;
 		if (preload) await EE.EventEmitter.wait("viewResolved");
 		this._webview.postMessage({
 			command: "load",
-			_memos: this._memoFetcher.getMemos(),
+			_memos: memos,
 			_state: defaultState,
 		});
 	}
-	private _updateWebviewContent() {
+	private _updateWebviewContent(changes: MemoEntry[]) {
 		if (!this._view?.visible) return;
-		this._webview.postMessage({ command: "update", _changes: this._memoFetcher.getChanges() });
+		this._webview.postMessage({ command: "update", _changes: changes });
 	}
 }
 
 type ExplorerState = {};
+
+//fix load and upd content

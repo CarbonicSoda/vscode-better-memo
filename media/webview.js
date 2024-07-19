@@ -8,13 +8,16 @@ function handleMessage(ev) {
 	const message = ev.data;
 	switch (message.command) {
 		case "load":
+			console.log("load ev rec");
 			_explorerState = vscode.getState() || (message._state ?? fallbackExplorerDefaultState);
 			loadContent(message._memos);
 			break;
 		case "update":
+			console.log("update ev rec");
 			updateContent(message._changes);
 			break;
 		case "dispose":
+			console.log("dispose ev rec");
 			dispose();
 			break;
 	}
