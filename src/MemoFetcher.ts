@@ -18,10 +18,7 @@ export default class MemoFetcher {
 		ConfigMaid.listen({
 			watch: (watch) => `{${watch.join(",")}}`,
 			ignore: (ignore) => `{${ignore.join(",")}}`,
-			workspaceScanDelay: null,
-			scanDelay: null,
 		});
-
 		await this._fetchDocs(true);
 		this._janitor.add(
 			workspace.onDidCreateFiles(() => {

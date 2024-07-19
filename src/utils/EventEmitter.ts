@@ -9,9 +9,9 @@ export const EventEmitter: {
 	 * @param args arguments to pass to callback functions
 	 */
 	evoke(event: string, ...args: any): void;
+
 	_events: Map<string, callbackType[]>;
 } = {
-	_events: new Map(),
 	subscribe(event, callback) {
 		if (!this._events.has(event)) this._events.set(event, []);
 		this._events.get(event).push(callback);
@@ -20,6 +20,8 @@ export const EventEmitter: {
 	evoke(event, ...args) {
 		for (const callback of this._events.get(event) ?? []) callback?.(...args);
 	},
+
+	_events: new Map(),
 };
 /**
  * A type which can be disposed to stop event listening

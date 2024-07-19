@@ -2,7 +2,8 @@ import Janitor from "./Janitor";
 import ConfigMaid from "./ConfigMaid";
 
 export default class IntervalMaid {
-	public add(callback: () => void, delayConfigName: string) {
+	public add(callback: () => void, delayConfigName: string, configCallback?: (retrieved: any) => any) {
+		ConfigMaid.listen(delayConfigName, configCallback);
 		const intervalId = this._intervalJanitor.add(setInterval(callback, ConfigMaid.get(delayConfigName)));
 		this._configChangeJanitor.add(
 			ConfigMaid.onChange(delayConfigName, () => {
