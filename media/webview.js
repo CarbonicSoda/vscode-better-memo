@@ -53,7 +53,6 @@ function loadViewContent() {
 			for (let i_l = 0; i_l < leaf.length; i_l++) {
 				const _leaf = leaf[i_l];
 				innerHtml += `<div id="c?${i_c}l?${i_l}" class="explorer-leaf">
-					<div class="leaf-tag">${_leaf.tag}</div>
 					<div class="leaf-content">${_leaf.content}</div>
 					<div class="leaf-line">Ln ${_leaf.line}</div>
 				</div>`;
