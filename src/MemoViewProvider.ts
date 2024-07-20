@@ -18,7 +18,7 @@ export default class MemoViewProvider implements vscode.WebviewViewProvider {
 				this._updateWebviewContent(changes, tags);
 			}),
 		);
-		EventEmitter.emitWait("eventSubscribed", "c__eventSubscribed");
+		EventEmitter.emitWait("eventSubscribed");
 	}
 
 	public resolveWebviewView(
@@ -41,7 +41,7 @@ export default class MemoViewProvider implements vscode.WebviewViewProvider {
 			}),
 		);
 		EventEmitter.wait("eventSubscribed", () => {
-			EventEmitter.emitWait("viewResolved", "c__viewResolved");
+			EventEmitter.emitWait("viewResolved");
 		});
 	}
 	public dispose() {
@@ -64,6 +64,7 @@ export default class MemoViewProvider implements vscode.WebviewViewProvider {
 				)}"></script>
 			</head>
 			<body>
+				<h1>Debug Anchor</h1>
 				<div id="explorer-root"></div>
 			</body>
 			</html>`;

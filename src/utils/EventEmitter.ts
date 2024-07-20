@@ -11,17 +11,17 @@ export const EventEmitter: {
 	emit(event: string, ...args: any): void;
 	/**
 	 * Almost identical as dispatch(), but wait()s binded afterwards
-	 * before stopCriterion is met will also resolve
+	 * before stopCriterion is met will also resolve.
+	 * If only event is provided, yields until default callback is returned
 	 * @param stopCriterion determines when to stop listening to new wait()s:
 	 * @param stopCriterion: number ~ timeout in ms
 	 * @param stopCriterion: string ~ EventEmitter event name
 	 * @param stopCriterion: callback ~ when invoked stop(), stops listening manually.
-	 * Use c__event for implicit callback
 	 * @returns a promise that resolves to the number of extra wait()s resolved before stop
 	 */
-	emitWait(event: string, stopCriterion: number, ...args: any): Promise<number>;
-	emitWait(event: string, stopCriterion: string, ...args: any): Promise<number>;
-	emitWait(event: string, stopCriterion: (stop: () => void) => void, ...args: any): Promise<number>;
+	emitWait(event: string, stopCriterion?: number, ...args: any): Promise<number>;
+	emitWait(event: string, stopCriterion?: string, ...args: any): Promise<number>;
+	emitWait(event: string, stopCriterion?: (stop: () => void) => void, ...args: any): Promise<number>;
 	/**
 	 * @param event event name to wait for dispatch
 	 * @param callback optional callback function evoked on dispatch
@@ -71,13 +71,19 @@ export const EventEmitter: {
 					setTimeout(stop, stopCriterion);
 					break;
 				case "string":
-					const disposable = this.subscribe(stopCriterion, () => {
+					const stopEvent = this.subscribe(stopCriterion, () => {
 						stop();
-						disposable.dispose();
+						stopEvent.dispose();
 					});
 					break;
 				case "function":
 					stopCriterion(stop);
+					break;
+				default:
+					const defaultStop = this.subscribe(`c__${event}`, () => {
+						stop();
+						defaultStop.dispose();
+					});
 					break;
 			}
 		});

@@ -12,22 +12,17 @@ function handleMessage(ev) {
 	const message = ev.data;
 	switch (message.command) {
 		case "load":
-			console.log("Webview load event triggered");
 			explorerState = vscode.getState() || (message._defaultState ?? fallbackExplorerDefaultState);
 			tags = message._tags;
-			console.log("$ ~ file: webview.js:18 ~ handleMessage ~ tags:", tags);
 			loadMemos(message._memos);
-			console.log("$ ~ file: webview.js:32 ~ handleMessage ~ message._memos:", message._memos);
 			loadViewContent();
 			break;
 		case "update":
-			console.log("Webview update event triggered");
 			tags = message._tags;
 			updateMemos(message._changes);
-			loadViewContent();
+			loadViewContent(); //more sophisticated updating that doesnt require reload later
 			break;
 		case "dispose":
-			console.log("Webview dispose event triggered");
 			dispose();
 			break;
 	}
@@ -43,8 +38,33 @@ function updateMemos(_changes) {
 	for (const [fileName, memos] of Object.entries(fileMemos)) if (memos.length === 0) delete fileMemos[fileName];
 }
 function loadViewContent() {
-	console.log(_getGroups());
+	const groups = _getGroups();
+	let innerHtml = "";
+	for (let i_p = 0; i_p < groups.parents.length; i_p++) {
+		const parent = groups.parents[i_p];
+		innerHtml += `<div id="r?p?${i_p}" class="explorer-parent">
+		<div class="parent-name">${parent}</div>`;
+		const child = groups.children[i_p];
+		for (let i_c = 0; i_c < child.length; i_c++) {
+			const _child = child[i_c];
+			innerHtml += `<div id="p?${i_p}c?${i_c}" class="explorer-child">
+			<div class="child-name">${_child}</div>`;
+			const leaf = groups.leaves[i_p][i_c];
+			for (let i_l = 0; i_l < leaf.length; i_l++) {
+				const _leaf = leaf[i_l];
+				innerHtml += `<div id="c?${i_c}l?${i_l}" class="explorer-leaf">
+					<div class="leaf-tag">${_leaf.tag}</div>
+					<div class="leaf-content">${_leaf.content}</div>
+					<div class="leaf-line">Ln ${_leaf.line}</div>
+				</div>`;
+			}
+			innerHtml += "</div>";
+		}
+		innerHtml += "</div>";
+	}
+	explorerRoot.innerHTML = innerHtml;
 }
+
 function _getMemos() {
 	return [...Object.values(fileMemos)].flat();
 }
@@ -66,7 +86,6 @@ function _getGroups() {
 			primaryGroup[parent],
 			explorerState.primaryGroup === "Files" ? "tag" : "path",
 		);
-		console.log("$ ~ file: webview.js:70 ~ _getGroups ~ subGroup:", subGroup);
 		const child = Object.keys(subGroup).toSorted();
 		children.push(child);
 		const leaf = [];
@@ -79,7 +98,6 @@ function _getGroups() {
 		leaves,
 	};
 }
-
 function updateState() {
 	vscode.setState(explorerState);
 }
