@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import * as EE from "./utils/EventEmitter";
+import { EventEmitter } from "./utils/EventEmitter";
 import Janitor from "./utils/Janitor";
 import ConfigMaid from "./utils/ConfigMaid";
 import { MemoFetcher, MemoEntry } from "./MemoFetcher";
@@ -11,14 +11,14 @@ export default class MemoViewProvider implements vscode.WebviewViewProvider {
 
 	constructor(private readonly _extensionUri: vscode.Uri, private readonly _memoFetcher: MemoFetcher) {
 		this._janitor.add(
-			EE.EventEmitter.subscribe("loadWebviewContent", (memos, tags) => {
+			EventEmitter.subscribe("loadWebviewContent", (memos, tags) => {
 				this._loadWebviewContent(memos, tags, true);
 			}),
-			EE.EventEmitter.subscribe("updateWebviewContent", (changes, tags) => {
+			EventEmitter.subscribe("updateWebviewContent", (changes, tags) => {
 				this._updateWebviewContent(changes, tags);
 			}),
 		);
-		EE.EventEmitter.dispatchWait("eventSubscribed", 5000);
+		EventEmitter.emitWait("eventSubscribed", "c__eventSubscribed");
 	}
 
 	public resolveWebviewView(
@@ -40,8 +40,8 @@ export default class MemoViewProvider implements vscode.WebviewViewProvider {
 				this._loadWebviewContent(this._memoFetcher.getMemos(), this._memoFetcher.getTags());
 			}),
 		);
-		EE.EventEmitter.wait("eventSubscribed").then(() => {
-			EE.EventEmitter.dispatchWait("viewResolved", 5000);
+		EventEmitter.wait("eventSubscribed", () => {
+			EventEmitter.emitWait("viewResolved", "c__viewResolved");
 		});
 	}
 	public dispose() {
@@ -75,7 +75,7 @@ export default class MemoViewProvider implements vscode.WebviewViewProvider {
 		defaultState?: ExplorerState,
 	) {
 		if (!(this._view?.visible || preload)) return;
-		if (preload) await EE.EventEmitter.wait("viewResolved");
+		if (preload) await EventEmitter.wait("viewResolved");
 		this._webview.postMessage({
 			command: "load",
 			_memos: memos,
