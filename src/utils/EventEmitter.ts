@@ -9,19 +9,19 @@ export const EventEmitter: {
 	 * @param args arguments to pass to callback functions
 	 */
 	dispatch(event: string, ...args: any): void;
-	/**
-	 * Almost identical as dispatch(), but wait()s binded afterwards within time ms will be resolved
-	 * @param time extra time to wait for wait() to be ran, in ms
-	 * @returns a promise that resolves to the number of extra wait()s resolved within time
-	 */
-	dispatchWait(event: string, time: number, ...args: any): Promise<number>;
+	// /**
+	//  * Almost identical as dispatch(), but wait()s binded afterwards within time ms will be resolved
+	//  * @param time extra time to wait for wait() to be ran, in ms
+	//  * @returns a promise that resolves to the number of extra wait()s resolved within time
+	//  */
+	dispatchWait(event: string, stopEvent: (stop: () => void) => void, ...args: any): Promise<number>;
 	/**
 	 * @param event event name to wait for dispatch
 	 * @param callback optional callback function evoked on dispatch
 	 * @param rejectAfter if provided, rejects the promise after given time in ms
 	 * @returns a promise that resolves to the returned value of callback
 	 */
-	wait(event: string, callback?: (...args: any) => any | null, rejectAfter?: number): Promise<any>;
+	wait<R>(event: string, callback?: (...args: any) => R, rejectAfter?: number): Promise<R>;
 
 	_events: Map<string, ((...args: any) => void)[]>;
 } = {
@@ -33,7 +33,7 @@ export const EventEmitter: {
 	dispatch(event, ...args) {
 		for (const callback of this._events.get(event) ?? []) callback?.(...args);
 	},
-	async dispatchWait(event, time, ...args) {
+	async dispatchWait(event, stopEvent, ...args) {
 		this.dispatch(event, ...args);
 		let catched = 0;
 		return new Promise((_resolve) => {
@@ -49,14 +49,14 @@ export const EventEmitter: {
 					catched++;
 				},
 			);
-			setTimeout(() => {
+			const stop = () => {
 				_disposable.dispose();
 				_resolve(catched);
-			}, time);
+			};
+			stopEvent(stop);
 		});
 	},
-	async wait(event, callback, rejectAfter) {
-		callback = callback ?? (() => {});
+	async wait(event, callback = () => undefined, rejectAfter) {
 		return new Promise((resolve, reject) => {
 			const disposable = this.subscribe(event, (...args) => {
 				resolve(callback(...args));
