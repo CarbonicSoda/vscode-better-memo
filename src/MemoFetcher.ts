@@ -1,5 +1,5 @@
 import { window, workspace, TextDocument } from "vscode";
-import * as EE from "./utils/EventEmitter";
+import { EventEmitter } from "./utils/EventEmitter";
 import Janitor from "./utils/Janitor";
 import ConfigMaid from "./utils/ConfigMaid";
 import IntervalMaid from "./utils/IntervalMaid";
@@ -41,7 +41,7 @@ export class MemoFetcher {
 			this._fetchDocs(true);
 		}, "workspaceScanDelay");
 
-		EE.EventEmitter.emit("loadWebviewContent", this.getMemos(), this.getTags());
+		EventEmitter.emit("loadWebviewContent", this.getMemos(), this.getTags());
 	}
 	public getMemos() {
 		const memos: { [fileName: string]: MemoEntry[] } = {};
@@ -112,7 +112,7 @@ export class MemoFetcher {
 			});
 		}
 		this._docMemos.set(doc, { memos: _memos, changes: _memos });
-		if (updateWebview) EE.EventEmitter.emit("updateWebviewContent", this.getChanges(), this.getTags());
+		if (updateWebview) EventEmitter.emit("updateWebviewContent", this.getChanges(), this.getTags());
 	}
 	private _validForScan(doc: TextDocument) {
 		const watched = this._watchedDocs.get(doc);

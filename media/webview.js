@@ -46,24 +46,32 @@ function loadViewContent() {
 	console.log(_getGroups());
 }
 function _getMemos() {
-	return [...Object.values(fileMemos)];
+	return [...Object.values(fileMemos)].flat();
 }
 function _getGroups() {
-	const primaryGroup = Object.groupBy(
-		_getMemos(),
-		explorerState.primaryGroup === "Files" ? ({ file }) => file : ({ tag }) => tag,
-	);
+	function objectGroupBy(iterableOfObjects, grouper) {
+		const groups = {};
+		for (const object of iterableOfObjects) {
+			if (!groups[object[grouper]]) groups[object[grouper]] = [];
+			groups[object[grouper]].push(object);
+		}
+		return groups;
+	}
+	const primaryGroup = objectGroupBy(_getMemos(), explorerState.primaryGroup === "Files" ? "path" : "tag");
 	const parents = Object.keys(primaryGroup).toSorted();
 	const children = [];
 	const leaves = [];
 	for (const parent of parents) {
-		const subGroup = Object.groupBy(
+		const subGroup = objectGroupBy(
 			primaryGroup[parent],
-			explorerState.primaryGroup === "Files" ? ({ tag }) => tag : ({ file }) => file,
+			explorerState.primaryGroup === "Files" ? "tag" : "path",
 		);
+		console.log("$ ~ file: webview.js:70 ~ _getGroups ~ subGroup:", subGroup);
 		const child = Object.keys(subGroup).toSorted();
 		children.push(child);
-		for (const leaf of child) leaves.push(leaf.toSorted((a, b) => a._offset - b._offset));
+		const leaf = [];
+		for (const _child of child) leaf.push(subGroup[_child].toSorted((a, b) => a._offset - b._offset));
+		leaves.push(leaf);
 	}
 	return {
 		parents,
