@@ -38,7 +38,7 @@ export default class Janitor {
 		this._managed[id] = DisposableOrTimeout;
 	}
 
-	private _managed: { [id: number]: (DisposableLike | NodeJS.Timeout)[] } = {};
+	private _managed: (DisposableLike | NodeJS.Timeout)[][] = [];
 	private _id = 0;
 }
 type DisposableLike = {

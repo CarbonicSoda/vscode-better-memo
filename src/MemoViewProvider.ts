@@ -11,16 +11,17 @@ export default class MemoViewProvider implements vscode.WebviewViewProvider {
 
 	constructor(private readonly _extensionUri: vscode.Uri, private readonly _memoFetcher: MemoFetcher) {
 		this._janitor.add(
-			EE.EventEmitter.subscribe("loadWebviewContent", (memos) => {
-				this._loadWebviewContent(memos, true);
+			EE.EventEmitter.subscribe("loadWebviewContent", (memos, tags) => {
+				this._loadWebviewContent(memos, tags, true);
 			}),
-			EE.EventEmitter.subscribe("updateWebviewContent", (changes) => {
-				this._updateWebviewContent(changes);
+			EE.EventEmitter.subscribe("updateWebviewContent", (changes, tags) => {
+				this._updateWebviewContent(changes, tags);
 			}),
 		);
+		EE.EventEmitter.dispatchWait("eventSubscribed", 5000);
 	}
 
-	public async resolveWebviewView(
+	public resolveWebviewView(
 		view: vscode.WebviewView,
 		context: vscode.WebviewViewResolveContext,
 		token: vscode.CancellationToken,
@@ -36,11 +37,12 @@ export default class MemoViewProvider implements vscode.WebviewViewProvider {
 
 		this._janitor.add(
 			view.onDidChangeVisibility(() => {
-				this._loadWebviewContent(this._memoFetcher.getMemos());
+				this._loadWebviewContent(this._memoFetcher.getMemos(), this._memoFetcher.getTags());
 			}),
 		);
-
-		EE.EventEmitter.dispatch("viewResolved");
+		EE.EventEmitter.wait("eventSubscribed").then(() => {
+			EE.EventEmitter.dispatchWait("viewResolved", 5000);
+		});
 	}
 	public dispose() {
 		this._webview?.postMessage({ command: "dispose" });
@@ -66,21 +68,29 @@ export default class MemoViewProvider implements vscode.WebviewViewProvider {
 			</body>
 			</html>`;
 	}
-	private async _loadWebviewContent(memos: MemoEntry[], preload?: boolean, defaultState?: ExplorerState) {
+	private async _loadWebviewContent(
+		memos: { [fileName: string]: MemoEntry[] },
+		tags: string[],
+		preload?: boolean,
+		defaultState?: ExplorerState,
+	) {
 		if (!(this._view?.visible || preload)) return;
 		if (preload) await EE.EventEmitter.wait("viewResolved");
 		this._webview.postMessage({
 			command: "load",
 			_memos: memos,
-			_state: defaultState,
+			_tags: tags,
+			_defaultState: defaultState,
 		});
 	}
-	private _updateWebviewContent(changes: MemoEntry[]) {
+	private _updateWebviewContent(changes: { [fileName: string]: MemoEntry[] }, tags: string[]) {
 		if (!this._view?.visible) return;
 		this._webview.postMessage({ command: "update", _changes: changes });
 	}
 }
 
-type ExplorerState = {};
+type ExplorerState = {
+	primaryGroup: "Files" | "Tags";
+};
 
 //fix load and upd content
