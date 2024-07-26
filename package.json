@@ -18,7 +18,12 @@
 	],
 	"main": "./out/extension.js",
 	"contributes": {
-		"commands": [],
+		"commands": [
+			{
+				"command": "better-memo.navigateToMemo",
+				"title": "Better Memo: Navigate To Memo"
+			}
+		],
 		"keybindings": [],
 		"viewsContainers": {
 			"activitybar": [
@@ -32,16 +37,33 @@
 		"views": {
 			"memoExplorer": [
 				{
-					"type": "webview",
 					"id": "better-memo.memoExplorer",
-					"name": "Memo Explorer"
+					"name": "Memo Explorer",
+					"contextualTitle": "Memo Explorer"
 				}
 			]
 		},
+		"viewsWelcome": [
+			{
+				"view": "better-memo.memoExplorer",
+				"contents": "Memos are loading.\nIf this is taking too long, consider changing fetcher configurations.",
+				"when": "better-memo.hasFiles && !better-memo.initFinished"
+			},
+			{
+				"view": "better-memo.memoExplorer",
+				"contents": "You have not yet opened any folders.\n[Open Folder](command:workbench.action.files.openFolder)",
+				"when": "better-memo.initFinished && !better-memo.hasFiles"
+			},
+			{
+				"view": "better-memo.memoExplorer",
+				"contents": "Oops, cannot spot any memos throughout the universe!\nConsider spicing up the place with some memos!",
+				"when": "better-memo.hasFiles && !better-memo.hasMemos"
+			}
+		],
 		"configuration": {
 			"title": "Better Memo",
 			"properties": {
-				"better-memo.watch": {
+				"better-memo.fetcher.watch": {
 					"type": "array",
 					"items": {
 						"type": "string"
@@ -50,7 +72,7 @@
 						"**/*"
 					]
 				},
-				"better-memo.ignore": {
+				"better-memo.fetcher.ignore": {
 					"type": "array",
 					"items": {
 						"type": "string"
@@ -59,13 +81,29 @@
 						"**/node_modules"
 					]
 				},
-				"better-memo.workspaceScanDelay": {
+				"better-memo.fetcher.workspaceScanDelay": {
 					"type": "integer",
 					"default": 10000
 				},
-				"better-memo.scanDelay": {
+				"better-memo.fetcher.scanDelay": {
 					"type": "integer",
 					"default": 1500
+				},
+				"better-memo.view.primaryGroup": {
+					"type": "string",
+					"enum": [
+						"File",
+						"Tag"
+					],
+					"default": "File"
+				},
+				"better-memo.view.expandPrimaryGroupByDefault": {
+					"type": "boolean",
+					"default": true
+				},
+				"better-memo.view.expandSecondaryGroupByDefault": {
+					"type": "boolean",
+					"default": false
 				}
 			}
 		}

@@ -1,17 +1,21 @@
 import * as vscode from "vscode";
-import { MemoFetcher } from "./MemoFetcher";
-import MemoViewProvider from "./MemoViewProvider";
-import { EventEmitter } from "./utils/EventEmitter";
+import { MemoEntry, MemoFetcher } from "./memoFetcher";
+import ExplorerViewProvider from "./explorerViewProvider";
 
-let _memoFetcher = new MemoFetcher();
+let _memoFetcher: MemoFetcher;
+let _explorerViewProvider: ExplorerViewProvider;
 export function activate(context: vscode.ExtensionContext) {
-	const webviewViewProvider = new MemoViewProvider(context.extensionUri, _memoFetcher);
+	_memoFetcher = new MemoFetcher();
 	_memoFetcher.init();
-	context.subscriptions.push(
-		vscode.window.registerWebviewViewProvider("better-memo.memoExplorer", webviewViewProvider),
-	);
+	_explorerViewProvider = new ExplorerViewProvider(_memoFetcher);
+	vscode.window.createTreeView("better-memo.memoExplorer", {
+		treeDataProvider: _explorerViewProvider,
+		showCollapseAll: true,
+	});
+	vscode.commands.executeCommand("setContext", "better-memo.initFinished", true);
 }
 
 export function deactivate() {
 	_memoFetcher?.dispose();
+	_explorerViewProvider?.dispose();
 }

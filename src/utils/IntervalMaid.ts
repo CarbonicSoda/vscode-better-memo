@@ -6,12 +6,12 @@ export default class IntervalMaid {
 		ConfigMaid.listen(delayConfigName, configCallback);
 		const intervalId = this._intervalJanitor.add(setInterval(callback, ConfigMaid.get(delayConfigName)));
 		this._configChangeJanitor.add(
-			ConfigMaid.onChange(delayConfigName, () => {
+			ConfigMaid.onChange(delayConfigName, () =>
 				this._intervalJanitor.override(
 					intervalId,
 					setInterval(callback, ConfigMaid.get(delayConfigName)),
-				);
-			}),
+				),
+			),
 		);
 		return intervalId;
 	}
