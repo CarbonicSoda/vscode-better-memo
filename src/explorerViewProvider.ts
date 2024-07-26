@@ -24,7 +24,13 @@ export default class ExplorerViewProvider implements vscode.TreeDataProvider<Tre
 				vscode.commands.registerCommand("better-memo.navigateToMemo", (memo: MemoEntry) => {
 					vscode.workspace.openTextDocument(memo.path).then((doc) => {
 						vscode.window.showTextDocument(doc).then((editor) => {
-							const pos = doc.positionAt(memo.offset + memo.rawLength);
+							let pos = doc.positionAt(memo.offset + memo.rawLength);
+							if (pos.line === memo.line) {
+								pos = pos.translate(
+									-1,
+									doc.lineAt(pos.line - 1).text.length,
+								);
+							}
 							editor.selection = new vscode.Selection(pos, pos);
 							editor.revealRange(new vscode.Range(pos, pos));
 						});
@@ -68,20 +74,30 @@ export default class ExplorerViewProvider implements vscode.TreeDataProvider<Tre
 			const childItems = c_labels.map((l) =>
 				fileIsPrimary ? new Tag(l, expandSecondaryGroup) : new File(l, expandSecondaryGroup),
 			);
-			items[i].children = childItems;
-			items[i].description = `- ${childItems.length} ${fileIsPrimary ? "Tag" : "File"}${
-				childItems.length === 1 ? "" : "s"
-			}`;
+			const parentItem = items[i];
+			parentItem.children = childItems;
 
-			for (let j = 0; j < items[i].children.length; j++) {
+			let childMemoCount = 0;
+			for (let j = 0; j < parentItem.children.length; j++) {
 				const memos = subGroup[c_labels[j]].sort((a, b) => a._offset - b._offset);
 				const memoItems = memos.map((m) => new Memo(<MemoEntry>m));
+				const childItem = parentItem.children[j];
 				// @ts-ignore
-				items[i].children[j].children = memoItems;
-				items[i].children[j].description = `- ${memoItems.length} Memo${
-					memoItems.length === 1 ? "" : "s"
-				}`;
+				childItem.children = memoItems;
+				childMemoCount += memoItems.length;
+
+				childItem.description = `${memoItems.length} Memo${multiplicity(memoItems)}`;
+				childItem.tooltip = `${fileIsPrimary ? "Tag" : "File"}: ${childItem.label} - ${
+					memoItems.length
+				}M`;
 			}
+
+			parentItem.description = `${childItems.length} ${fileIsPrimary ? "Tag" : "File"}${multiplicity(
+				childItems,
+			)} > ${childMemoCount} Memo${multiplicity(childMemoCount)}`;
+			parentItem.tooltip = `${fileIsPrimary ? "File" : "Tag"}: ${parentItem.label} - ${
+				childItems.length
+			}C${childMemoCount}M`;
 		}
 		return items;
 	}
@@ -97,24 +113,14 @@ class ParentItem extends vscode.TreeItem {
 		);
 	}
 }
-class File extends ParentItem {
-	constructor(label: string, expand: boolean) {
-		super(label, expand);
-		this.tooltip = `File - ${label}`;
-	}
-}
-class Tag extends ParentItem {
-	constructor(label: string, expand: boolean) {
-		super(label, expand);
-		this.tooltip = `Tag - ${label}`;
-	}
-}
+class File extends ParentItem {}
+class Tag extends ParentItem {}
 class Memo extends vscode.TreeItem {
 	constructor(public memoEntry: MemoEntry) {
 		const content = memoEntry.content === "" ? "Placeholder T^T" : memoEntry.content;
 		super(content, vscode.TreeItemCollapsibleState.None);
 		this.description = `Ln ${memoEntry.line}`;
-		this.tooltip = `${memoEntry.relativePath} Ln ${memoEntry.line} > ${memoEntry.tag} > ${content}`;
+		this.tooltip = `${memoEntry.tag} ~ ${memoEntry.relativePath} - Ln ${memoEntry.line}\n${content}`;
 		this.command = {
 			command: "better-memo.navigateToMemo",
 			title: "Better Memo: Navigate To Memo",
@@ -132,3 +138,5 @@ function ObjectGroupBy(arrayOrIterable: { [key: string]: any }[], grouper: strin
 	}
 	return groups;
 }
+//@ts-ignore
+const multiplicity = (countable: number | any[]) => ((countable.length ?? countable) === 1 ? "" : "s");
