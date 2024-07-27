@@ -49,7 +49,6 @@ export default class ExplorerViewProvider implements vscode.TreeDataProvider<Tre
 	}
 	public refresh() {
 		this._items = this._getItems();
-		vscode.commands.executeCommand("setContext", "better-memo.hasMemos", this._items.length !== 0);
 		this._onDidChangeTreeData.fire();
 	}
 	public dispose() {

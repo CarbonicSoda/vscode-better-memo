@@ -47,17 +47,17 @@
 			{
 				"view": "better-memo.memoExplorer",
 				"contents": "Memos are loading.\nIf this is taking too long, consider changing fetcher configurations.",
-				"when": "better-memo.hasFiles && !better-memo.initFinished"
+				"when": "!better-memo.initFinished"
 			},
 			{
 				"view": "better-memo.memoExplorer",
 				"contents": "You have not yet opened any folders.\n[Open Folder](command:workbench.action.files.openFolder)",
-				"when": "better-memo.initFinished && !better-memo.hasFiles"
+				"when": "better-memo.noFiles"
 			},
 			{
 				"view": "better-memo.memoExplorer",
 				"contents": "Oops, cannot spot any memos throughout the universe!\nConsider spicing up the place with some memos!",
-				"when": "better-memo.hasFiles && !better-memo.hasMemos"
+				"when": "!better-memo.noFiles && better-memo.noMemos"
 			}
 		],
 		"configuration": {

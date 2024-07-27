@@ -1,4 +1,4 @@
-import { commands, window, workspace, TextDocument } from "vscode";
+import { commands, window, workspace, TextDocument, WorkspaceEdit, Range } from "vscode";
 import { EventEmitter } from "./utils/EventEmitter";
 import Janitor from "./utils/Janitor";
 import ConfigMaid from "./utils/ConfigMaid";
@@ -11,6 +11,7 @@ export class MemoFetcher {
 	private _tags: Set<string> = new Set();
 	private _janitor = new Janitor();
 	private _intervalMaid = new IntervalMaid();
+	private _prevDoc?: TextDocument;
 
 	public async init() {
 		ConfigMaid.listen({
@@ -24,12 +25,24 @@ export class MemoFetcher {
 			workspace.onDidDeleteFiles(() => this._fetchDocs(true)),
 
 			workspace.onDidSaveTextDocument((doc) => {
-				if (this._validForScan(doc)) this._scanDoc(doc, true);
+				if (this._validForScan(doc)) {
+					this._scanDoc(doc, true);
+					this._formatMemos(doc);
+				}
 			}),
+			window.onDidChangeVisibleTextEditors((editors) => {
+				if (editors.length !== 0 || !this._prevDoc) return;
+				if (this._validForScan(this._prevDoc)) {
+					this._scanDoc(this._prevDoc, true);
+					this._formatMemos(this._prevDoc);
+				}
+			}),
+			window.onDidChangeActiveTextEditor((editor) => this._formatMemos(editor.document)),
 		);
 		this._intervalMaid.add(() => {
 			const doc = window.activeTextEditor?.document;
 			if (!doc) return;
+			this._prevDoc = doc;
 			if (this._validForScan(doc)) this._scanDoc(doc, true);
 		}, "fetcher.scanDelay");
 		this._intervalMaid.add(() => this._fetchDocs(true), "fetcher.workspaceScanDelay");
@@ -37,7 +50,9 @@ export class MemoFetcher {
 		EventEmitter.emitWait("fetcherInit");
 	}
 	public getMemos() {
-		return Array.from(this._docMemos.values()).flat();
+		const memos = Array.from(this._docMemos.values()).flat();
+		commands.executeCommand("setContext", "better-memo.noMemos", memos.length === 0);
+		return memos;
 	}
 	public getTags() {
 		return Array.from(this._tags.values());
@@ -64,7 +79,7 @@ export class MemoFetcher {
 				throw new Error(`Error when fetching documents: ${err}`);
 			})
 		).filter((doc) => Object.hasOwn(LangComments, doc?.languageId));
-		commands.executeCommand("setContext", "better-memo.hasFiles", documents.length !== 0);
+		commands.executeCommand("setContext", "better-memo.noFiles", documents.length === 0);
 		this._watchedDocs.clear();
 		for (const doc of documents) this._watchedDocs.set(doc, { version: doc.version, lang: doc.languageId });
 		if (!refreshMemos) return;
@@ -72,19 +87,19 @@ export class MemoFetcher {
 		for (const doc of this._watchedDocs.keys()) if (!this._docMemos.has(doc)) this._scanDoc(doc);
 	}
 	private _scanDoc(doc: TextDocument, updateView?: boolean) {
+		const rawString = (str?: string) => str?.replaceAll("", "\\").slice(0, -1);
 		const content = doc.getText();
-		//@ts-ignore
-		const commentData = LangComments[doc.languageId];
+		const commentData = LangComments[<keyof typeof LangComments>doc.languageId];
 		const matchPattern = new RegExp(
-			`${commentData.open}\\s*mo\\s+(?<tag>\\S+)\\s+(?<content>.*?)${
+			`${rawString(commentData.open)}[ \t]*mo[ \t]+(?<tag>\\S+)[ \t]*(?<content>.*)${
 				//@ts-ignore
-				commentData["close"] ?? "$"
+				rawString(commentData.close) ?? ""
 			}`,
 			"gim",
 		);
 		let _memos = [];
 		for (const match of content.matchAll(matchPattern)) {
-			const [tag, content] = [match.groups["tag"], match.groups["content"].trimEnd()];
+			const [tag, content] = [match.groups["tag"].toUpperCase(), match.groups["content"].trimEnd()];
 			this._tags.add(tag);
 			_memos.push({
 				content: content,
@@ -99,7 +114,27 @@ export class MemoFetcher {
 		this._docMemos.set(doc, _memos);
 		if (updateView) EventEmitter.emit("updateView");
 	}
-	private _validForScan(doc: TextDocument) {
+	private _formatMemos(doc: TextDocument) {
+		const memos = this._docMemos.get(doc);
+		if (!memos) return;
+		const edit = new WorkspaceEdit();
+		for (const memo of memos) {
+			const commentData = LangComments[<keyof typeof LangComments>doc.languageId];
+			//@ts-ignore
+			const padding = commentData.close ? " " : "";
+			const newMemo = `${commentData.open}${padding}MO ${memo.tag}${memo.content ? " " : ""}${
+				memo.content
+			}${padding}${
+				//@ts-ignore
+				commentData.close ?? ""
+			}`;
+			const editStart = doc.positionAt(memo.offset);
+			const editEnd = editStart.translate(0, memo.rawLength);
+			edit.replace(doc.uri, new Range(editStart, editEnd), newMemo);
+		}
+		workspace.applyEdit(edit);
+	}
+	private _validForScan(doc?: TextDocument) {
 		const watched = this._watchedDocs.get(doc);
 		if (!watched) return false;
 		const versionChanged = doc.version !== watched.version;

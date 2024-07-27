@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { MemoEntry, MemoFetcher } from "./memoFetcher";
+import { MemoFetcher } from "./memoFetcher";
 import ExplorerViewProvider from "./explorerViewProvider";
 
 let _memoFetcher: MemoFetcher;
