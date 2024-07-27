@@ -3,14 +3,14 @@ export default class Janitor {
 	 * @param DisposableOrTimeout instances to manage
 	 * @returns unique id for Janitor.clear()
 	 */
-	public add(...DisposableOrTimeout: (DisposableLike | NodeJS.Timeout)[]) {
+	add(...DisposableOrTimeout: (DisposableLike | NodeJS.Timeout)[]) {
 		this._managed[this._id] = DisposableOrTimeout;
 		return this._id++;
 	}
 	/**
 	 * @param id unique id of managed instances for clearing
 	 */
-	public clear(id: number) {
+	clear(id: number) {
 		for (const instance of this._managed[id] ?? []) {
 			// @ts-ignore
 			instance.dispose?.();
@@ -24,7 +24,7 @@ export default class Janitor {
 	/**
 	 * clears all managed instances
 	 */
-	public clearAll() {
+	clearAll() {
 		for (const id of Object.keys(this._managed)) this.clear(Number(id));
 	}
 	/**
@@ -32,7 +32,7 @@ export default class Janitor {
 	 * @param id unique id of managed instance to override
 	 * @param DisposableOrTimeout instances to manage instead
 	 */
-	public override(id: number, ...DisposableOrTimeout: (DisposableLike | NodeJS.Timeout)[]) {
+	override(id: number, ...DisposableOrTimeout: (DisposableLike | NodeJS.Timeout)[]) {
 		if (!Object.hasOwn(this._managed, id)) throw new Error(`No managed instance to override with id ${id}`);
 		this.clear(id);
 		this._managed[id] = DisposableOrTimeout;

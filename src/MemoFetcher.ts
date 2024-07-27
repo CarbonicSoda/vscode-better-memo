@@ -13,7 +13,7 @@ export class MemoFetcher {
 	private _intervalMaid = new IntervalMaid();
 	private _prevDoc?: TextDocument;
 
-	public async init() {
+	async init() {
 		ConfigMaid.listen({
 			"fetcher.watch": (watch) => `{${watch.join(",")}}`,
 			"fetcher.ignore": (ignore) => `{${ignore.join(",")}}`,
@@ -49,15 +49,15 @@ export class MemoFetcher {
 
 		EventEmitter.emitWait("fetcherInit");
 	}
-	public getMemos() {
+	getMemos() {
 		const memos = Array.from(this._docMemos.values()).flat();
 		commands.executeCommand("setContext", "better-memo.noMemos", memos.length === 0);
 		return memos;
 	}
-	public getTags() {
+	getTags() {
 		return Array.from(this._tags.values());
 	}
-	public dispose() {
+	dispose() {
 		this._janitor.clearAll();
 		this._intervalMaid.dispose();
 	}

@@ -2,7 +2,7 @@ import Janitor from "./Janitor";
 import ConfigMaid from "./ConfigMaid";
 
 export default class IntervalMaid {
-	public add(callback: () => void, delayConfigName: string, configCallback?: (retrieved: any) => any) {
+	add(callback: () => void, delayConfigName: string, configCallback?: (retrieved: any) => any) {
 		ConfigMaid.listen(delayConfigName, configCallback);
 		const intervalId = this._intervalJanitor.add(setInterval(callback, ConfigMaid.get(delayConfigName)));
 		this._configChangeJanitor.add(
@@ -15,13 +15,13 @@ export default class IntervalMaid {
 		);
 		return intervalId;
 	}
-	public clear(intervalId: number) {
+	clear(intervalId: number) {
 		this._intervalJanitor.clear(intervalId);
 	}
-	public clearAll() {
+	clearAll() {
 		this._intervalJanitor.clearAll();
 	}
-	public dispose() {
+	dispose() {
 		this.clearAll();
 		this._configChangeJanitor.clearAll();
 	}

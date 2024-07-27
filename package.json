@@ -22,6 +22,12 @@
 			{
 				"command": "better-memo.navigateToMemo",
 				"title": "Better Memo: Navigate To Memo"
+			},
+			{
+				"command": "better-memo.explorerExpandAll",
+				"title": "Expand All Folders",
+				"enablement": "view.better-memo.memoExplorer.visible && better-memo.explorerInitFinished && !better-memo.noFiles",
+				"icon": "$(expand-all)"
 			}
 		],
 		"keybindings": [],
@@ -38,8 +44,16 @@
 			"memoExplorer": [
 				{
 					"id": "better-memo.memoExplorer",
-					"name": "Memo Explorer",
-					"contextualTitle": "Memo Explorer"
+					"name": "Memo Explorer"
+				}
+			]
+		},
+		"menus": {
+			"view/title": [
+				{
+					"command": "better-memo.explorerExpandAll",
+					"when": "view.better-memo.memoExplorer.visible && better-memo.explorerInitFinished && !better-memo.noFiles && !better-memo.noMemos",
+					"group": "navigation"
 				}
 			]
 		},
@@ -47,7 +61,7 @@
 			{
 				"view": "better-memo.memoExplorer",
 				"contents": "Memos are loading.\nIf this is taking too long, consider changing fetcher configurations.",
-				"when": "!better-memo.initFinished"
+				"when": "!better-memo.explorerInitFinished"
 			},
 			{
 				"view": "better-memo.memoExplorer",
