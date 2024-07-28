@@ -25,9 +25,19 @@
 			},
 			{
 				"command": "better-memo.explorerExpandAll",
-				"title": "Expand All Folders",
-				"enablement": "view.better-memo.memoExplorer.visible && better-memo.explorerInitFinished && !better-memo.noFiles",
+				"title": "Expand All",
+				"enablement": "treeView.better-memo.memoExplorer.toggleCollapseAll",
 				"icon": "$(expand-all)"
+			},
+			{
+				"command": "better-memo.completeMemo",
+				"title": "Mark Memo as Complete",
+				"icon": "$(check)"
+			},
+			{
+				"command": "better-memo.completeMemos",
+				"title": "Mark All Memos as Complete",
+				"icon": "$(check-all)"
 			}
 		],
 		"keybindings": [],
@@ -36,7 +46,7 @@
 				{
 					"id": "memoExplorer",
 					"title": "Memo Explorer",
-					"icon": ""
+					"icon": "$(output)"
 				}
 			]
 		},
@@ -52,8 +62,20 @@
 			"view/title": [
 				{
 					"command": "better-memo.explorerExpandAll",
-					"when": "view.better-memo.memoExplorer.visible && better-memo.explorerInitFinished && !better-memo.noFiles && !better-memo.noMemos",
-					"group": "navigation"
+					"when": "view.better-memo.memoExplorer.visible",
+					"group": "navigation@1"
+				}
+			],
+			"view/item/context": [
+				{
+					"command": "better-memo.completeMemo",
+					"when": "view.better-memo.memoExplorer.visible && viewItem == memo",
+					"group": "inline@1"
+				},
+				{
+					"command": "better-memo.completeMemos",
+					"when": "view.better-memo.memoExplorer.visible && (viewItem == parent || viewItem == child)",
+					"group": "inline@1"
 				}
 			]
 		},
@@ -117,7 +139,7 @@
 				},
 				"better-memo.view.expandSecondaryGroupByDefault": {
 					"type": "boolean",
-					"default": false
+					"default": true
 				}
 			}
 		}

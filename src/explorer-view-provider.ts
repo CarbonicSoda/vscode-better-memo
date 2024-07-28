@@ -26,16 +26,7 @@ export class ExplorerTreeView {
 			),
 			eventEmitter.subscribe("updateItemCollapsibleState", () => this.updateItemCollapsibleState()),
 
-			vscode.commands.registerCommand("better-memo.navigateToMemo", (memo: MemoEntry) => {
-				vscode.workspace.openTextDocument(memo.path).then((doc) => {
-					vscode.window.showTextDocument(doc).then((editor) => {
-						let pos = doc.positionAt(memo.offset + memo.rawLength);
-						if (pos.line === memo.line) pos = pos.translate(-1, doc.lineAt(pos.line - 1).text.length);
-						editor.selection = new vscode.Selection(pos, pos);
-						editor.revealRange(new vscode.Range(pos, pos));
-					});
-				});
-			}),
+			vscode.commands.registerCommand("better-memo.navigateToMemo", (memo) => this.navigateToMemo(memo)),
 			vscode.commands.registerCommand("better-memo.explorerExpandAll", () => {
 				for (const item of this.viewProvider.items) this.view.reveal(item, { select: false, expand: 2 });
 			}),
@@ -46,6 +37,16 @@ export class ExplorerTreeView {
 		this.janitor.clearAll();
 	}
 
+	private navigateToMemo(memo: MemoEntry) {
+		vscode.workspace.openTextDocument(memo.path).then((doc) => {
+			vscode.window.showTextDocument(doc).then((editor) => {
+				let pos = doc.positionAt(memo.offset + memo.rawLength);
+				if (pos.line === memo.line) pos = pos.translate(-1, doc.lineAt(pos.line - 1).text.length);
+				editor.selection = new vscode.Selection(pos, pos);
+				editor.revealRange(new vscode.Range(pos, pos));
+			});
+		});
+	}
 	private updateItemCollapsibleState() {
 		this.view.reveal(this.viewProvider.items[0], { select: false, focus: true }).then(() => {
 			Promise.resolve(vscode.commands.executeCommand("list.collapseAll")).finally(async () => {
@@ -152,6 +153,7 @@ class ParentItem extends vscode.TreeItem {
 	children: TreeItem[] = [];
 	constructor(label: string, expand: boolean, public parent?: ParentItem) {
 		super(label, expand ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed);
+		this.contextValue = parent ? "child" : "parent";
 	}
 }
 class File extends ParentItem {}
@@ -162,6 +164,7 @@ class Memo extends vscode.TreeItem {
 		super(content, vscode.TreeItemCollapsibleState.None);
 		this.description = `Ln ${memoEntry.line}`;
 		this.tooltip = `${memoEntry.tag} ~ ${memoEntry.relativePath} - Ln ${memoEntry.line}\n${content}`;
+		this.contextValue = "memo";
 		this.command = {
 			command: "better-memo.navigateToMemo",
 			title: "Better Memo: Navigate To Memo",
