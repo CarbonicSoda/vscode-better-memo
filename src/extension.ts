@@ -1,10 +1,9 @@
-import * as vscode from "vscode";
-import { MemoFetcher } from "./memo-fetcher";
 import { ExplorerTreeView } from "./explorer-view-provider";
+import { MemoFetcher } from "./memo-fetcher";
 
 let memoFetcher: MemoFetcher;
 let explorerTreeView: ExplorerTreeView;
-export function activate(context: vscode.ExtensionContext) {
+export function activate() {
 	memoFetcher = new MemoFetcher();
 	memoFetcher.init();
 	explorerTreeView = new ExplorerTreeView();

@@ -1,45 +1,46 @@
-import { commands, window, workspace, TextDocument, WorkspaceEdit, Range } from "vscode";
+import { commands, Range, TabGroup, TextDocument, window, workspace, WorkspaceEdit } from "vscode";
 import { EE } from "./utils/event-emitter";
-import { Janitor } from "./utils/janitor";
-import { IntervalMaid } from "./utils/interval-maid";
 import { getConfigMaid } from "./utils/config-maid";
+import { IntervalMaid } from "./utils/interval-maid";
+import { Janitor } from "./utils/janitor";
 import LangComments from "./lang-comments.json";
 
-const EventEmitter = EE.getEventEmitter();
-const ConfigMaid = getConfigMaid();
+const eventEmitter = EE.getEventEmitter();
+const configMaid = getConfigMaid();
 export class MemoFetcher {
 	private watchedDocs: Map<TextDocument, { version: number; lang: string }> = new Map();
 	private docMemos: Map<TextDocument, MemoEntry[]> = new Map();
 	private tags: Set<string> = new Set();
 	private janitor = new Janitor();
 	private intervalMaid = new IntervalMaid();
-	private prevDoc?: TextDocument;
+	private forceScanTimeOut: boolean;
+	private prevDoc: TextDocument;
 
 	async init() {
-		ConfigMaid.listen({
+		configMaid.listen({
 			"fetcher.watch": (watch) => `{${watch.join(",")}}`,
 			"fetcher.ignore": (ignore) => `{${ignore.join(",")}}`,
 		});
+		configMaid.listen("fetcher.forceScanDelay");
 		await this.fetchDocs();
 		for (const doc of this.watchedDocs.keys()) this.scanDoc(doc);
+
 		this.janitor.add(
 			workspace.onDidCreateFiles(() => this.fetchDocs(true)),
 			workspace.onDidDeleteFiles(() => this.fetchDocs(true)),
 
-			workspace.onDidSaveTextDocument((doc) => {
-				if (this.validForScan(doc)) {
-					this.scanDoc(doc, true);
-					this.formatMemos(doc);
-				}
+			workspace.onDidSaveTextDocument(async (doc) => {
+				if (this.validForScan(doc)) this.scanDoc(doc, true);
 			}),
-			window.onDidChangeVisibleTextEditors((editors) => {
-				if (editors.length !== 0 || !this.prevDoc) return;
-				if (this.validForScan(this.prevDoc)) {
-					this.scanDoc(this.prevDoc, true);
-					this.formatMemos(this.prevDoc);
-				}
+			workspace.onDidChangeTextDocument((ev) => {
+				if (!this.forceScanTimeOut || !this.watchedDocs.has(ev.document)) return;
+				this.forceScanTimeOut = false;
+				this.scanDoc(ev.document, true);
+				setTimeout(() => {
+					this.forceScanTimeOut = true;
+				}, configMaid.get("fetcher.forceScanDelay"));
 			}),
-			window.onDidChangeActiveTextEditor((editor) => this.formatMemos(editor.document)),
+			window.tabGroups.onDidChangeTabGroups((ev) => this.handleTabChange(ev.changed)),
 		);
 		this.intervalMaid.add(() => {
 			const doc = window.activeTextEditor?.document;
@@ -49,7 +50,7 @@ export class MemoFetcher {
 		}, "fetcher.scanDelay");
 		this.intervalMaid.add(() => this.fetchDocs(true), "fetcher.workspaceScanDelay");
 
-		EventEmitter.emitWait("fetcherInit");
+		eventEmitter.emitWait("fetcherInit");
 	}
 	getMemos() {
 		const memos = Array.from(this.docMemos.values()).flat();
@@ -68,7 +69,7 @@ export class MemoFetcher {
 		const documents: TextDocument[] = (
 			await Promise.all(
 				await workspace
-					.findFiles(ConfigMaid.get("fetcher.watch"), ConfigMaid.get("fetcher.ignore"))
+					.findFiles(configMaid.get("fetcher.watch"), configMaid.get("fetcher.ignore"))
 					.then((files) =>
 						files.map((file) =>
 							workspace.openTextDocument(file).then(
@@ -88,7 +89,7 @@ export class MemoFetcher {
 		for (const doc of this.docMemos.keys()) if (!this.watchedDocs.has(doc)) this.docMemos.delete(doc);
 		for (const doc of this.watchedDocs.keys()) if (!this.docMemos.has(doc)) this.scanDoc(doc);
 	}
-	private scanDoc(doc: TextDocument, updateView?: boolean) {
+	private async scanDoc(doc: TextDocument, updateView?: boolean) {
 		const rawString = (str?: string) => str?.replaceAll("", "\\").slice(0, -1);
 		const content = doc.getText();
 		const commentData = LangComments[<keyof typeof LangComments>doc.languageId];
@@ -114,9 +115,9 @@ export class MemoFetcher {
 			});
 		}
 		this.docMemos.set(doc, memos);
-		if (updateView) EventEmitter.emit("updateView");
+		if (updateView) eventEmitter.emit("updateView");
 	}
-	private formatMemos(doc: TextDocument) {
+	private async formatMemos(doc: TextDocument) {
 		const memos = this.docMemos.get(doc);
 		if (!memos) return;
 		const edit = new WorkspaceEdit();
@@ -134,7 +135,20 @@ export class MemoFetcher {
 			const editEnd = editStart.translate(0, memo.rawLength);
 			edit.replace(doc.uri, new Range(editStart, editEnd), newMemo);
 		}
-		workspace.applyEdit(edit);
+		workspace.applyEdit(edit).then(() => doc.save());
+	}
+	private async handleTabChange(changed: readonly TabGroup[]) {
+		if (!this.prevDoc || !this.watchedDocs.has(this.prevDoc) || changed.length !== 1) return;
+		const tabGroup = changed[0];
+		const activeTab = tabGroup.activeTab;
+		const input = activeTab.input;
+		if (!tabGroup.isActive || !activeTab.isActive || Object.getPrototypeOf(input).constructor.name !== "Kn") return;
+		if (this.validForScan(this.prevDoc)) await this.scanDoc(this.prevDoc, true);
+		this.formatMemos(this.prevDoc);
+		//@ts-ignore
+		workspace.openTextDocument(input.uri).then((doc) => {
+			this.prevDoc = doc;
+		});
 	}
 	private validForScan(doc?: TextDocument) {
 		const watched = this.watchedDocs.get(doc);

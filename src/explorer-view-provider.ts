@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { EE } from "./utils/event-emitter";
-import { Janitor } from "./utils/janitor";
 import { getConfigMaid } from "./utils/config-maid";
+import { Janitor } from "./utils/janitor";
 import { MemoFetcher, MemoEntry } from "./memo-fetcher";
 
 const eventEmitter = EE.getEventEmitter();
@@ -19,17 +19,21 @@ export class ExplorerTreeView {
 		});
 		this.janitor.add(
 			this.view,
-			eventEmitter.subscribe("updateView", () => this.viewProvider.refresh()),
+
 			configMaid.onChange("view", () => this.viewProvider.refresh()),
 			configMaid.onChange(["view.expandPrimaryGroupByDefault", "view.expandSecondaryGroupByDefault"], () =>
 				eventEmitter.emit("updateItemCollapsibleState"),
 			),
+
+			eventEmitter.subscribe("updateView", () => this.viewProvider.reloadMemos()),
+			eventEmitter.subscribe("memoCompleted", () => this.viewProvider.refresh()),
 			eventEmitter.subscribe("updateItemCollapsibleState", () => this.updateItemCollapsibleState()),
 
 			vscode.commands.registerCommand("better-memo.navigateToMemo", (memo) => this.navigateToMemo(memo)),
 			vscode.commands.registerCommand("better-memo.explorerExpandAll", () => {
 				for (const item of this.viewProvider.items) this.view.reveal(item, { select: false, expand: 2 });
 			}),
+			vscode.commands.registerCommand("better-memo.completeMemo", (memo) => memo?.complete(this.viewProvider)),
 		);
 		vscode.commands.executeCommand("setContext", "better-memo.explorerInitFinished", true);
 	}
@@ -72,9 +76,8 @@ export class ExplorerTreeView {
 	}
 }
 class ExplorerViewProvider implements vscode.TreeDataProvider<TreeItem> {
-	items: (File | Tag)[] = [];
+	items: ParentItem[] = [];
 	memoCount = 0;
-
 	private _onDidChangeTreeData: vscode.EventEmitter<void> = new vscode.EventEmitter<void>();
 	readonly onDidChangeTreeData: vscode.Event<void> = this._onDidChangeTreeData.event;
 
@@ -82,7 +85,7 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<TreeItem> {
 		configMaid.listen("view.primaryGroup");
 		configMaid.listen("view.expandPrimaryGroupByDefault");
 		configMaid.listen("view.expandSecondaryGroupByDefault");
-		eventEmitter.wait("fetcherInit").then(() => this.refresh());
+		eventEmitter.wait("fetcherInit").then(() => this.reloadMemos());
 	}
 	getTreeItem(element: TreeItem) {
 		return element;
@@ -90,12 +93,15 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<TreeItem> {
 	getParent(element: TreeItem) {
 		return element.parent;
 	}
-	getChildren(element: File | Tag | undefined) {
+	getChildren(element: ParentItem | undefined) {
 		if (element) return element.children;
 		return this.items;
 	}
-	refresh() {
+	reloadMemos() {
 		this.items = this.getItems();
+		this._onDidChangeTreeData.fire();
+	}
+	refresh() {
 		this._onDidChangeTreeData.fire();
 	}
 
@@ -108,27 +114,21 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<TreeItem> {
 		this.memoCount = memos.length;
 		const mainGroup = groupObjects(memos, fileIsPrimary ? "relativePath" : "tag");
 		const pLabels = Object.keys(mainGroup).sort();
-		const items = pLabels.map((l) =>
-			fileIsPrimary ? new File(l, expandPrimaryGroup) : new Tag(l, expandPrimaryGroup),
-		);
+		const items = pLabels.map((label) => new ParentItem(label, expandPrimaryGroup));
 
 		for (let i = 0; i < pLabels.length; i++) {
 			const subGroup = groupObjects(mainGroup[pLabels[i]], fileIsPrimary ? "tag" : "relativePath");
 			const cLabels = Object.keys(subGroup).sort();
 
 			const parentItem = items[i];
-			const childItems = cLabels.map((l) =>
-				fileIsPrimary
-					? new Tag(l, expandSecondaryGroup, parentItem)
-					: new File(l, expandSecondaryGroup, parentItem),
-			);
+			const childItems = cLabels.map((label) => new ParentItem(label, expandSecondaryGroup, parentItem));
 			parentItem.children = childItems;
 
 			let childMemoCount = 0;
 			for (let j = 0; j < parentItem.children.length; j++) {
 				const memos = subGroup[cLabels[j]].sort((a, b) => a._offset - b._offset);
 				const childItem = parentItem.children[j];
-				const memoItems = memos.map((m) => new Memo(<MemoEntry>m, <File | Tag>childItem));
+				const memoItems = memos.map((m) => new Memo(<MemoEntry>m, <ParentItem>childItem));
 				// @ts-ignore
 				childItem.children = memoItems;
 				childMemoCount += memoItems.length;
@@ -148,16 +148,15 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<TreeItem> {
 	}
 }
 
-type TreeItem = File | Tag | Memo;
+type TreeItem = ParentItem | Memo;
 class ParentItem extends vscode.TreeItem {
 	children: TreeItem[] = [];
 	constructor(label: string, expand: boolean, public parent?: ParentItem) {
 		super(label, expand ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed);
 		this.contextValue = parent ? "child" : "parent";
 	}
+	complete() {}
 }
-class File extends ParentItem {}
-class Tag extends ParentItem {}
 class Memo extends vscode.TreeItem {
 	constructor(public memoEntry: MemoEntry, public parent: ParentItem) {
 		const content = memoEntry.content === "" ? "Placeholder T^T" : memoEntry.content;
@@ -170,6 +169,17 @@ class Memo extends vscode.TreeItem {
 			title: "Better Memo: Navigate To Memo",
 			arguments: [memoEntry],
 		};
+	}
+	complete(viewProvider: ExplorerViewProvider) {
+		vscode.workspace.openTextDocument(this.memoEntry.path).then((doc) => {
+			const edit = new vscode.WorkspaceEdit();
+			const editStart = doc.positionAt(this.memoEntry.offset);
+			const editEnd = editStart.translate(0, this.memoEntry.rawLength);
+			edit.delete(vscode.Uri.file(this.memoEntry.path), new vscode.Range(editStart, editEnd));
+			vscode.workspace.applyEdit(edit).then(() => doc.save());
+			deleteItem(this, viewProvider);
+			eventEmitter.emit("memoCompleted");
+		});
 	}
 }
 
@@ -184,3 +194,11 @@ function groupObjects(arrayOrIterable: { [key: string]: any }[], grouper: string
 }
 //@ts-ignore
 const multiplicity = (countable: number | any[]) => ((countable.length ?? countable) === 1 ? "" : "s");
+function deleteItem(item: TreeItem, viewProvider: ExplorerViewProvider) {
+	if (!item) return;
+	const items = item.parent?.children ?? viewProvider.items;
+	console.log("$ ~ file: explorer-view-provider.ts:204 ~ deleteItem ~ items:", items);
+	delete items[items.indexOf(item)];
+	console.log("$ ~ file: explorer-view-provider.ts:208 ~ deleteItem ~ items:", items);
+	if (items.length === 0) deleteItem(item.parent, viewProvider);
+}

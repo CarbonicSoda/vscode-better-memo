@@ -62,7 +62,7 @@
 			"view/title": [
 				{
 					"command": "better-memo.explorerExpandAll",
-					"when": "view.better-memo.memoExplorer.visible",
+					"when": "view.better-memo.memoExplorer.visible && better-memo.explorerInitFinished",
 					"group": "navigation@1"
 				}
 			],
@@ -119,11 +119,15 @@
 				},
 				"better-memo.fetcher.workspaceScanDelay": {
 					"type": "integer",
-					"default": 10000
+					"default": 5000
 				},
 				"better-memo.fetcher.scanDelay": {
 					"type": "integer",
-					"default": 1500
+					"default": 1000
+				},
+				"better-memo.fetcher.forceScanDelay": {
+					"type": "integer",
+					"default": 3000
 				},
 				"better-memo.view.primaryGroup": {
 					"type": "string",
