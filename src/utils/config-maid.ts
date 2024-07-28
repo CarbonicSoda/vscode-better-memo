@@ -1,5 +1,9 @@
 import { workspace, Disposable, WorkspaceConfiguration } from "vscode";
 
+export function getConfigMaid() {
+	return ConfigMaid;
+}
+
 const ConfigMaid: {
 	/**
 	 * @param configName name of configuration to keep track of
@@ -21,10 +25,10 @@ const ConfigMaid: {
 	onChange(configs: string | string[], callback: (newValues: NewValues) => void): Disposable;
 	dispose(): void;
 
-	_config: WorkspaceConfiguration;
-	_configsMap: Map<string, (retrieved: any) => any>;
-	_retrieved: Map<string, any>;
-	_onChangeConfig: Disposable;
+	config: WorkspaceConfiguration;
+	configsMap: Map<string, (retrieved: any) => any>;
+	retrieved: Map<string, any>;
+	onChangeConfig: Disposable;
 } = {
 	listen(configNameOrList, callback = (r: any) => r) {
 		if (typeof configNameOrList === "object") {
@@ -33,29 +37,29 @@ const ConfigMaid: {
 			return;
 		}
 		//@ts-ignore
-		this._configsMap.set(configNameOrList, callback);
+		this.configsMap.set(configNameOrList, callback);
 	},
 	get(configName) {
-		return this._configsMap.get(configName)(this._config.get(configName));
+		return this.configsMap.get(configName)(this.config.get(configName));
 	},
 	onChange(configs, callback) {
 		const _configs = [configs].flat();
 		return workspace.onDidChangeConfiguration((ev) => {
 			if (!ev.affectsConfiguration("better-memo")) return;
 			if (!_configs.some((config) => ev.affectsConfiguration(`better-memo.${config}`))) return;
-			callback(Object.fromEntries(_configs.map((config) => [config, this._config.get(config)])));
+			callback(Object.fromEntries(_configs.map((config) => [config, this.config.get(config)])));
 		});
 	},
 	dispose() {
-		this._onChangeConfig.dispose();
+		this.onChangeConfig.dispose();
 	},
 
-	_config: workspace.getConfiguration("better-memo"),
-	_configsMap: new Map(),
-	_retrieved: new Map(),
-	_onChangeConfig: workspace.onDidChangeConfiguration((ev) => {
+	config: workspace.getConfiguration("better-memo"),
+	configsMap: new Map(),
+	retrieved: new Map(),
+	onChangeConfig: workspace.onDidChangeConfiguration((ev) => {
 		if (!ev.affectsConfiguration("better-memo")) return;
-		ConfigMaid._config = workspace.getConfiguration("better-memo");
+		ConfigMaid.config = workspace.getConfiguration("better-memo");
 	}),
 };
 type ListenList = {
@@ -64,4 +68,3 @@ type ListenList = {
 type NewValues = {
 	[changedConfig: string]: any;
 };
-export default ConfigMaid;
