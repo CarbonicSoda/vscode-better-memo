@@ -67,14 +67,16 @@ export class MemoFetcher {
 	private async fetchDocs(refreshMemos?: boolean) {
 		const documents: TextDocument[] = (
 			await Promise.all(
-				await workspace.findFiles(ConfigMaid.get("fetcher.watch"), ConfigMaid.get("fetcher.ignore")).then((files) =>
-					files.map((file) =>
-						workspace.openTextDocument(file).then(
-							(doc) => doc,
-							() => null,
+				await workspace
+					.findFiles(ConfigMaid.get("fetcher.watch"), ConfigMaid.get("fetcher.ignore"))
+					.then((files) =>
+						files.map((file) =>
+							workspace.openTextDocument(file).then(
+								(doc) => doc,
+								() => null,
+							),
 						),
 					),
-				),
 			).catch((err) => {
 				throw new Error(`Error when fetching documents: ${err}`);
 			})
@@ -122,7 +124,9 @@ export class MemoFetcher {
 			const commentData = LangComments[<keyof typeof LangComments>doc.languageId];
 			//@ts-ignore
 			const padding = commentData.close ? " " : "";
-			const newMemo = `${commentData.open}${padding}MO ${memo.tag}${memo.content ? " " : ""}${memo.content}${padding}${
+			const newMemo = `${commentData.open}${padding}MO ${memo.tag}${memo.content ? " " : ""}${
+				memo.content
+			}${padding}${
 				//@ts-ignore
 				commentData.close ?? ""
 			}`;

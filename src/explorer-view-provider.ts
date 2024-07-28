@@ -7,58 +7,24 @@ import { MemoFetcher, MemoEntry } from "./memo-fetcher";
 const eventEmitter = EE.getEventEmitter();
 const configMaid = getConfigMaid();
 export class ExplorerTreeView {
-	private view?: vscode.TreeView<TreeItem>;
+	private viewProvider: ExplorerViewProvider;
+	private view: vscode.TreeView<TreeItem>;
 	private janitor = new Janitor();
 
 	init(memoFetcher: MemoFetcher) {
-		const viewProvider = new ExplorerViewProvider(memoFetcher);
+		this.viewProvider = new ExplorerViewProvider(memoFetcher);
 		this.view = vscode.window.createTreeView("better-memo.memoExplorer", {
-			treeDataProvider: viewProvider,
+			treeDataProvider: this.viewProvider,
 			showCollapseAll: true,
 		});
 		this.janitor.add(
 			this.view,
-			eventEmitter.subscribe("updateView", () => viewProvider.refresh()),
-			configMaid.onChange("view", () => viewProvider.refresh()),
+			eventEmitter.subscribe("updateView", () => this.viewProvider.refresh()),
+			configMaid.onChange("view", () => this.viewProvider.refresh()),
 			configMaid.onChange(["view.expandPrimaryGroupByDefault", "view.expandSecondaryGroupByDefault"], () =>
 				eventEmitter.emit("updateItemCollapsibleState"),
 			),
-			eventEmitter.subscribe("updateItemCollapsibleState", () => {
-				this.view.reveal(viewProvider.items[0], { select: false, focus: true }).then(() => {
-					Promise.resolve(vscode.commands.executeCommand("list.collapseAll")).finally(async () => {
-						for (const parent of viewProvider.items) {
-							const revealChildren = [];
-							if (configMaid.get("view.expandSecondaryGroupByDefault")) {
-								for (const child of parent.children) {
-									revealChildren.push(
-										this.view.reveal(child, {
-											select: false,
-											expand: true,
-										}),
-									);
-								}
-							}
-							await Promise.allSettled(revealChildren);
-							if (configMaid.get("view.expandPrimaryGroupByDefault")) {
-								this.view.reveal(parent, {
-									select: false,
-									expand: true,
-								});
-							} else {
-								await this.view.reveal(parent, {
-									select: false,
-									focus: true,
-								});
-								vscode.commands.executeCommand("list.collapse");
-							}
-						}
-						this.view.reveal(viewProvider.items[0], {
-							select: false,
-							focus: true,
-						});
-					});
-				});
-			}),
+			eventEmitter.subscribe("updateItemCollapsibleState", () => this.updateItemCollapsibleState()),
 
 			vscode.commands.registerCommand("better-memo.navigateToMemo", (memo: MemoEntry) => {
 				vscode.workspace.openTextDocument(memo.path).then((doc) => {
@@ -71,13 +37,37 @@ export class ExplorerTreeView {
 				});
 			}),
 			vscode.commands.registerCommand("better-memo.explorerExpandAll", () => {
-				for (const item of viewProvider.items) this.view.reveal(item, { select: false, expand: 2 });
+				for (const item of this.viewProvider.items) this.view.reveal(item, { select: false, expand: 2 });
 			}),
 		);
 		vscode.commands.executeCommand("setContext", "better-memo.explorerInitFinished", true);
 	}
 	dispose() {
 		this.janitor.clearAll();
+	}
+
+	private updateItemCollapsibleState() {
+		this.view.reveal(this.viewProvider.items[0], { select: false, focus: true }).then(() => {
+			Promise.resolve(vscode.commands.executeCommand("list.collapseAll")).finally(async () => {
+				if (configMaid.get("view.expandSecondaryGroupByDefault")) {
+					const reveals = [];
+					for (const item of this.viewProvider.items) {
+						for (const child of item.children)
+							reveals.push(this.view.reveal(child, { select: false, expand: true }));
+					}
+					await Promise.allSettled(reveals);
+				}
+				for (const item of this.viewProvider.items) {
+					if (configMaid.get("view.expandPrimaryGroupByDefault")) {
+						this.view.reveal(item, { select: false, expand: true });
+					} else {
+						await this.view.reveal(item, { select: false, focus: true });
+						vscode.commands.executeCommand("list.collapse");
+					}
+				}
+				this.view.reveal(this.viewProvider.items[0], { select: false, focus: true });
+			});
+		});
 	}
 }
 class ExplorerViewProvider implements vscode.TreeDataProvider<TreeItem> {
@@ -127,7 +117,9 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<TreeItem> {
 
 			const parentItem = items[i];
 			const childItems = cLabels.map((l) =>
-				fileIsPrimary ? new Tag(l, expandSecondaryGroup, parentItem) : new File(l, expandSecondaryGroup, parentItem),
+				fileIsPrimary
+					? new Tag(l, expandSecondaryGroup, parentItem)
+					: new File(l, expandSecondaryGroup, parentItem),
 			);
 			parentItem.children = childItems;
 

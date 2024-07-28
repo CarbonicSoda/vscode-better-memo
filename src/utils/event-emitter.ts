@@ -33,7 +33,12 @@ export namespace EE {
 		 * @param callbackArgs passes to callbackEvent emit
 		 * @returns a promise that resolves to the returned value of callback
 		 */
-		wait<R>(event: string, callback?: (...args: any) => R, callbackEvent?: string, ...callbackArgs: any): Promise<R>;
+		wait<R>(
+			event: string,
+			callback?: (...args: any) => R,
+			callbackEvent?: string,
+			...callbackArgs: any
+		): Promise<R>;
 
 		events: Map<string, ((...args: any) => void)[]>;
 	} = {
