@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { EE } from "./utils/event-emitter";
+import { FE } from "./utils/file-edit";
 import { getConfigMaid } from "./utils/config-maid";
 import { Janitor } from "./utils/janitor";
 import { MemoFetcher, MemoEntry } from "./memo-fetcher";
@@ -22,7 +23,7 @@ export class ExplorerTreeView {
 
 			configMaid.onChange("view", () => this.viewProvider.refresh()),
 			configMaid.onChange(["view.expandPrimaryGroupByDefault", "view.expandSecondaryGroupByDefault"], () =>
-				eventEmitter.emit("updateItemCollapsibleState"),
+				eventEmitter.emit("updateItemCollapsibleState")
 			),
 
 			eventEmitter.subscribe("updateView", () => this.viewProvider.reloadMemos()),
@@ -33,7 +34,7 @@ export class ExplorerTreeView {
 			vscode.commands.registerCommand("better-memo.explorerExpandAll", () => {
 				for (const item of this.viewProvider.items) this.view.reveal(item, { select: false, expand: 2 });
 			}),
-			vscode.commands.registerCommand("better-memo.completeMemo", (memo) => memo?.complete(this.viewProvider)),
+			vscode.commands.registerCommand("better-memo.completeMemo", (memo) => memo?.complete(this.viewProvider))
 		);
 		vscode.commands.executeCommand("setContext", "better-memo.explorerInitFinished", true);
 	}
@@ -45,7 +46,7 @@ export class ExplorerTreeView {
 		vscode.workspace.openTextDocument(memo.path).then((doc) => {
 			vscode.window.showTextDocument(doc).then((editor) => {
 				let pos = doc.positionAt(memo.offset + memo.rawLength);
-				if (pos.line === memo.line) pos = pos.translate(-1, doc.lineAt(pos.line - 1).text.length);
+				if (pos.line === memo.line - 1) pos = pos.translate(-1, doc.lineAt(pos.line - 1).text.length);
 				editor.selection = new vscode.Selection(pos, pos);
 				editor.revealRange(new vscode.Range(pos, pos));
 			});
@@ -56,21 +57,22 @@ export class ExplorerTreeView {
 			Promise.resolve(vscode.commands.executeCommand("list.collapseAll")).finally(async () => {
 				if (configMaid.get("view.expandSecondaryGroupByDefault")) {
 					const reveals = [];
-					for (const item of this.viewProvider.items) {
-						for (const child of item.children)
-							reveals.push(this.view.reveal(child, { select: false, expand: true }));
-					}
+					for (const item of this.viewProvider.items)
+						for (const child of item.children) reveals.push(this.view.reveal(child, { select: false, expand: true }));
 					await Promise.allSettled(reveals);
 				}
 				for (const item of this.viewProvider.items) {
 					if (configMaid.get("view.expandPrimaryGroupByDefault")) {
 						this.view.reveal(item, { select: false, expand: true });
-					} else {
-						await this.view.reveal(item, { select: false, focus: true });
-						vscode.commands.executeCommand("list.collapse");
+						continue;
 					}
+					await this.view.reveal(item, { select: false, focus: true });
+					vscode.commands.executeCommand("list.collapse");
 				}
-				this.view.reveal(this.viewProvider.items[0], { select: false, focus: true });
+				this.view.reveal(this.viewProvider.items[0], {
+					select: false,
+					focus: true,
+				});
 			});
 		});
 	}
@@ -138,7 +140,7 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<TreeItem> {
 			}
 
 			parentItem.description = `${childItems.length} ${fileIsPrimary ? "Tag" : "File"}${multiplicity(
-				childItems,
+				childItems
 			)} > ${childMemoCount} Memo${multiplicity(childMemoCount)}`;
 			parentItem.tooltip = `${fileIsPrimary ? "File" : "Tag"}: ${parentItem.label} - ${
 				childItems.length
@@ -161,8 +163,8 @@ class Memo extends vscode.TreeItem {
 	constructor(public memoEntry: MemoEntry, public parent: ParentItem) {
 		const content = memoEntry.content === "" ? "Placeholder T^T" : memoEntry.content;
 		super(content, vscode.TreeItemCollapsibleState.None);
-		this.description = `Ln ${memoEntry.line}`;
-		this.tooltip = `${memoEntry.tag} ~ ${memoEntry.relativePath} - Ln ${memoEntry.line}\n${content}`;
+		this.description = `Ln ${memoEntry.line + 1}`;
+		this.tooltip = `${memoEntry.tag} ~ ${memoEntry.relativePath} - Ln ${memoEntry.line + 1}\n${content}`;
 		this.contextValue = "memo";
 		this.command = {
 			command: "better-memo.navigateToMemo",
@@ -171,12 +173,16 @@ class Memo extends vscode.TreeItem {
 		};
 	}
 	complete(viewProvider: ExplorerViewProvider) {
-		vscode.workspace.openTextDocument(this.memoEntry.path).then((doc) => {
-			const edit = new vscode.WorkspaceEdit();
-			const editStart = doc.positionAt(this.memoEntry.offset);
-			const editEnd = editStart.translate(0, this.memoEntry.rawLength);
-			edit.delete(vscode.Uri.file(this.memoEntry.path), new vscode.Range(editStart, editEnd));
-			vscode.workspace.applyEdit(edit).then(() => doc.save());
+		const memo = this.memoEntry;
+		vscode.workspace.openTextDocument(memo.path).then((doc) => {
+			const removeLine =
+				memo.line < doc.lineCount - 1 && doc.lineAt(memo.line).text.replace(memo.raw, "").trim().length === 0;
+			const start = doc.positionAt(memo.offset);
+			const end = removeLine ? new vscode.Position(memo.line + 1, 0) : start.translate(0, memo.rawLength);
+			const range = new vscode.Range(start, end);
+			const edit = new FE.FileEdit();
+			edit.delete(doc.uri, range);
+			edit.apply({ isRefactoring: true });
 			deleteItem(this, viewProvider);
 			eventEmitter.emit("memoCompleted");
 		});
@@ -195,10 +201,8 @@ function groupObjects(arrayOrIterable: { [key: string]: any }[], grouper: string
 //@ts-ignore
 const multiplicity = (countable: number | any[]) => ((countable.length ?? countable) === 1 ? "" : "s");
 function deleteItem(item: TreeItem, viewProvider: ExplorerViewProvider) {
-	if (!item) return;
 	const items = item.parent?.children ?? viewProvider.items;
-	console.log("$ ~ file: explorer-view-provider.ts:204 ~ deleteItem ~ items:", items);
 	delete items[items.indexOf(item)];
-	console.log("$ ~ file: explorer-view-provider.ts:208 ~ deleteItem ~ items:", items);
+	if (!item.parent) return;
 	if (items.length === 0) deleteItem(item.parent, viewProvider);
 }
