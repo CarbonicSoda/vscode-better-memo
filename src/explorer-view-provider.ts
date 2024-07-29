@@ -3,7 +3,7 @@ import { EE } from "./utils/event-emitter";
 import { FE } from "./utils/file-edit";
 import { getConfigMaid } from "./utils/config-maid";
 import { Janitor } from "./utils/janitor";
-import { MemoFetcher, MemoEntry } from "./memo-fetcher";
+import { MemoFetcher, MemoEntry, getFormattedMemo } from "./memo-fetcher";
 
 const eventEmitter = EE.getEventEmitter();
 const configMaid = getConfigMaid();
@@ -13,6 +13,7 @@ export class ExplorerTreeView {
 	private janitor = new Janitor();
 
 	init(memoFetcher: MemoFetcher) {
+		console.time("a");
 		this.viewProvider = new ExplorerViewProvider(memoFetcher);
 		this.view = vscode.window.createTreeView("better-memo.memoExplorer", {
 			treeDataProvider: this.viewProvider,
@@ -23,18 +24,26 @@ export class ExplorerTreeView {
 
 			configMaid.onChange("view", () => this.viewProvider.refresh()),
 			configMaid.onChange(["view.expandPrimaryGroupByDefault", "view.expandSecondaryGroupByDefault"], () =>
-				eventEmitter.emit("updateItemCollapsibleState")
+				eventEmitter.emit("updateItemCollapsibleState"),
 			),
 
 			eventEmitter.subscribe("updateView", () => this.viewProvider.reloadMemos()),
-			eventEmitter.subscribe("memoCompleted", () => this.viewProvider.refresh()),
 			eventEmitter.subscribe("updateItemCollapsibleState", () => this.updateItemCollapsibleState()),
 
 			vscode.commands.registerCommand("better-memo.navigateToMemo", (memo) => this.navigateToMemo(memo)),
+			vscode.commands.registerCommand("better-memo.navigateToFile", (file: File) => file?.navigate()),
 			vscode.commands.registerCommand("better-memo.explorerExpandAll", () => {
 				for (const item of this.viewProvider.items) this.view.reveal(item, { select: false, expand: 2 });
 			}),
-			vscode.commands.registerCommand("better-memo.completeMemo", (memo) => memo?.complete(this.viewProvider))
+			vscode.commands.registerCommand("better-memo.completeMemo", (memo: Memo) =>
+				memo?.complete(this.viewProvider).then(
+					() => {
+						console.timeLog("a", "refresh");
+						this.viewProvider.refresh();
+					},
+					() => null,
+				),
+			),
 		);
 		vscode.commands.executeCommand("setContext", "better-memo.explorerInitFinished", true);
 	}
@@ -89,6 +98,12 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<TreeItem> {
 		configMaid.listen("view.expandSecondaryGroupByDefault");
 		eventEmitter.wait("fetcherInit").then(() => this.reloadMemos());
 	}
+	getChildItems() {
+		return this.items;
+	}
+	setChildItems(items: ParentItem[]) {
+		this.items = items;
+	}
 	getTreeItem(element: TreeItem) {
 		return element;
 	}
@@ -105,6 +120,7 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<TreeItem> {
 	}
 	refresh() {
 		this._onDidChangeTreeData.fire();
+		console.log("items:", this.items);
 	}
 
 	private getItems() {
@@ -116,14 +132,16 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<TreeItem> {
 		this.memoCount = memos.length;
 		const mainGroup = groupObjects(memos, fileIsPrimary ? "relativePath" : "tag");
 		const pLabels = Object.keys(mainGroup).sort();
-		const items = pLabels.map((label) => new ParentItem(label, expandPrimaryGroup));
+		const items = pLabels.map((label) => new (fileIsPrimary ? File : Tag)(label, expandPrimaryGroup));
 
 		for (let i = 0; i < pLabels.length; i++) {
 			const subGroup = groupObjects(mainGroup[pLabels[i]], fileIsPrimary ? "tag" : "relativePath");
 			const cLabels = Object.keys(subGroup).sort();
 
 			const parentItem = items[i];
-			const childItems = cLabels.map((label) => new ParentItem(label, expandSecondaryGroup, parentItem));
+			const childItems = cLabels.map(
+				(label) => new (fileIsPrimary ? Tag : File)(label, expandSecondaryGroup, parentItem),
+			);
 			parentItem.children = childItems;
 
 			let childMemoCount = 0;
@@ -140,7 +158,7 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<TreeItem> {
 			}
 
 			parentItem.description = `${childItems.length} ${fileIsPrimary ? "Tag" : "File"}${multiplicity(
-				childItems
+				childItems,
 			)} > ${childMemoCount} Memo${multiplicity(childMemoCount)}`;
 			parentItem.tooltip = `${fileIsPrimary ? "File" : "Tag"}: ${parentItem.label} - ${
 				childItems.length
@@ -153,11 +171,38 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<TreeItem> {
 type TreeItem = ParentItem | Memo;
 class ParentItem extends vscode.TreeItem {
 	children: TreeItem[] = [];
+	hierarchy: "parent" | "child";
 	constructor(label: string, expand: boolean, public parent?: ParentItem) {
 		super(label, expand ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed);
-		this.contextValue = parent ? "child" : "parent";
+		this.hierarchy = parent ? "child" : "parent";
+	}
+	getChildItems() {
+		return this.children;
+	}
+	setChildItems(items: TreeItem[]) {
+		this.children = items;
 	}
 	complete() {}
+}
+class File extends ParentItem {
+	constructor(label: string, expand: boolean, parent?: ParentItem) {
+		super(label, expand, parent);
+		this.contextValue = "file";
+	}
+
+	navigate() {
+		//@ts-ignore
+		if (this.children.length === 0 || this.children[0].children.length === 0) return;
+		//@ts-ignore
+		const firstMemo = this.hierarchy === "parent" ? this.children[0].children[0] : this.children[0];
+		vscode.commands.executeCommand("better-memo.navigateToMemo", firstMemo);
+	}
+}
+class Tag extends ParentItem {
+	constructor(label: string, expand: boolean, parent?: ParentItem) {
+		super(label, expand, parent);
+		this.contextValue = "tag";
+	}
 }
 class Memo extends vscode.TreeItem {
 	constructor(public memoEntry: MemoEntry, public parent: ParentItem) {
@@ -172,11 +217,16 @@ class Memo extends vscode.TreeItem {
 			arguments: [memoEntry],
 		};
 	}
-	complete(viewProvider: ExplorerViewProvider) {
+
+	async complete(viewProvider: ExplorerViewProvider) {
 		const memo = this.memoEntry;
-		vscode.workspace.openTextDocument(memo.path).then((doc) => {
+		await vscode.workspace.openTextDocument(memo.path).then((doc) => {
 			const removeLine =
-				memo.line < doc.lineCount - 1 && doc.lineAt(memo.line).text.replace(memo.raw, "").trim().length === 0;
+				memo.line < doc.lineCount - 1 &&
+				doc
+					.lineAt(memo.line)
+					.text.replace(new RegExp(`${memo.raw}|${getFormattedMemo(memo)}`), "")
+					.trim().length === 0;
 			const start = doc.positionAt(memo.offset);
 			const end = removeLine ? new vscode.Position(memo.line + 1, 0) : start.translate(0, memo.rawLength);
 			const range = new vscode.Range(start, end);
@@ -184,7 +234,7 @@ class Memo extends vscode.TreeItem {
 			edit.delete(doc.uri, range);
 			edit.apply({ isRefactoring: true });
 			deleteItem(this, viewProvider);
-			eventEmitter.emit("memoCompleted");
+			console.timeLog("a", "deleteditems");
 		});
 	}
 }
@@ -198,11 +248,15 @@ function groupObjects(arrayOrIterable: { [key: string]: any }[], grouper: string
 	}
 	return groups;
 }
+
 //@ts-ignore
 const multiplicity = (countable: number | any[]) => ((countable.length ?? countable) === 1 ? "" : "s");
+
 function deleteItem(item: TreeItem, viewProvider: ExplorerViewProvider) {
-	const items = item.parent?.children ?? viewProvider.items;
-	delete items[items.indexOf(item)];
+	const parent = item.parent ?? viewProvider;
+	//@ts-ignore
+	parent.setChildItems(parent.getChildItems().filter((_item) => _item !== item));
 	if (!item.parent) return;
-	if (items.length === 0) deleteItem(item.parent, viewProvider);
+	//@ts-ignore
+	if (parent.getChildItems().length === 0) deleteItem(parent, viewProvider);
 }
