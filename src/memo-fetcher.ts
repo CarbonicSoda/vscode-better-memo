@@ -23,7 +23,7 @@ export class MemoFetcher {
 	).join("");
 	private janitor = new Janitor();
 	private intervalMaid = new IntervalMaid();
-	private forceScanTimeOut: boolean;
+	private forceScanTimeOut = true;
 	private prevDoc: TextDocument;
 
 	async init() {
@@ -43,13 +43,11 @@ export class MemoFetcher {
 				if (this.validForScan(doc)) this.scanDoc(doc, true);
 			}),
 			workspace.onDidChangeTextDocument((ev) => {
-				window.showInformationMessage(`${!this.forceScanTimeOut}${!this.watchedDocs.has(ev.document)}`);
 				if (!this.forceScanTimeOut || !this.watchedDocs.has(ev.document)) return;
-				window.showInformationMessage("FORCE SCAN");
 				this.forceScanTimeOut = false;
+				window.showInformationMessage("FORCE SCAN");
 				this.scanDoc(ev.document, true);
 				setTimeout(() => {
-					window.showInformationMessage("TIMEOUT");
 					this.forceScanTimeOut = true;
 				}, configMaid.get("fetcher.forceScanDelay"));
 			}),
