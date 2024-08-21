@@ -173,85 +173,113 @@
 				"when": "better-memo.explorerInitFinished && !better-memo.noFiles && better-memo.noMemos"
 			}
 		],
-		"configuration": {
-			"title": "Better Memo",
-			"properties": {
-				"better-memo.fetcher.watch": {
-					"order": 0,
-					"type": "array",
-					"items": {
-						"type": "string"
+		"configuration": [
+			{
+				"title": "Better Memo",
+				"order": 1,
+				"properties": {
+					"better-memo.customTags": {
+						"order": 111,
+						"type": "object",
+						"uniqueItems": true,
+						"additionalProperties": {
+							"type": "string"							
+						},
+						"default": {
+							"TODO": "#fff86b",
+							"FIX": "#f21d1d",
+							"REFACTOR": "#83d6f2"
+						}
+					}
+				}
+			},
+			{
+				"title": "Fetcher",
+				"order": 2,
+				"properties": {
+					"better-memo.fetcher.watch": {
+						"order": 211,
+						"type": "array",
+						"items": {
+							"type": "string"
+						},
+						"default": [
+							"**/*"
+						]
 					},
-					"default": [
-						"**/*"
-					]
-				},
-				"better-memo.fetcher.ignore": {
-					"order": 1,
-					"type": "array",
-					"items": {
-						"type": "string"
+					"better-memo.fetcher.ignore": {
+						"order": 212,
+						"type": "array",
+						"items": {
+							"type": "string"
+						},
+						"default": [
+							"**/node_modules"
+						]
 					},
-					"default": [
-						"**/node_modules"
-					]
-				},
-				"better-memo.fetcher.scanDelay": {
-					"order": 2,
-					"type": "integer",
-					"default": 1000
-				},
-				"better-memo.fetcher.forceScanDelay": {
-					"order": 3,
-					"type": "integer",
-					"default": 10000
-				},
-				"better-memo.fetcher.workspaceScanDelay": {
-					"order": 4,
-					"type": "integer",
-					"default": 10000
-				},
-				"better-memo.view.defaultView": {
-					"order": 5,
-					"type": "string",
-					"enum": [
-						"File",
-						"Tag"
-					],
-					"default": "File"
-				},
-				"better-memo.view.expandPrimaryByDefault": {
-					"order": 6,
-					"type": "boolean",
-					"default": true
-				},
-				"better-memo.view.expandSecondaryByDefault": {
-					"order": 7,
-					"type": "boolean",
-					"default": true
-				},
-				"better-memo.view.confirmCompleteMemo": {
-					"order": 8,
-					"type": "boolean",
-					"default": false
-				},
-				"better-memo.view.confirmCompleteMultiple": {
-					"order": 9,
-					"type": "boolean",
-					"default": true
-				},
-				"better-memo.view.confirmCompleteTimeout": {
-					"order": 10,
-					"type": "integer",
-					"default": 3000
-				},
-				"better-memo.view.alwaysOpenFileOnCompleteSingleMemo": {
-					"order": 11,
-					"type": "boolean",
-					"default": true
+					"better-memo.fetcher.scanDelay": {
+						"order": 221,
+						"type": "integer",
+						"default": 1000
+					},
+					"better-memo.fetcher.forceScanDelay": {
+						"order": 222,
+						"type": "integer",
+						"default": 10000
+					},
+					"better-memo.fetcher.workspaceScanDelay": {
+						"order": 223,
+						"type": "integer",
+						"default": 10000
+					}
+				}
+			},
+			{
+				"title": "View",
+				"order": 3,
+				"properties": {
+					"better-memo.view.defaultView": {
+						"order": 311,
+						"type": "string",
+						"enum": [
+							"File",
+							"Tag"
+						],
+						"default": "File"
+					},
+					"better-memo.view.expandPrimaryByDefault": {
+						"order": 321,
+						"type": "boolean",
+						"default": true
+					},
+					"better-memo.view.expandSecondaryByDefault": {
+						"order": 322,
+						"type": "boolean",
+						"default": true
+					},
+					"better-memo.view.confirmCompleteMemo": {
+						"order": 331,
+						"type": "boolean",
+						"default": false
+					},
+					"better-memo.view.confirmCompleteMultiple": {
+						"order": 332,
+						"type": "boolean",
+						"default": true
+					},
+					"better-memo.view.confirmCompleteTimeout": {
+						"order": 333,
+						"type": "integer",
+						"default": 3000
+					},
+					"better-memo.view.alwaysOpenFileOnCompleteSingleMemo": {
+						"order": 334,
+						"type": "boolean",
+						"default": true
+					}
 				}
 			}
-		}
+		]
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",

@@ -1,5 +1,0 @@
-{
-	"TODO": "terminal.ansiBrightYellow",
-	"FIX": "debugConsole.errorForeground",
-	"REFACTOR": "debugTokenExpression.type"
-}

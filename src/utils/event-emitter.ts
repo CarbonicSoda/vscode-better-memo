@@ -1,18 +1,21 @@
 export namespace EE {
-	export function getEventEmitter() {
+	export function getEventEmitter(): typeof EventEmitter {
 		return EventEmitter;
 	}
+
 	const EventEmitter: {
 		/**
 		 * @param event event name to subscribe to, names that start with __ or c__ shall be avoided
 		 * @param callback callback function evoked on event dispatch
 		 */
 		subscribe(event: string, callback: (...args: any) => void): Disposable;
+
 		/**
 		 * @param event event name to dispatch
 		 * @param args arguments to pass to callback functions
 		 */
 		emit(event: string, ...args: any): void;
+
 		/**
 		 * Almost identical as dispatch(), but wait()s binded afterwards
 		 * before stopCriterion is met will also resolve.
@@ -24,8 +27,11 @@ export namespace EE {
 		 * @returns a promise that resolves to the number of extra wait()s resolved before stop
 		 */
 		emitWait(event: string, stopCriterion?: number, ...args: any): Promise<number>;
+
 		emitWait(event: string, stopCriterion?: string, ...args: any): Promise<number>;
+
 		emitWait(event: string, stopCriterion?: (stop: () => void) => void, ...args: any): Promise<number>;
+
 		/**
 		 * @param event event name to wait for dispatch
 		 * @param callback optional callback function evoked on dispatch
@@ -42,15 +48,21 @@ export namespace EE {
 
 		events: Map<string, ((...args: any) => void)[]>;
 	} = {
-		subscribe(event, callback) {
+		subscribe(event: string, callback: (...args: any) => void): Disposable {
 			if (!this.events.has(event)) this.events.set(event, []);
 			this.events.get(event).push(callback);
 			return new Disposable(event, this.events.get(event).length - 1);
 		},
-		emit(event, ...args) {
+
+		emit(event: string, ...args: any): void {
 			for (const callback of this.events.get(event) ?? []) callback?.(...args);
 		},
-		async emitWait(event, stopCriterion, ...args) {
+
+		async emitWait(
+			event: string,
+			stopCriterion?: number | string | ((stop: () => void) => void),
+			...args: any
+		): Promise<number> {
 			this.emit(event, ...args);
 			let catched = 0;
 			return new Promise((_resolve) => {
@@ -88,7 +100,13 @@ export namespace EE {
 				}
 			});
 		},
-		async wait(event, callback, callbackEvent, ...callbackArgs) {
+
+		async wait<R>(
+			event: string,
+			callback: (...args: any) => R,
+			callbackEvent?: string,
+			...callbackArgs: any
+		): Promise<R> {
 			callback = callback ?? (() => undefined);
 			return new Promise((resolve) => {
 				const disposable = this.subscribe(event, (...args) => {
@@ -109,7 +127,7 @@ export namespace EE {
 	 */
 	export class Disposable {
 		constructor(private readonly event: string, private readonly id: number) {}
-		dispose() {
+		dispose(): void {
 			delete EventEmitter.events.get(this.event)[this.id];
 		}
 	}

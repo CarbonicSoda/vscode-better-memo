@@ -1,29 +1,33 @@
 import { Janitor } from "./janitor";
 import { getConfigMaid } from "./config-maid";
 
-const ConfigMaid = getConfigMaid();
+const configMaid = getConfigMaid();
+
 export class IntervalMaid {
-	add(callback: () => void, delayConfigName: string, configCallback?: (retrieved: any) => any) {
-		ConfigMaid.listen(delayConfigName, configCallback);
-		const intervalId = this.intervalJanitor.add(setInterval(callback, ConfigMaid.get(delayConfigName)));
+	private intervalJanitor = new Janitor();
+	private configChangeJanitor = new Janitor();
+
+	add(callback: () => void, delayConfigName: string, configCallback?: (retrieved: any) => any): number {
+		configMaid.listen(delayConfigName, configCallback);
+		const intervalId = this.intervalJanitor.add(setInterval(callback, configMaid.get(delayConfigName)));
 		this.configChangeJanitor.add(
-			ConfigMaid.onChange(delayConfigName, (delay) =>
+			configMaid.onChange(delayConfigName, (delay) =>
 				this.intervalJanitor.override(intervalId, setInterval(callback, delay)),
 			),
 		);
 		return intervalId;
 	}
-	clear(intervalId: number) {
+
+	clear(intervalId: number): void {
 		this.intervalJanitor.clear(intervalId);
 	}
-	clearAll() {
+
+	clearAll(): void {
 		this.intervalJanitor.clearAll();
 	}
-	dispose() {
+
+	dispose(): void {
 		this.clearAll();
 		this.configChangeJanitor.clearAll();
 	}
-
-	private intervalJanitor = new Janitor();
-	private configChangeJanitor = new Janitor();
 }

@@ -1,17 +1,9 @@
-import {
-	commands,
-	Position,
-	Range,
-	TextDocument,
-	Uri,
-	window,
-	workspace,
-	WorkspaceEdit,
-} from "vscode";
+import { commands, Position, Range, TextDocument, Uri, window, workspace, WorkspaceEdit } from "vscode";
 import { readFile, writeFile } from "fs";
 
 export namespace FE {
 	const textEncoder = new TextEncoder();
+
 	type EditRange = [start: number | Position, end: number | Position];
 	type FileEdits = Map<EditRange, string>;
 	type FileEditMetaData = { isRefactoring?: boolean };
@@ -19,18 +11,21 @@ export namespace FE {
 	export class FileEdit {
 		private edits: Map<Uri, FileEdits> = new Map();
 
-		replace(uri: Uri, range: EditRange | Range, text: string) {
+		replace(uri: Uri, range: EditRange | Range, text: string): void {
 			if (range instanceof Range) range = [range.start, range.end];
 			if (range.length !== 2) throw new Error(`Range must contain (only) start and end: ${range}`);
 			if (!this.edits.has(uri)) this.edits.set(uri, new Map());
 			this.edits.get(uri).set(<[number, number]>range, text);
 		}
-		delete(uri: Uri, range: EditRange | Range) {
+
+		delete(uri: Uri, range: EditRange | Range): void {
 			this.replace(uri, range, "");
 		}
-		insert(uri: Uri, offset: number, text: string) {
+
+		insert(uri: Uri, offset: number, text: string): void {
 			this.replace(uri, [offset, offset], text);
 		}
+
 		getFsPathOfOpenDocs(): string[] {
 			const tabGroups = window.tabGroups.all;
 			const fsPaths = [];
@@ -43,18 +38,20 @@ export namespace FE {
 			}
 			return fsPaths;
 		}
-		async apply(metaData?: FileEditMetaData, background?: boolean, alwaysOpenFile?: boolean) {
+
+		async apply(metaData?: FileEditMetaData, background?: boolean, alwaysOpenFile?: boolean): Promise<void> {
 			this.edits.forEach((fileEdits, uri) => {
 				this.editFile(fileEdits, uri, metaData, background, alwaysOpenFile).catch((err) => {
 					throw new Error(`Error when applying edits to files: ${err}`);
 				});
 			});
 		}
-		reset() {
+
+		reset(): void {
 			this.edits.clear();
 		}
 
-		private async editFileWithFs(edits: FileEdits, doc: TextDocument) {
+		private async editFileWithFs(edits: FileEdits, doc: TextDocument): Promise<void> {
 			const uri = doc.uri;
 			readFile(uri.fsPath, (err, data) => {
 				if (err) throw new Error(`Error when reading file with NodeJS fs: ${err}`);
@@ -71,13 +68,14 @@ export namespace FE {
 				});
 			});
 		}
+
 		private async editFile(
 			edits: FileEdits,
 			uri: Uri,
 			metaData?: FileEditMetaData,
 			background?: boolean,
 			alwaysOpenFile?: boolean,
-		) {
+		): Promise<void> {
 			workspace.openTextDocument(uri).then(async (doc) => {
 				if (!doc.isDirty && (background || !this.getFsPathOfOpenDocs().includes(doc.fileName))) {
 					await this.editFileWithFs(edits, doc).then(

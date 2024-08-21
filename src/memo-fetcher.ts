@@ -5,12 +5,25 @@ import { getConfigMaid } from "./utils/config-maid";
 import { IntervalMaid } from "./utils/interval-maid";
 import { Janitor } from "./utils/janitor";
 import LangComments from "./lang-comments.json";
-import PresetTags from "./preset-tags.json";
+
+export type MemoEntry = {
+	readonly content: string;
+	readonly tag: string;
+	readonly priority: number;
+	readonly path: string;
+	readonly relativePath: string;
+	readonly line: number;
+	readonly offset: number;
+	readonly rawLength: number;
+	readonly raw: string;
+	readonly langId: keyof typeof LangComments;
+};
 
 const eventEmitter = EE.getEventEmitter();
 const configMaid = getConfigMaid();
 
 export class MemoFetcher {
+	customTags: { [tag: string]: string } = {};
 	readonly closeCharacters = Array.from(
 		new Set(
 			Object.values(LangComments)
@@ -23,22 +36,26 @@ export class MemoFetcher {
 
 	private watchedDocs: Map<TextDocument, { version: number; lang: string }> = new Map();
 	private docMemos: Map<TextDocument, MemoEntry[]> = new Map();
-	private tags: Set<string> = new Set(Object.keys(PresetTags));
 	private janitor = new Janitor();
 	private intervalMaid = new IntervalMaid();
 	private forceScanSuppressed = false;
 	private prevDoc: TextDocument;
 
-	async init() {
+	async init(): Promise<void> {
+		configMaid.listen("customTags");
 		configMaid.listen({
 			"fetcher.watch": (watch) => `{${watch.join(",")}}`,
 			"fetcher.ignore": (ignore) => `{${ignore.join(",")}}`,
 		});
 		configMaid.listen("fetcher.forceScanDelay");
+
+		this.fetchCustomTags();
 		await this.fetchDocs();
 		for (const doc of this.watchedDocs.keys()) this.scanDoc(doc);
 
 		this.janitor.add(
+			configMaid.onChange("customTags", () => this.fetchCustomTags()),
+
 			workspace.onDidCreateFiles(() => this.fetchDocs(true)),
 			workspace.onDidDeleteFiles(() => this.fetchDocs(true)),
 
@@ -62,36 +79,61 @@ export class MemoFetcher {
 		this.intervalMaid.add(() => this.fetchDocs(true), "fetcher.workspaceScanDelay");
 		eventEmitter.emitWait("fetcherInitFinished");
 	}
-	getMemos() {
+
+	getMemos(): MemoEntry[] {
 		const memos = Array.from(this.docMemos.values()).flat();
 		commands.executeCommand("setContext", "better-memo.noMemos", memos.length === 0);
 		return memos;
 	}
-	getTags() {
-		return Array.from(this.tags.values());
+
+	getTags(): string[] {
+		const memoTags = this.getMemos().map((memo) => memo.tag);
+		return [...new Set(memoTags.concat(Object.keys(this.customTags)))];
 	}
-	suppressForceScan() {
+
+	getCustomTagColor(memo: MemoEntry): string | undefined {
+		return this.customTags[memo.tag];
+	}
+
+	suppressForceScan(): void {
 		this.forceScanSuppressed = true;
 	}
-	unsuppressForceScan() {
+
+	unsuppressForceScan(): void {
 		this.forceScanSuppressed = false;
 	}
-	dispose() {
+
+	dispose(): void {
 		this.janitor.clearAll();
 		this.intervalMaid.dispose();
 	}
 
-	private async fetchDocs(refreshMemos?: boolean) {
+	private fetchCustomTags(): void {
+		const userDefinedCustomTags = configMaid.get("customTags");
+		const validTagRE = new RegExp(`^[^\\r\\n\t ${reEscape(this.closeCharacters)}]+$`);
+		const validHexRE = /^#[0-9a-fA-F]{6}$/;
+		const validCustomTags: { [tag: string]: string } = {};
+		for (let [tag, hex] of userDefinedCustomTags) {
+			[tag, hex] = [tag.trim(), hex.trim()];
+			if (!validTagRE.test(tag) || !validHexRE.test(hex)) continue;
+			validCustomTags[tag.toUpperCase()] = hex;
+		}
+		this.customTags = validCustomTags;
+	}
+
+	private async fetchDocs(refreshMemos?: boolean): Promise<void> {
 		const documents: TextDocument[] = (
 			await Promise.all(
-				await workspace.findFiles(configMaid.get("fetcher.watch"), configMaid.get("fetcher.ignore")).then((files) =>
-					files.map((file) =>
-						workspace.openTextDocument(file).then(
-							(doc) => doc,
-							() => null,
+				await workspace
+					.findFiles(configMaid.get("fetcher.watch"), configMaid.get("fetcher.ignore"))
+					.then((files) =>
+						files.map((file) =>
+							workspace.openTextDocument(file).then(
+								(doc) => doc,
+								() => null,
+							),
 						),
 					),
-				),
 			).catch((err) => {
 				throw new Error(`Error when fetching documents: ${err}`);
 			})
@@ -103,7 +145,8 @@ export class MemoFetcher {
 		for (const doc of this.docMemos.keys()) if (!this.watchedDocs.has(doc)) this.docMemos.delete(doc);
 		for (const doc of this.watchedDocs.keys()) if (!this.docMemos.has(doc)) this.scanDoc(doc);
 	}
-	private async scanDoc(doc: TextDocument, updateView?: boolean) {
+
+	private async scanDoc(doc: TextDocument, updateView?: boolean): Promise<void> {
 		const content = doc.getText();
 		const langId = <keyof typeof LangComments>doc.languageId;
 		const commentData = LangComments[langId];
@@ -123,7 +166,6 @@ export class MemoFetcher {
 				match.groups["priority"].length,
 				match.groups["content"].trimEnd().replace(leftoverCloseCharacters, ""),
 			];
-			this.tags.add(tag);
 			memos.push({
 				content: content,
 				tag: tag,
@@ -140,7 +182,8 @@ export class MemoFetcher {
 		this.docMemos.set(doc, memos);
 		if (updateView) eventEmitter.emit("updateView");
 	}
-	private async formatMemos(doc: TextDocument, background?: boolean) {
+
+	private async formatMemos(doc: TextDocument, background?: boolean): Promise<void> {
 		const memos = this.docMemos.get(doc);
 		if (!memos) return;
 		const edit = new FE.FileEdit();
@@ -148,7 +191,8 @@ export class MemoFetcher {
 			edit.replace(doc.uri, [memo.offset, memo.offset + memo.rawLength], getFormattedMemo(memo));
 		edit.apply({ isRefactoring: true }, background);
 	}
-	private async handleTabChange(changed: readonly TabGroup[]) {
+
+	private async handleTabChange(changed: readonly TabGroup[]): Promise<void> {
 		if (!this.prevDoc || !this.watchedDocs.has(this.prevDoc) || changed.length !== 1) return;
 		const tabGroup = changed[0];
 		const activeTab = tabGroup.activeTab;
@@ -168,7 +212,8 @@ export class MemoFetcher {
 			this.prevDoc = doc;
 		});
 	}
-	private validForScan(doc?: TextDocument) {
+
+	private validForScan(doc?: TextDocument): boolean {
 		const watched = this.watchedDocs.get(doc);
 		if (!watched) return false;
 		const versionChanged = doc.version !== watched.version;
@@ -179,20 +224,7 @@ export class MemoFetcher {
 	}
 }
 
-export type MemoEntry = {
-	readonly content: string;
-	readonly tag: string;
-	readonly priority: number;
-	readonly path: string;
-	readonly relativePath: string;
-	readonly line: number;
-	readonly offset: number;
-	readonly rawLength: number;
-	readonly raw: string;
-	readonly langId: keyof typeof LangComments;
-};
-
-export function getFormattedMemo(memo: MemoEntry) {
+export function getFormattedMemo(memo: MemoEntry): string {
 	const commentData = LangComments[memo.langId];
 	//@ts-ignore
 	const padding = commentData.close ? " " : "";
