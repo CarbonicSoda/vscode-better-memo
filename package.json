@@ -26,13 +26,25 @@
 				"icon": "$(expand-all)"
 			},
 			{
+				"command": "better-memo.switchToFileView",
+				"title": "Switch to File View",
+				"enablement": "treeView.better-memo.memoExplorer.toggleCollapseAll && better-memo.explorerIsTagView",
+				"icon": "$(folder-library)"
+			},
+			{
+				"command": "better-memo.switchToTagView",
+				"title": "Switch to Tag View",
+				"enablement": "treeView.better-memo.memoExplorer.toggleCollapseAll && better-memo.explorerIsFileView",
+				"icon": "$(symbol-parameter)"
+			},
+			{
 				"command": "better-memo.navigateToMemo",
 				"title": "Navigate to Memo"
 			},
 			{
 				"command": "better-memo.navigateToFile",
 				"title": "Navigate to File",
-				"icon": "$(file-symlink-file)"
+				"icon": "$(go-to-file)"
 			},
 			{
 				"command": "better-memo.completeMemo",
@@ -40,9 +52,28 @@
 				"icon": "$(check)"
 			},
 			{
-				"command": "better-memo.completeMemos",
-				"title": "Mark All Memos as Complete",
+				"command": "better-memo.completeMemoNoConfirm",
+				"title": "Mark Memo as Complete"
+			},
+			{
+				"command": "better-memo.confirmCompleteMemo",
+				"title": "Confirm Completion",
+				"icon": "$(trash)"
+			},
+			{
+				"command": "better-memo.completeFile",
+				"title": "Mark All Memos in File as Complete",
 				"icon": "$(check-all)"
+			},
+			{
+				"command": "better-memo.completeTag",
+				"title": "Mark All Memos Under Tag as Complete",
+				"icon": "$(tag-remove)"
+			},
+			{
+				"command": "better-memo.completeAll",
+				"title": "Mark All Memos as Complete",
+				"icon": "$(checklist)"
 			}
 		],
 		"keybindings": [],
@@ -66,9 +97,19 @@
 		"menus": {
 			"view/title": [
 				{
+					"command": "better-memo.switchToFileView",
+					"when": "view.better-memo.memoExplorer.visible && better-memo.explorerInitFinished && better-memo.explorerIsTagView",
+					"group": "navigation@1"
+				},
+				{
+					"command": "better-memo.switchToTagView",
+					"when": "view.better-memo.memoExplorer.visible && better-memo.explorerInitFinished && better-memo.explorerIsFileView",
+					"group": "navigation@1"
+				},
+				{
 					"command": "better-memo.explorerExpandAll",
 					"when": "view.better-memo.memoExplorer.visible && better-memo.explorerInitFinished",
-					"group": "navigation@1"
+					"group": "navigation@2"
 				}
 			],
 			"view/item/context": [
@@ -78,14 +119,40 @@
 					"group": "inline@1"
 				},
 				{
+					"command": "better-memo.navigateToFile",
+					"when": "view.better-memo.memoExplorer.visible && viewItem == file"
+				},
+				{
 					"command": "better-memo.completeMemo",
 					"when": "view.better-memo.memoExplorer.visible && viewItem == memo",
 					"group": "inline@1"
 				},
 				{
-					"command": "better-memo.completeMemos",
-					"when": "view.better-memo.memoExplorer.visible && (viewItem == file || viewItem == tag)",
+					"command": "better-memo.completeMemoNoConfirm",
+					"when": "view.better-memo.memoExplorer.visible && viewItem == memo"
+				},
+				{
+					"command": "better-memo.confirmCompleteMemo",
+					"when": "view.better-memo.memoExplorer.visible && viewItem == memoWaitingForConfirmComplete",
 					"group": "inline@1"
+				},
+				{
+					"command": "better-memo.completeFile",
+					"when": "view.better-memo.memoExplorer.visible && viewItem == file",
+					"group": "inline@2"
+				},
+				{
+					"command": "better-memo.completeFile",
+					"when": "view.better-memo.memoExplorer.visible && viewItem == file"
+				},
+				{
+					"command": "better-memo.completeTag",
+					"when": "view.better-memo.memoExplorer.visible && viewItem == tag",
+					"group": "inline@1"
+				},
+				{
+					"command": "better-memo.completeTag",
+					"when": "view.better-memo.memoExplorer.visible && viewItem == tag"
 				}
 			]
 		},
@@ -93,23 +160,24 @@
 			{
 				"view": "better-memo.memoExplorer",
 				"contents": "Memos are loading.\nIf this is taking too long, consider changing fetcher configurations.",
-				"when": "!better-memo.explorerInitFinished"
+				"when": "!better-memo.explorerInitFinished && !treeView.better-memo.memoExplorer.toggleCollapseAll"
 			},
 			{
 				"view": "better-memo.memoExplorer",
 				"contents": "You have not yet opened any folders.\n[Open Folder](command:workbench.action.files.openFolder)",
-				"when": "better-memo.noFiles"
+				"when": "!treeView.better-memo.memoExplorer.toggleCollapseAll && better-memo.noFiles"
 			},
 			{
 				"view": "better-memo.memoExplorer",
 				"contents": "Oops, cannot spot any memos throughout the universe!\nConsider spicing up the place with some memos!",
-				"when": "!better-memo.noFiles && better-memo.noMemos"
+				"when": "!treeView.better-memo.memoExplorer.toggleCollapseAll && !better-memo.noFiles && better-memo.noMemos"
 			}
 		],
 		"configuration": {
 			"title": "Better Memo",
 			"properties": {
 				"better-memo.fetcher.watch": {
+					"order": 0,
 					"type": "array",
 					"items": {
 						"type": "string"
@@ -119,6 +187,7 @@
 					]
 				},
 				"better-memo.fetcher.ignore": {
+					"order": 1,
 					"type": "array",
 					"items": {
 						"type": "string"
@@ -127,19 +196,23 @@
 						"**/node_modules"
 					]
 				},
-				"better-memo.fetcher.workspaceScanDelay": {
-					"type": "integer",
-					"default": 5000
-				},
 				"better-memo.fetcher.scanDelay": {
+					"order": 2,
 					"type": "integer",
 					"default": 1000
 				},
 				"better-memo.fetcher.forceScanDelay": {
+					"order": 3,
 					"type": "integer",
 					"default": 5000
 				},
-				"better-memo.view.primaryGroup": {
+				"better-memo.fetcher.workspaceScanDelay": {
+					"order": 4,
+					"type": "integer",
+					"default": 5000
+				},
+				"better-memo.view.defaultView": {
+					"order": 5,
 					"type": "string",
 					"enum": [
 						"File",
@@ -147,11 +220,33 @@
 					],
 					"default": "File"
 				},
-				"better-memo.view.expandPrimaryGroupByDefault": {
+				"better-memo.view.expandPrimaryByDefault": {
+					"order": 6,
 					"type": "boolean",
 					"default": true
 				},
-				"better-memo.view.expandSecondaryGroupByDefault": {
+				"better-memo.view.expandSecondaryByDefault": {
+					"order": 7,
+					"type": "boolean",
+					"default": true
+				},
+				"better-memo.view.confirmCompleteMemo": {
+					"order": 8,
+					"type": "boolean",
+					"default": false
+				},
+				"better-memo.view.confirmCompleteMultiple": {
+					"order": 9,
+					"type": "boolean",
+					"default": true
+				},
+				"better-memo.view.confirmCompleteTimeout": {
+					"order": 10,
+					"type": "integer",
+					"default": 3000
+				},
+				"better-memo.view.alwaysOpenFileOnCompleteSingleMemo": {
+					"order": 11,
 					"type": "boolean",
 					"default": true
 				}
@@ -178,5 +273,4 @@
 		"@vscode/test-electron": "^2.3.9"
 	}
 }
-
 

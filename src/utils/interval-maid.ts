@@ -7,8 +7,8 @@ export class IntervalMaid {
 		ConfigMaid.listen(delayConfigName, configCallback);
 		const intervalId = this.intervalJanitor.add(setInterval(callback, ConfigMaid.get(delayConfigName)));
 		this.configChangeJanitor.add(
-			ConfigMaid.onChange(delayConfigName, () =>
-				this.intervalJanitor.override(intervalId, setInterval(callback, ConfigMaid.get(delayConfigName))),
+			ConfigMaid.onChange(delayConfigName, (delay) =>
+				this.intervalJanitor.override(intervalId, setInterval(callback, delay)),
 			),
 		);
 		return intervalId;

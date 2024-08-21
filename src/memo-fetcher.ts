@@ -9,10 +9,7 @@ import LangComments from "./lang-comments.json";
 const eventEmitter = EE.getEventEmitter();
 const configMaid = getConfigMaid();
 export class MemoFetcher {
-	private watchedDocs: Map<TextDocument, { version: number; lang: string }> = new Map();
-	private docMemos: Map<TextDocument, MemoEntry[]> = new Map();
-	private tags: Set<string> = new Set();
-	private closeCharacters = Array.from(
+	readonly closeCharacters = Array.from(
 		new Set(
 			Object.values(LangComments)
 				//@ts-ignore
@@ -21,6 +18,10 @@ export class MemoFetcher {
 				.split(""),
 		),
 	).join("");
+
+	private watchedDocs: Map<TextDocument, { version: number; lang: string }> = new Map();
+	private docMemos: Map<TextDocument, MemoEntry[]> = new Map();
+	private tags: Set<string> = new Set();
 	private janitor = new Janitor();
 	private intervalMaid = new IntervalMaid();
 	private prevDoc: TextDocument;
@@ -94,29 +95,30 @@ export class MemoFetcher {
 		for (const doc of this.watchedDocs.keys()) if (!this.docMemos.has(doc)) this.scanDoc(doc);
 	}
 	private async scanDoc(doc: TextDocument, updateView?: boolean) {
-		const rawString = (str?: string) => str?.replaceAll("", "\\").slice(0, -1);
 		const content = doc.getText();
 		const langId = <keyof typeof LangComments>doc.languageId;
 		const commentData = LangComments[langId];
 		//@ts-ignore
-		const close = rawString(commentData.close) ?? "";
+		const close = reEscape(commentData.close) ?? "";
 		const matchPattern = new RegExp(
-			`${rawString(commentData.open)}[\t ]*mo[\t ]+(?<tag>[^\\r\\n\t ${rawString(
+			`${reEscape(commentData.open)}[\t ]*mo[\t ]+(?<tag>[^\\r\\n\t ${reEscape(
 				this.closeCharacters,
-			)}]+)[\t ]*(?<content>.*${close ? "?" : ""})${close}`,
+			)}]+)[\t ]*(?<priority>!*)(?<content>.*${close ? "?" : ""})${close}`,
 			"gim",
 		);
 		let memos = [];
-		const leftoverCloseCharacters = new RegExp(`^[${rawString(this.closeCharacters)}]*`);
+		const leftoverCloseCharacters = new RegExp(`^[${reEscape(this.closeCharacters)}]*`);
 		for (const match of content.matchAll(matchPattern)) {
-			const [tag, content] = [
+			const [tag, priority, content] = [
 				match.groups["tag"].toUpperCase(),
+				match.groups["priority"].length,
 				match.groups["content"].trimEnd().replace(leftoverCloseCharacters, ""),
 			];
 			this.tags.add(tag);
 			memos.push({
 				content: content,
 				tag: tag,
+				priority: priority,
 				path: doc.fileName,
 				relativePath: workspace.asRelativePath(doc.fileName),
 				line: doc.positionAt(match.index).line,
@@ -148,6 +150,7 @@ export class MemoFetcher {
 			(input && Object.getPrototypeOf(input).constructor.name !== "Kn")
 		)
 			return;
+		if (this.prevDoc.isDirty) return;
 		if (this.validForScan(this.prevDoc)) await this.scanDoc(this.prevDoc, true);
 		this.formatMemos(this.prevDoc, true);
 		if (!input) return;
@@ -170,6 +173,7 @@ export class MemoFetcher {
 export type MemoEntry = {
 	readonly content: string;
 	readonly tag: string;
+	readonly priority: number;
 	readonly path: string;
 	readonly relativePath: string;
 	readonly line: number;
@@ -183,8 +187,12 @@ export function getFormattedMemo(memo: MemoEntry) {
 	const commentData = LangComments[memo.langId];
 	//@ts-ignore
 	const padding = commentData.close ? " " : "";
-	return `${commentData.open}${padding}MO ${memo.tag}${memo.content ? " " : ""}${memo.content}${padding}${
+	return `${commentData.open}${padding}MO ${memo.tag}${memo.content ? " " : ""}${"!".repeat(memo.priority)}${
+		memo.content
+	}${padding}${
 		//@ts-ignore
 		commentData.close ?? ""
 	}`;
 }
+
+const reEscape = (str?: string) => str?.replace(/[[\]*+?{}.()^$|/\\-]/g, "\\$&");

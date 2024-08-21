@@ -45,9 +45,9 @@ export namespace FE {
 			}
 			return fsPaths;
 		}
-		async apply(metaData?: FileEditMetaData, background?: boolean) {
+		async apply(metaData?: FileEditMetaData, background?: boolean, alwaysOpenFile?: boolean) {
 			this.edits.forEach(async (fileEdits, uri) => {
-				this.editFile(fileEdits, uri, metaData, background).catch((err) => {
+				this.editFile(fileEdits, uri, metaData, background, alwaysOpenFile).catch((err) => {
 					throw new Error(`Error when applying edits to files: ${err}`);
 				});
 			});
@@ -73,14 +73,26 @@ export namespace FE {
 				});
 			});
 		}
-		private async editFile(edits: FileEdits, uri: Uri, metaData?: FileEditMetaData, background?: boolean) {
+		private async editFile(
+			edits: FileEdits,
+			uri: Uri,
+			metaData?: FileEditMetaData,
+			background?: boolean,
+			alwaysOpenFile?: boolean,
+		) {
 			workspace.openTextDocument(uri).then(async (doc) => {
-				if (background || !this.getFsPathOfOpenDocs().includes(doc.fileName)) {
-					await this.editFileWithFs(edits, doc).catch((err) => {
-						throw new Error(`Error when editing with NodeJS fs: ${err}`);
-					});
+				if (!doc.isDirty && (background || !this.getFsPathOfOpenDocs().includes(doc.fileName))) {
+					await this.editFileWithFs(edits, doc).then(
+						() => {
+							if (alwaysOpenFile) window.showTextDocument(doc);
+						},
+						(err) => {
+							throw new Error(`Error when editing with NodeJS fs: ${err}`);
+						},
+					);
 					return;
 				}
+				console.log("WE YES");
 				await window
 					.showTextDocument(doc)
 					.then(() => commands.executeCommand("workbench.action.files.saveWithoutFormatting", doc));

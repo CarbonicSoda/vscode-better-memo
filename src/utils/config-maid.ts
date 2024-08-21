@@ -22,7 +22,7 @@ const ConfigMaid: {
 	 * @param configs configurations to listen for change
 	 * @param callback function supplied with the new values packed into an object
 	 */
-	onChange(configs: string | string[], callback: (newValues: NewValues) => void): Disposable;
+	onChange(configs: string | string[], callback: (...newValues: any[]) => void): Disposable;
 	dispose(): void;
 
 	config: WorkspaceConfiguration;
@@ -40,6 +40,7 @@ const ConfigMaid: {
 		this.configsMap.set(configNameOrList, callback);
 	},
 	get(configName) {
+		if (!this.configsMap.has(configName)) throw new Error(`${configName} is not listened`);
 		return this.configsMap.get(configName)(this.config.get(configName));
 	},
 	onChange(configs, callback) {
@@ -47,7 +48,7 @@ const ConfigMaid: {
 		return workspace.onDidChangeConfiguration((ev) => {
 			if (!ev.affectsConfiguration("better-memo")) return;
 			if (!_configs.some((config) => ev.affectsConfiguration(`better-memo.${config}`))) return;
-			callback(Object.fromEntries(_configs.map((config) => [config, this.config.get(config)])));
+			callback(..._configs.map((config) => this.config.get(config)));
 		});
 	},
 	dispose() {
@@ -64,7 +65,4 @@ const ConfigMaid: {
 };
 type ListenList = {
 	[configName: string]: null | ((retrieved: any) => any);
-};
-type NewValues = {
-	[changedConfig: string]: any;
 };
