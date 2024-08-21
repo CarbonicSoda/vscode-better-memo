@@ -5,11 +5,13 @@ export function getColorMaid() {
 	return ColorMaid;
 }
 const ColorMaid: {
-	interpolate(rgb: RGB3): ThemeColor;
+	interpolate(rgbOrHex: RGB3 | string): ThemeColor;
 	randomColor(): ThemeColor;
 	hashColor(hashString: string): ThemeColor;
+	hex2rgb(hex: string): RGB3;
 } = {
-	interpolate(rgb) {
+	interpolate(rgbOrHex) {
+		const rgb = typeof rgbOrHex === "string" ? this.hex2rgb(rgbOrHex) : rgbOrHex;
 		let bestDist = 999999;
 		let best = "";
 		for (const [colorName, colorRgb] of Object.entries(VscodeColors)) {
@@ -29,6 +31,10 @@ const ColorMaid: {
 	hashColor(hashString) {
 		const rgb = colorHash(hashString);
 		return this.interpolate(<RGB3>rgb);
+	},
+	hex2rgb(hex) {
+		hex = hex.replace("#", "");
+		return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
 	},
 };
 type RGB3 = [number, number, number];
