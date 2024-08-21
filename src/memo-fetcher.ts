@@ -9,6 +9,7 @@ import PresetTags from "./preset-tags.json";
 
 const eventEmitter = EE.getEventEmitter();
 const configMaid = getConfigMaid();
+
 export class MemoFetcher {
 	readonly closeCharacters = Array.from(
 		new Set(
@@ -19,6 +20,8 @@ export class MemoFetcher {
 				.split(""),
 		),
 	).join("");
+
+	public maxPriority = 0;
 
 	private watchedDocs: Map<TextDocument, { version: number; lang: string }> = new Map();
 	private docMemos: Map<TextDocument, MemoEntry[]> = new Map();
@@ -116,6 +119,7 @@ export class MemoFetcher {
 			"gim",
 		);
 		let memos = [];
+		let maxPriority = 0;
 		const leftoverCloseCharacters = new RegExp(`^[${reEscape(this.closeCharacters)}]*`);
 		for (const match of content.matchAll(matchPattern)) {
 			const [tag, priority, content] = [
@@ -124,6 +128,7 @@ export class MemoFetcher {
 				match.groups["content"].trimEnd().replace(leftoverCloseCharacters, ""),
 			];
 			this.tags.add(tag);
+			if (priority > maxPriority) maxPriority = priority;
 			memos.push({
 				content: content,
 				tag: tag,
@@ -138,6 +143,7 @@ export class MemoFetcher {
 			});
 		}
 		this.docMemos.set(doc, memos);
+		this.maxPriority = maxPriority;
 		if (updateView) eventEmitter.emit("updateView");
 	}
 	private async formatMemos(doc: TextDocument, background?: boolean) {

@@ -1,13 +1,13 @@
-import * as vscode from "vscode";
+import { ThemeColor } from "vscode";
 import VscodeColors from "../vscode-colors.json";
 
 export function getColorMaid() {
 	return ColorMaid;
 }
 const ColorMaid: {
-	interpolate(rgb: RGB3): vscode.ThemeColor;
-	randomColor(): vscode.ThemeColor;
-	hashColor(hashString: string): vscode.ThemeColor;
+	interpolate(rgb: RGB3): ThemeColor;
+	randomColor(): ThemeColor;
+	hashColor(hashString: string): ThemeColor;
 } = {
 	interpolate(rgb) {
 		let bestDist = 999999;
@@ -20,7 +20,7 @@ const ColorMaid: {
 				best = colorName;
 			}
 		}
-		return new vscode.ThemeColor(best);
+		return new ThemeColor(best);
 	},
 	randomColor() {
 		const rgb = [randInt(0, 255), randInt(0, 255), randInt(0, 255)];
@@ -33,11 +33,11 @@ const ColorMaid: {
 };
 type RGB3 = [number, number, number];
 
-const randInt = (min: number, max: number) => Math.floor(Math.random() * (max - min) + min);
-// Hash function modified from https://github.com/RolandR/ColorHash
+const randInt = (min: number, max: number) => Math.round(Math.random() * (max - min) + min);
+// Hash function from https://github.com/RolandR/ColorHash, modified to make permutations of characters be treated differently etc
 function colorHash(hashString: string) {
 	let sum = 0;
-	for (let i = 0; i < hashString.length; i++) sum += hashString.charCodeAt(i);
+	for (let i = 0; i < hashString.length; i++) sum += hashString.charCodeAt(i) * (i + 1);
 	const getVal = (param: number) =>
 		Math.floor(
 			Number(

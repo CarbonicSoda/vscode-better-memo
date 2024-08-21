@@ -2,11 +2,14 @@ import * as vscode from "vscode";
 import { EE } from "./utils/event-emitter";
 import { FE } from "./utils/file-edit";
 import { getConfigMaid } from "./utils/config-maid";
+import { getColorMaid } from "./utils/color-maid";
 import { Janitor } from "./utils/janitor";
 import { MemoFetcher, MemoEntry, getFormattedMemo } from "./memo-fetcher";
 
 const eventEmitter = EE.getEventEmitter();
 const configMaid = getConfigMaid();
+const colorMaid = getColorMaid();
+
 export class ExplorerTreeView {
 	public memoFetcher: MemoFetcher;
 	public viewProvider: ExplorerViewProvider;
@@ -176,7 +179,8 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<ExplorerTreeItem> 
 				}
 				memos = urgent.sort((a, b) => b.priority - a.priority).concat(normal);
 				const halfLeafItem = innerItem.children[j];
-				const memoItems = memos.map((m) => new Memo(<MemoEntry>m, <InnerItemType>halfLeafItem));
+				const tagColor = (<vscode.ThemeIcon>(isFileView ? halfLeafItem : innerItem).iconPath).color;
+				const memoItems = memos.map((memoEntry) => new Memo(<MemoEntry>memoEntry, <InnerItemType>halfLeafItem, tagColor, this._memoFetcher.maxPriority));
 				(<InnerItemType>halfLeafItem).children = memoItems;
 				childMemoCount += memoItems.length;
 
@@ -346,7 +350,7 @@ class File extends InnerItem {
 	// }
 }
 class Tag extends InnerItem {
-	readonly idleIconColor = new vscode.ThemeColor("icon.foreground");
+	readonly idleIconColor = colorMaid.hashColor(this.label.toString());
 	readonly idleIcon = new vscode.ThemeIcon("bookmark", this.idleIconColor);
 
 	constructor(tag: string, expand: boolean, parent?: InnerItem) {
@@ -358,16 +362,12 @@ class Tag extends InnerItem {
 }
 
 class Memo extends CompletableItem {
-	readonly idleIconColor = new vscode.ThemeColor("icon.foreground"); //use priority
-	readonly idleIcon = new vscode.ThemeIcon("circle-filled", this.idleIconColor);
-
-	constructor(public memoEntry: MemoEntry, parent: InnerItem) {
+	constructor(public memoEntry: MemoEntry, parent: InnerItem, tagColor: vscode.ThemeColor, maxPriority: number) {
 		const content = memoEntry.content === "" ? "Placeholder T^T" : memoEntry.content;
 		super(content, "none", parent);
 
 		this.description = `Ln ${memoEntry.line + 1}`;
 		this.tooltip = `${memoEntry.tag} ~ ${memoEntry.relativePath} - Ln ${memoEntry.line + 1}\n${content}`; //use markdown string
-		this.iconPath = this.idleIcon;
 		this.contextValue = "memo";
 		this.command = {
 			command: "better-memo.navigateToMemo",
@@ -375,6 +375,8 @@ class Memo extends CompletableItem {
 			tooltip: "Navigate to Memo",
 			arguments: [memoEntry],
 		};
+		let iconColor = memoEntry.priority === 0 ? tagColor : colorMaid.interpolate([255, (1 - memoEntry.priority / maxPriority) * 255, 0]);
+		this.iconPath = new vscode.ThemeIcon("circle-filled", iconColor);
 	}
 
 	complete(explorerTreeView: ExplorerTreeView, noConfirm?: boolean) {
