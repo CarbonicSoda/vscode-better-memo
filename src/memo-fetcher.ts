@@ -21,8 +21,6 @@ export class MemoFetcher {
 		),
 	).join("");
 
-	public maxPriority = 0;
-
 	private watchedDocs: Map<TextDocument, { version: number; lang: string }> = new Map();
 	private docMemos: Map<TextDocument, MemoEntry[]> = new Map();
 	private tags: Set<string> = new Set(Object.keys(PresetTags));
@@ -62,7 +60,6 @@ export class MemoFetcher {
 			this.scanDoc(doc, true);
 		}, "fetcher.forceScanDelay");
 		this.intervalMaid.add(() => this.fetchDocs(true), "fetcher.workspaceScanDelay");
-
 		eventEmitter.emitWait("fetcherInitFinished");
 	}
 	getMemos() {
@@ -119,7 +116,6 @@ export class MemoFetcher {
 			"gim",
 		);
 		let memos = [];
-		let maxPriority = 0;
 		const leftoverCloseCharacters = new RegExp(`^[${reEscape(this.closeCharacters)}]*`);
 		for (const match of content.matchAll(matchPattern)) {
 			const [tag, priority, content] = [
@@ -128,7 +124,6 @@ export class MemoFetcher {
 				match.groups["content"].trimEnd().replace(leftoverCloseCharacters, ""),
 			];
 			this.tags.add(tag);
-			if (priority > maxPriority) maxPriority = priority;
 			memos.push({
 				content: content,
 				tag: tag,
@@ -143,7 +138,6 @@ export class MemoFetcher {
 			});
 		}
 		this.docMemos.set(doc, memos);
-		this.maxPriority = maxPriority;
 		if (updateView) eventEmitter.emit("updateView");
 	}
 	private async formatMemos(doc: TextDocument, background?: boolean) {

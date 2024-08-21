@@ -5,6 +5,7 @@ import { getConfigMaid } from "./utils/config-maid";
 import { getColorMaid } from "./utils/color-maid";
 import { Janitor } from "./utils/janitor";
 import { MemoFetcher, MemoEntry, getFormattedMemo } from "./memo-fetcher";
+import PresetTags from "./preset-tags.json";
 
 const eventEmitter = EE.getEventEmitter();
 const configMaid = getConfigMaid();
@@ -180,13 +181,18 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<ExplorerTreeItem> 
 				memos = urgent.sort((a, b) => b.priority - a.priority).concat(normal);
 				const halfLeafItem = innerItem.children[j];
 				const tagColor = (<vscode.ThemeIcon>(isFileView ? halfLeafItem : innerItem).iconPath).color;
-				const memoItems = memos.map((memoEntry) => new Memo(<MemoEntry>memoEntry, <InnerItemType>halfLeafItem, tagColor, this._memoFetcher.maxPriority));
+				const maxPriority = Math.max(...memos.map((memo) => (<MemoEntry>memo).priority));
+				const memoItems = memos.map(
+					(memo) => new Memo(<MemoEntry>memo, <InnerItemType>halfLeafItem, tagColor, maxPriority),
+				);
 				(<InnerItemType>halfLeafItem).children = memoItems;
 				childMemoCount += memoItems.length;
 
 				halfLeafItem.description = `${memoItems.length} Memo${multiplicity(memoItems)}`;
 				halfLeafItem.tooltip = new vscode.MarkdownString(
-					`${isFileView ? "Tag" : "File"}: ${halfLeafItem.label} - ${memoItems.length} $(edit)`,
+					`### ${isFileView ? "Tag: **" : "File: *"}${halfLeafItem.label}${isFileView ? "**" : "*"} - ${
+						memoItems.length
+					} $(pencil)`,
 					true,
 				);
 			}
@@ -195,9 +201,9 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<ExplorerTreeItem> 
 				halfLeafItems,
 			)} > ${childMemoCount} Memo${multiplicity(childMemoCount)}`;
 			innerItem.tooltip = new vscode.MarkdownString(
-				`${isFileView ? "File" : "Tag"}: ${innerItem.label} - ${halfLeafItems.length} ${
-					isFileView ? "$(bookmark)" : "$(file)"
-				} ${childMemoCount} $(edit)`,
+				`### ${isFileView ? "File: *" : "Tag: **"}${innerItem.label}${isFileView ? "*" : "**"} - ${
+					halfLeafItems.length
+				} ${isFileView ? "$(bookmark)" : "$(file)"} ${childMemoCount} $(pencil)`,
 				true,
 			);
 		}
@@ -209,10 +215,6 @@ type InnerItemType = File | Tag;
 type ExplorerTreeItem = CompletableItem | InnerItemType | Memo;
 
 class CompletableItem extends vscode.TreeItem {
-	static readonly confirmIconPhase1 = new vscode.ThemeIcon("loading~spin", new vscode.ThemeColor("#fffb00"));
-	static readonly confirmIconPhase2 = new vscode.ThemeIcon("loading~spin", new vscode.ThemeColor("#43ff00"));
-	static readonly confirmIconPhase3 = new vscode.ThemeIcon("loading~spin", new vscode.ThemeColor("#00fff2"));
-
 	readonly hierarchy: "parent" | "child";
 
 	private attemptedToComplete = false;
@@ -252,7 +254,6 @@ class CompletableItem extends vscode.TreeItem {
 			if (abbrevLabel.length > labelOptions.maxLength)
 				abbrevLabel = `${abbrevLabel.slice(0, labelOptions.maxLength)}...`;
 			this.label = abbrevLabel;
-			this.iconPath = CompletableItem.confirmIconPhase1;
 			this.contextValue = confirmContext;
 
 			explorerTreeView.memoFetcher.suppressForceScan();
@@ -261,8 +262,8 @@ class CompletableItem extends vscode.TreeItem {
 			let time = timeout;
 			const updateTime = (time: number) => {
 				this.description = `Confirm in ${Math.round(time / 1000)}`;
-				if (time / timeout < 0.33) this.iconPath = CompletableItem.confirmIconPhase3;
-				else if (time / timeout < 0.66) this.iconPath = CompletableItem.confirmIconPhase2;
+				const gbVal = (255 * time) / timeout;
+				this.iconPath = new vscode.ThemeIcon("loading~spin", colorMaid.interpolate([255, gbVal, gbVal]));
 				explorerTreeView.viewProvider.refresh(this);
 			};
 			updateTime(timeout);
@@ -367,7 +368,10 @@ class Memo extends CompletableItem {
 		super(content, "none", parent);
 
 		this.description = `Ln ${memoEntry.line + 1}`;
-		this.tooltip = `${memoEntry.tag} ~ ${memoEntry.relativePath} - Ln ${memoEntry.line + 1}\n${content}`; //use markdown string
+		this.tooltip = new vscode.MarkdownString(
+			`#### **${memoEntry.tag}** ~ *${memoEntry.relativePath}* - Ln ${memoEntry.line + 1}\n***\n## ${content}`,
+		);
+		this.tooltip.supportHtml = true;
 		this.contextValue = "memo";
 		this.command = {
 			command: "better-memo.navigateToMemo",
@@ -375,8 +379,13 @@ class Memo extends CompletableItem {
 			tooltip: "Navigate to Memo",
 			arguments: [memoEntry],
 		};
-		let iconColor = memoEntry.priority === 0 ? tagColor : colorMaid.interpolate([255, (1 - memoEntry.priority / maxPriority) * 255, 0]);
-		this.iconPath = new vscode.ThemeIcon("circle-filled", iconColor);
+		this.iconPath =
+			memoEntry.priority === 0
+				? new vscode.ThemeIcon("circle-filled", tagColor)
+				: new vscode.ThemeIcon(
+						"circle-outline",
+						colorMaid.interpolate([255, (1 - memoEntry.priority / maxPriority) * 255, 0]),
+				  );
 	}
 
 	complete(explorerTreeView: ExplorerTreeView, noConfirm?: boolean) {
@@ -419,6 +428,7 @@ function groupObjects(arrayOrIterable: { [key: string]: any }[], grouper: string
 
 //@ts-ignore
 const multiplicity = (countable: number | any[]) => ((countable.length ?? countable) === 1 ? "" : "s");
+const reEscape = (str?: string) => str?.replace(/[[\]*+?{}.()^$|/\\-]/g, "\\$&");
 
 function deleteItem(item: ExplorerTreeItem, viewProvider: ExplorerViewProvider) {
 	const parent = item.parent ?? viewProvider;
@@ -427,5 +437,3 @@ function deleteItem(item: ExplorerTreeItem, viewProvider: ExplorerViewProvider) 
 	if (item.parent && parent.getChildItems().length === 0) deleteItem(<ExplorerTreeItem>parent, viewProvider);
 	return item.parent;
 }
-
-const reEscape = (str?: string) => str?.replace(/[[\]*+?{}.()^$|/\\-]/g, "\\$&");
