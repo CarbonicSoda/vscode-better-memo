@@ -165,12 +165,12 @@
 			{
 				"view": "better-memo.memoExplorer",
 				"contents": "You have not yet opened any folders.\n[Open Folder](command:workbench.action.files.openFolder)",
-				"when": "!treeView.better-memo.memoExplorer.toggleCollapseAll && better-memo.noFiles"
+				"when": "better-memo.explorerInitFinished && better-memo.noFiles"
 			},
 			{
 				"view": "better-memo.memoExplorer",
 				"contents": "Oops, cannot spot any memos throughout the universe!\nConsider spicing up the place with some memos!",
-				"when": "!treeView.better-memo.memoExplorer.toggleCollapseAll && !better-memo.noFiles && better-memo.noMemos"
+				"when": "better-memo.explorerInitFinished && !better-memo.noFiles && better-memo.noMemos"
 			}
 		],
 		"configuration": {
@@ -204,12 +204,12 @@
 				"better-memo.fetcher.forceScanDelay": {
 					"order": 3,
 					"type": "integer",
-					"default": 5000
+					"default": 10000
 				},
 				"better-memo.fetcher.workspaceScanDelay": {
 					"order": 4,
 					"type": "integer",
-					"default": 5000
+					"default": 10000
 				},
 				"better-memo.view.defaultView": {
 					"order": 5,

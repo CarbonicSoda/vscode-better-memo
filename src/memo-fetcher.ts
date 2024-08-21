@@ -5,6 +5,7 @@ import { getConfigMaid } from "./utils/config-maid";
 import { IntervalMaid } from "./utils/interval-maid";
 import { Janitor } from "./utils/janitor";
 import LangComments from "./lang-comments.json";
+import PresetTags from "./preset-tags.json";
 
 const eventEmitter = EE.getEventEmitter();
 const configMaid = getConfigMaid();
@@ -21,9 +22,10 @@ export class MemoFetcher {
 
 	private watchedDocs: Map<TextDocument, { version: number; lang: string }> = new Map();
 	private docMemos: Map<TextDocument, MemoEntry[]> = new Map();
-	private tags: Set<string> = new Set();
+	private tags: Set<string> = new Set(Object.keys(PresetTags));
 	private janitor = new Janitor();
 	private intervalMaid = new IntervalMaid();
+	private forceScanSuppressed = false;
 	private prevDoc: TextDocument;
 
 	async init() {
@@ -51,13 +53,14 @@ export class MemoFetcher {
 			if (this.validForScan(doc)) this.scanDoc(doc, true);
 		}, "fetcher.scanDelay");
 		this.intervalMaid.add(() => {
+			if (this.forceScanSuppressed) return;
 			const doc = window.activeTextEditor?.document;
 			if (!doc || !this.watchedDocs.has(doc)) return;
 			this.scanDoc(doc, true);
 		}, "fetcher.forceScanDelay");
 		this.intervalMaid.add(() => this.fetchDocs(true), "fetcher.workspaceScanDelay");
 
-		eventEmitter.emitWait("fetcherInit");
+		eventEmitter.emitWait("fetcherInitFinished");
 	}
 	getMemos() {
 		const memos = Array.from(this.docMemos.values()).flat();
@@ -66,6 +69,12 @@ export class MemoFetcher {
 	}
 	getTags() {
 		return Array.from(this.tags.values());
+	}
+	suppressForceScan() {
+		this.forceScanSuppressed = true;
+	}
+	unsuppressForceScan() {
+		this.forceScanSuppressed = false;
 	}
 	dispose() {
 		this.janitor.clearAll();

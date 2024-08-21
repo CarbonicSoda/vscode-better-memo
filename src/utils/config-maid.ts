@@ -3,7 +3,6 @@ import { workspace, Disposable, WorkspaceConfiguration } from "vscode";
 export function getConfigMaid() {
 	return ConfigMaid;
 }
-
 const ConfigMaid: {
 	/**
 	 * @param configName name of configuration to keep track of

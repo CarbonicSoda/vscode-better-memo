@@ -8,11 +8,13 @@ import { MemoFetcher, MemoEntry, getFormattedMemo } from "./memo-fetcher";
 const eventEmitter = EE.getEventEmitter();
 const configMaid = getConfigMaid();
 export class ExplorerTreeView {
-	private viewProvider: ExplorerViewProvider;
+	public memoFetcher: MemoFetcher;
+	public viewProvider: ExplorerViewProvider;
+
 	private view: vscode.TreeView<ExplorerTreeItem>;
 	private janitor = new Janitor();
 
-	init(memoFetcher: MemoFetcher) {
+	async init(memoFetcher: MemoFetcher) {
 		configMaid.listen("view.defaultView");
 		configMaid.listen("view.expandPrimaryByDefault");
 		configMaid.listen("view.expandSecondaryByDefault");
@@ -21,8 +23,10 @@ export class ExplorerTreeView {
 		configMaid.listen("view.confirmCompleteTimeout");
 		configMaid.listen("view.alwaysOpenFileOnCompleteSingleMemo");
 
+		this.memoFetcher = memoFetcher;
 		this.viewProvider = new ExplorerViewProvider(memoFetcher);
-		this.updateViewType(this.viewProvider.currentView);
+		this.updateViewType(null, true);
+		await this.viewProvider.init();
 		this.view = vscode.window.createTreeView("better-memo.memoExplorer", {
 			treeDataProvider: this.viewProvider,
 			showCollapseAll: true,
@@ -46,9 +50,9 @@ export class ExplorerTreeView {
 			vscode.commands.registerCommand("better-memo.switchToTagView", () => this.updateViewType("Tag")),
 			vscode.commands.registerCommand("better-memo.navigateToMemo", (memo: MemoEntry) => this.navigateToMemo(memo)),
 			vscode.commands.registerCommand("better-memo.navigateToFile", (file: File) => file.navigate()),
-			vscode.commands.registerCommand("better-memo.completeMemo", (memo: Memo) => memo.complete(this.viewProvider)),
-			vscode.commands.registerCommand("better-memo.confirmCompleteMemo", (memo: Memo) => memo.complete(this.viewProvider)),
-			vscode.commands.registerCommand("better-memo.completeMemoNoConfirm", (memo: Memo) => memo.complete(this.viewProvider, true)),
+			vscode.commands.registerCommand("better-memo.completeMemo", (memo: Memo) => memo.complete(this)),
+			vscode.commands.registerCommand("better-memo.confirmCompleteMemo", (memo: Memo) => memo.complete(this)),
+			vscode.commands.registerCommand("better-memo.completeMemoNoConfirm", (memo: Memo) => memo.complete(this, true)),
 		);
 		vscode.commands.executeCommand("setContext", "better-memo.explorerInitFinished", true);
 	}
@@ -56,14 +60,15 @@ export class ExplorerTreeView {
 		this.janitor.clearAll();
 	}
 
-	private updateViewType(view: "File" | "Tag") {
-		this.viewProvider.currentView = view;
+	private updateViewType(view?: "File" | "Tag", noReload?: boolean) {
+		this.viewProvider.currentView = view ?? configMaid.get("view.defaultView");
 		vscode.commands.executeCommand(
 			"setContext",
 			`better-memo.explorerIs${view === "File" ? "Tag" : "File"}View`,
 			false,
 		);
 		vscode.commands.executeCommand("setContext", `better-memo.explorerIs${view}View`, true);
+		if (noReload) return;
 		this.viewProvider.reloadItems();
 	}
 	private navigateToMemo(memo: MemoEntry) {
@@ -101,20 +106,21 @@ export class ExplorerTreeView {
 	}
 }
 class ExplorerViewProvider implements vscode.TreeDataProvider<ExplorerTreeItem> {
-	items: ParentItemType[] = [];
+	items: InnerItemType[] = [];
 	memoCount = 0;
 	currentView: "File" | "Tag";
-	private _onDidChangeTreeData: vscode.EventEmitter<void | ExplorerTreeItem> = new vscode.EventEmitter<void | ExplorerTreeItem>();
+	private _onDidChangeTreeData: vscode.EventEmitter<void | ExplorerTreeItem> =
+		new vscode.EventEmitter<void | ExplorerTreeItem>();
 	readonly onDidChangeTreeData: vscode.Event<void | ExplorerTreeItem> = this._onDidChangeTreeData.event;
 
-	constructor(private _memoFetcher: MemoFetcher) {
-		this.currentView = configMaid.get("view.defaultView");
-		eventEmitter.wait("fetcherInit").then(() => this.reloadItems());
+	constructor(private _memoFetcher: MemoFetcher) {}
+	async init() {
+		await eventEmitter.wait("fetcherInitFinished").then(() => this.reloadItems());
 	}
 	getChildItems() {
 		return this.items;
 	}
-	setChildItems(items: ParentItemType[]) {
+	setChildItems(items: InnerItemType[]) {
 		this.items = items;
 	}
 	getTreeItem(element: ExplorerTreeItem) {
@@ -123,7 +129,7 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<ExplorerTreeItem> 
 	getParent(element: ExplorerTreeItem) {
 		return element.parent;
 	}
-	getChildren(element: ParentItemType | undefined) {
+	getChildren(element: InnerItemType | undefined) {
 		if (element) return element.children;
 		return this.items;
 	}
@@ -142,21 +148,23 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<ExplorerTreeItem> 
 
 		const memos = this._memoFetcher.getMemos();
 		this.memoCount = memos.length;
-		const mainGroup = groupObjects(memos, isFileView ? "path" : "tag");
-		const pLabels = Object.keys(mainGroup).sort();
-		const items = pLabels.map((label) => new (isFileView ? File : Tag)(label, expandPrimaryGroup));
+		const inner = groupObjects(memos, isFileView ? "path" : "tag");
+		const innerLabels = Object.keys(inner).sort();
+		const innerItems = innerLabels.map((label) => new (isFileView ? File : Tag)(label, expandPrimaryGroup));
 
-		for (let i = 0; i < pLabels.length; i++) {
-			const subGroup = groupObjects(mainGroup[pLabels[i]], isFileView ? "tag" : "path");
-			const cLabels = Object.keys(subGroup).sort();
+		for (let i = 0; i < innerLabels.length; i++) {
+			const halfLeaves = groupObjects(inner[innerLabels[i]], isFileView ? "tag" : "path");
+			const halfLeafLabels = Object.keys(halfLeaves).sort();
 
-			const parentItem = items[i];
-			const childItems = cLabels.map((label) => new (isFileView ? Tag : File)(label, expandSecondaryGroup, parentItem));
-			parentItem.children = childItems;
+			const innerItem = innerItems[i];
+			const halfLeafItems = halfLeafLabels.map(
+				(label) => new (isFileView ? Tag : File)(label, expandSecondaryGroup, innerItem),
+			);
+			innerItem.children = halfLeafItems;
 
 			let childMemoCount = 0;
-			for (let j = 0; j < parentItem.children.length; j++) {
-				let memos = subGroup[cLabels[j]].sort((a, b) => a._offset - b._offset);
+			for (let j = 0; j < innerItem.children.length; j++) {
+				let memos = halfLeaves[halfLeafLabels[j]].sort((a, b) => a._offset - b._offset);
 				const urgent = [];
 				const normal = [];
 				for (const memo of memos) {
@@ -167,75 +175,114 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<ExplorerTreeItem> 
 					normal.push(memo);
 				}
 				memos = urgent.sort((a, b) => b.priority - a.priority).concat(normal);
-				const childItem = parentItem.children[j];
-				const memoItems = memos.map((m) => new Memo(<MemoEntry>m, <ParentItemType>childItem));
-				(<ParentItemType>childItem).children = memoItems;
+				const halfLeafItem = innerItem.children[j];
+				const memoItems = memos.map((m) => new Memo(<MemoEntry>m, <InnerItemType>halfLeafItem));
+				(<InnerItemType>halfLeafItem).children = memoItems;
 				childMemoCount += memoItems.length;
 
-				childItem.description = `${memoItems.length} Memo${multiplicity(memoItems)}`;
-				childItem.tooltip = `${isFileView ? "Tag" : "File"}: ${childItem.label} - ${memoItems.length}M`;
+				halfLeafItem.description = `${memoItems.length} Memo${multiplicity(memoItems)}`;
+				halfLeafItem.tooltip = new vscode.MarkdownString(
+					`${isFileView ? "Tag" : "File"}: ${halfLeafItem.label} - ${memoItems.length} $(edit)`,
+					true,
+				);
 			}
 
-			parentItem.description = `${childItems.length} ${isFileView ? "Tag" : "File"}${multiplicity(
-				childItems,
+			innerItem.description = `${halfLeafItems.length} ${isFileView ? "Tag" : "File"}${multiplicity(
+				halfLeafItems,
 			)} > ${childMemoCount} Memo${multiplicity(childMemoCount)}`;
-			parentItem.tooltip = `${isFileView ? "File" : "Tag"}: ${parentItem.label} - ${ //use markdown strin
-				childItems.length
-			}C${childMemoCount}M`;
+			innerItem.tooltip = new vscode.MarkdownString(
+				`${isFileView ? "File" : "Tag"}: ${innerItem.label} - ${halfLeafItems.length} ${
+					isFileView ? "$(bookmark)" : "$(file)"
+				} ${childMemoCount} $(edit)`,
+				true,
+			);
 		}
-		return items;
+		return innerItems;
 	}
 }
 
-type ParentItemType = File | Tag;
-type ExplorerTreeItem = CompletionItem | ParentItemType | Memo;
+type InnerItemType = File | Tag;
+type ExplorerTreeItem = CompletableItem | InnerItemType | Memo;
 
-class CompletionItem extends vscode.TreeItem {
+class CompletableItem extends vscode.TreeItem {
+	static readonly confirmIconPhase1 = new vscode.ThemeIcon("loading~spin", new vscode.ThemeColor("#fffb00"));
+	static readonly confirmIconPhase2 = new vscode.ThemeIcon("loading~spin", new vscode.ThemeColor("#43ff00"));
+	static readonly confirmIconPhase3 = new vscode.ThemeIcon("loading~spin", new vscode.ThemeColor("#00fff2"));
+
 	readonly hierarchy: "parent" | "child";
 
-	private confirmCompleteTimeout = false;
+	private attemptedToComplete = false;
+	private confirmInterval: NodeJS.Timeout;
+	private confirmTimeout: NodeJS.Timeout;
 
-	constructor(label: string, expand: boolean | "none", public parent?: ParentItem) {
+	constructor(label: string, expand: boolean | "none", public parent?: InnerItem) {
 		let collapsibleState;
 		if (expand === "none") collapsibleState = vscode.TreeItemCollapsibleState.None;
-		else collapsibleState = expand ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed;
+		else
+			collapsibleState = expand ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed;
 		super(label, collapsibleState);
 		this.hierarchy = parent ? "parent" : "child";
 	}
-	confirmHandle(viewProvider: ExplorerViewProvider, labelOptions: { words?: number, maxLength: number }, confirmIcon: vscode.ThemeIcon, confirmContext: string, noConfirm?: boolean) {
+	confirmHandle(
+		explorerTreeView: ExplorerTreeView,
+		labelOptions: { words?: number; maxLength: number },
+		confirmContext: string,
+		noConfirm?: boolean,
+	) {
 		if (!noConfirm && configMaid.get("view.confirmCompleteMemo")) {
-			const timeout = configMaid.get("view.confirmCompleteTimeout");
-			if (!this.confirmCompleteTimeout) {
-				this.confirmCompleteTimeout = true;
-				const [label, desc, icon, context] = [this.label, this.description, this.iconPath, this.contextValue];
-				this.label = `${this.label.toString().split(/\s/, labelOptions.words ?? 1).join(" ").slice(0, labelOptions.maxLength)}...`;
-				this.iconPath = confirmIcon;
-				this.contextValue = confirmContext;
-	
-				let time = Math.round(timeout / 1000);
-				const updateTime = (time: number) => {
-					this.description = `Confirm in ${time}`;
-					viewProvider.refresh(this);
-				};
-				updateTime(time);
-				const updateTimeout = setInterval(() => updateTime(--time), timeout / time);
-	
-				setTimeout(() => {
-					clearInterval(updateTimeout);
-					[this.label, this.description, this.iconPath, this.contextValue] = [label, desc, icon, context];
-					this.confirmCompleteTimeout = false;
-				}, timeout);
+			clearTimeout(this.confirmTimeout);
+			clearInterval(this.confirmInterval);
+			explorerTreeView.memoFetcher.unsuppressForceScan();
+
+			if (this.attemptedToComplete) {
+				this.attemptedToComplete = false;
 				return true;
 			}
-			this.confirmCompleteTimeout = false;
+			this.attemptedToComplete = true;
+
+			const [label, desc, icon, context] = [this.label, this.description, this.iconPath, this.contextValue];
+			let abbrevLabel = `${this.label
+				.toString()
+				.split(/\s/, labelOptions.words ?? 1)
+				.join(" ")}`;
+			if (abbrevLabel.length > labelOptions.maxLength)
+				abbrevLabel = `${abbrevLabel.slice(0, labelOptions.maxLength)}...`;
+			this.label = abbrevLabel;
+			this.iconPath = CompletableItem.confirmIconPhase1;
+			this.contextValue = confirmContext;
+
+			explorerTreeView.memoFetcher.suppressForceScan();
+
+			const timeout = configMaid.get("view.confirmCompleteTimeout");
+			let time = timeout;
+			const updateTime = (time: number) => {
+				this.description = `Confirm in ${Math.round(time / 1000)}`;
+				if (time / timeout < 0.33) this.iconPath = CompletableItem.confirmIconPhase3;
+				else if (time / timeout < 0.66) this.iconPath = CompletableItem.confirmIconPhase2;
+				explorerTreeView.viewProvider.refresh(this);
+			};
+			updateTime(timeout);
+			this.confirmInterval = setInterval(() => updateTime((time -= 1000)), timeout / Math.round(time / 1000));
+
+			this.confirmTimeout = setTimeout(() => {
+				this.attemptedToComplete = false;
+				clearInterval(this.confirmInterval);
+
+				[this.label, this.description, this.iconPath, this.contextValue] = [label, desc, icon, context];
+				explorerTreeView.viewProvider.refresh(this);
+				explorerTreeView.memoFetcher.unsuppressForceScan();
+			}, timeout);
+			return false;
 		}
-		return false;
+		return true;
 	}
 }
 
-class ParentItem extends CompletionItem {
+class InnerItem extends CompletableItem {
 	children: ExplorerTreeItem[] = [];
-	constructor(label: string, expand: boolean, parent?: ParentItem) {super(label, expand, parent);}
+	constructor(label: string, expand: boolean, parent?: InnerItem) {
+		super(label, expand, parent);
+	}
 	getChildItems() {
 		return this.children;
 	}
@@ -243,11 +290,8 @@ class ParentItem extends CompletionItem {
 		this.children = items;
 	}
 }
-class File extends ParentItem {
-	readonly confirmCompleteIconColor = new vscode.ThemeColor("icon.foreground");
-	readonly confirmCompleteIcon = new vscode.ThemeIcon("loading~spin", this.confirmCompleteIconColor);
-
-	constructor(readonly path: string, expand: boolean, parent?: ParentItem) {
+class File extends InnerItem {
+	constructor(readonly path: string, expand: boolean, parent?: InnerItem) {
 		super(vscode.workspace.asRelativePath(path), expand, parent);
 		//what if I set desc to true?
 		this.resourceUri = vscode.Uri.file(path);
@@ -264,41 +308,48 @@ class File extends ParentItem {
 			});
 		});
 	}
-	complete(viewProvider: ExplorerViewProvider, noConfirm?: boolean) {
-		if (this.confirmHandle(viewProvider, { maxLength: 15 }, this.confirmCompleteIcon, "fileWaitingForConfirmComplete", noConfirm)) return;
-		// const memos = this.hierarchy === "parent" ? this.children.map((c) => (<Tag>c).children).flat() : this.children;
-		// const memo = this.memoEntry;
-		// await vscode.workspace.openTextDocument(memo.path).then((doc) => {
-		// 	const removeLine =
-		// 		memo.line < doc.lineCount - 1 &&
-		// 		doc
-		// 			.lineAt(memo.line)
-		// 			.text.replace(new RegExp(`${reEscape(memo.raw)}|${reEscape(getFormattedMemo(memo))}`), "")
-		// 			.trim().length === 0;
-		// 	const start = doc.positionAt(memo.offset);
-		// 	const end = removeLine ? new vscode.Position(memo.line + 1, 0) : start.translate(0, memo.rawLength);
-		// 	const range = new vscode.Range(start, end);
-		// 	const edit = new FE.FileEdit();
-		// 	edit.delete(doc.uri, range);
-		// 	edit.apply({ isRefactoring: true }, false, configMaid.get("view.alwaysOpenFileOnCompleteSingleMemo")).then(() => {
-		// 		const editor = vscode.window.activeTextEditor;
-		// 		if (editor.document === doc) {
-		// 			editor.revealRange(new vscode.Range(start, start));
-		// 			editor.selection = new vscode.Selection(start, start);
-		// 		}
-		// 	});
-		// 	deleteItem(this, viewProvider);
-		// });
-		// viewProvider.refresh();
-	}
+	// complete(viewProvider: ExplorerViewProvider, noConfirm?: boolean) {
+	// 	if (
+	// 		!this.confirmHandle(
+	// 			viewProvider,
+	// 			{ maxLength: 15 },
+	// 			this.confirmCompleteIcon,
+	// 			"fileWaitingForConfirmComplete",
+	// 			noConfirm,
+	// 		)
+	// 	)
+	// 		return;
+	// const memos = this.hierarchy === "parent" ? this.children.map((c) => (<Tag>c).children).flat() : this.children;
+	// const memo = this.memoEntry;
+	// await vscode.workspace.openTextDocument(memo.path).then((doc) => {
+	// 	const removeLine =
+	// 		memo.line < doc.lineCount - 1 &&
+	// 		doc
+	// 			.lineAt(memo.line)
+	// 			.text.replace(new RegExp(`${reEscape(memo.raw)}|${reEscape(getFormattedMemo(memo))}`), "")
+	// 			.trim().length === 0;
+	// 	const start = doc.positionAt(memo.offset);
+	// 	const end = removeLine ? new vscode.Position(memo.line + 1, 0) : start.translate(0, memo.rawLength);
+	// 	const range = new vscode.Range(start, end);
+	// 	const edit = new FE.FileEdit();
+	// 	edit.delete(doc.uri, range);
+	// 	edit.apply({ isRefactoring: true }, false, configMaid.get("view.alwaysOpenFileOnCompleteSingleMemo")).then(() => {
+	// 		const editor = vscode.window.activeTextEditor;
+	// 		if (editor.document === doc) {
+	// 			editor.revealRange(new vscode.Range(start, start));
+	// 			editor.selection = new vscode.Selection(start, start);
+	// 		}
+	// 	});
+	// 	deleteItem(this, viewProvider);
+	// });
+	// viewProvider.refresh();
+	// }
 }
-class Tag extends ParentItem {
+class Tag extends InnerItem {
 	readonly idleIconColor = new vscode.ThemeColor("icon.foreground");
-	readonly idleIcon = new vscode.ThemeIcon("tag", this.idleIconColor);
-	readonly confirmCompleteIconColor = new vscode.ThemeColor("icon.foreground");
-	readonly confirmCompleteIcon = new vscode.ThemeIcon("loading~spin", this.confirmCompleteIconColor);
+	readonly idleIcon = new vscode.ThemeIcon("bookmark", this.idleIconColor);
 
-	constructor(tag: string, expand: boolean, parent?: ParentItem) {
+	constructor(tag: string, expand: boolean, parent?: InnerItem) {
 		super(tag, expand, parent);
 
 		this.iconPath = this.idleIcon;
@@ -306,13 +357,11 @@ class Tag extends ParentItem {
 	}
 }
 
-class Memo extends CompletionItem {
-	readonly idleIconColor = new vscode.ThemeColor("icon.foreground");
+class Memo extends CompletableItem {
+	readonly idleIconColor = new vscode.ThemeColor("icon.foreground"); //use priority
 	readonly idleIcon = new vscode.ThemeIcon("circle-filled", this.idleIconColor);
-	readonly confirmCompleteIconColor = new vscode.ThemeColor("icon.foreground"); //use memo priority color
-	readonly confirmCompleteIcon = new vscode.ThemeIcon("loading~spin", this.confirmCompleteIconColor);
 
-	constructor(public memoEntry: MemoEntry, parent: ParentItem) {
+	constructor(public memoEntry: MemoEntry, parent: InnerItem) {
 		const content = memoEntry.content === "" ? "Placeholder T^T" : memoEntry.content;
 		super(content, "none", parent);
 
@@ -328,10 +377,11 @@ class Memo extends CompletionItem {
 		};
 	}
 
-	async complete(viewProvider: ExplorerViewProvider, noConfirm?: boolean) {
-		if (this.confirmHandle(viewProvider, { words: 3, maxLength: 12 }, this.confirmCompleteIcon, "memoWaitingForConfirmComplete", noConfirm)) return;
+	complete(explorerTreeView: ExplorerTreeView, noConfirm?: boolean) {
+		if (!this.confirmHandle(explorerTreeView, { words: 3, maxLength: 12 }, "memoWaitingForConfirmComplete", noConfirm))
+			return;
 		const memo = this.memoEntry;
-		await vscode.workspace.openTextDocument(memo.path).then((doc) => {
+		vscode.workspace.openTextDocument(memo.path).then((doc) => {
 			const removeLine =
 				memo.line < doc.lineCount - 1 &&
 				doc
@@ -350,9 +400,8 @@ class Memo extends CompletionItem {
 					editor.selection = new vscode.Selection(start, start);
 				}
 			});
-			deleteItem(this, viewProvider);
+			explorerTreeView.viewProvider.refresh(deleteItem(this, explorerTreeView.viewProvider));
 		});
-		viewProvider.refresh();
 	}
 }
 
@@ -373,8 +422,8 @@ function deleteItem(item: ExplorerTreeItem, viewProvider: ExplorerViewProvider) 
 	const parent = item.parent ?? viewProvider;
 	//@ts-ignore
 	parent.setChildItems(parent.getChildItems().filter((_item) => _item !== item));
-	if (!item.parent) return;
-	if (parent.getChildItems().length === 0) deleteItem(<ExplorerTreeItem>parent, viewProvider);
+	if (item.parent && parent.getChildItems().length === 0) deleteItem(<ExplorerTreeItem>parent, viewProvider);
+	return item.parent;
 }
 
 const reEscape = (str?: string) => str?.replace(/[[\]*+?{}.()^$|/\\-]/g, "\\$&");

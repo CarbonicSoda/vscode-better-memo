@@ -2,10 +2,8 @@ import {
 	commands,
 	Position,
 	Range,
-	Selection,
 	TextDocument,
 	Uri,
-	ViewColumn,
 	window,
 	workspace,
 	WorkspaceEdit,
@@ -46,7 +44,7 @@ export namespace FE {
 			return fsPaths;
 		}
 		async apply(metaData?: FileEditMetaData, background?: boolean, alwaysOpenFile?: boolean) {
-			this.edits.forEach(async (fileEdits, uri) => {
+			this.edits.forEach((fileEdits, uri) => {
 				this.editFile(fileEdits, uri, metaData, background, alwaysOpenFile).catch((err) => {
 					throw new Error(`Error when applying edits to files: ${err}`);
 				});
@@ -92,7 +90,6 @@ export namespace FE {
 					);
 					return;
 				}
-				console.log("WE YES");
 				await window
 					.showTextDocument(doc)
 					.then(() => commands.executeCommand("workbench.action.files.saveWithoutFormatting", doc));
