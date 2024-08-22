@@ -53,8 +53,7 @@ export class MemoFetcher {
 		configMaid.listen("fetcher.forceScanDelay");
 
 		this.fetchCustomTags();
-		await this.fetchDocs();
-		for (const doc of this.watchedDocs.keys()) this.scanDoc(doc);
+		await this.forceScan();
 
 		this.janitor.add(
 			configMaid.onChange("customTags", () => this.fetchCustomTags()),
@@ -66,6 +65,8 @@ export class MemoFetcher {
 				if (this.validForScan(doc)) this.scanDoc(doc, true);
 			}),
 			window.tabGroups.onDidChangeTabGroups((ev) => this.handleTabChange(ev.changed)),
+
+			commands.registerCommand("better-memo.reloadExplorer", () => this.forceScan(true)),
 		);
 		this.intervalMaid.add(() => {
 			const doc = window.activeTextEditor?.document;
@@ -120,6 +121,13 @@ export class MemoFetcher {
 			validCustomTags[tag.toUpperCase()] = colorMaid.interpolate(<string>hex);
 		}
 		this.customTags = validCustomTags;
+	}
+
+	private async forceScan(updateView?: boolean): Promise<void> {
+		this.fetchDocs(true).then(() => {
+			for (const doc of this.watchedDocs.keys()) this.scanDoc(doc);
+			if (updateView) eventEmitter.emit("updateView");
+		});
 	}
 
 	private async fetchDocs(refreshMemos?: boolean): Promise<void> {

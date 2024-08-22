@@ -54,7 +54,6 @@ export class ExplorerTreeView {
 			vscode.commands.registerCommand("better-memo.explorerExpandAll", () => {
 				for (const item of this.viewProvider.items) this.view.reveal(item, { select: false, expand: 2 });
 			}),
-			vscode.commands.registerCommand("better-memo.reloadExplorer", () => this.viewProvider.reloadItems()),
 			vscode.commands.registerCommand("better-memo.switchToFileView", () => this.updateViewType("File")),
 			vscode.commands.registerCommand("better-memo.switchToTagView", () => this.updateViewType("Tag")),
 			vscode.commands.registerCommand("better-memo.navigateToMemo", (memo: MemoEntry) =>
@@ -157,10 +156,8 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<ExplorerTreeItem> 
 	}
 
 	reloadItems(): void {
-		vscode.commands.executeCommand("setContext", "better-memo.explorerReloading", true);
 		this.items = this.getItems();
 		this._onDidChangeTreeData.fire();
-		vscode.commands.executeCommand("setContext", "better-memo.explorerReloading", false);
 	}
 
 	refresh(item?: ExplorerTreeItem): void {
@@ -240,11 +237,19 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<ExplorerTreeItem> 
 }
 
 class CompletableItem extends vscode.TreeItem {
-	readonly hierarchy: "parent" | "child";
+	static confirmingItem: {
+		item?: CompletableItem;
+		label?: string | vscode.TreeItemLabel;
+		desc?: string | boolean;
+		icon?: string | vscode.Uri | { light: string | vscode.Uri; dark: string | vscode.Uri } | vscode.ThemeIcon;
+		context?: string;
 
-	private attemptedToComplete = false;
-	private confirmInterval: NodeJS.Timeout;
-	private confirmTimeout: NodeJS.Timeout;
+		attemptedToComplete: boolean;
+		confirmInterval?: NodeJS.Timeout;
+		confirmTimeout?: NodeJS.Timeout;
+	} = { attemptedToComplete: false };
+
+	readonly hierarchy: "parent" | "child";
 
 	constructor(label: string, expand: boolean | "none", public parent?: CompletableInnerItem) {
 		let collapsibleState;
@@ -265,18 +270,40 @@ class CompletableItem extends vscode.TreeItem {
 		confirmContext: string,
 		noConfirm?: boolean,
 	): boolean {
+		const confirmingItem = CompletableItem.confirmingItem;
+		const item = confirmingItem?.item ?? this;
+
+		const reset = () => {
+			confirmingItem.attemptedToComplete = false;
+			clearInterval(confirmingItem.confirmInterval);
+			clearTimeout(confirmingItem.confirmTimeout);
+
+			[item.label, item.description, item.iconPath, item.contextValue] = [
+				confirmingItem?.label ?? this.label,
+				confirmingItem?.desc ?? this.description,
+				confirmingItem?.icon ?? this.iconPath,
+				confirmingItem?.context ?? this.contextValue,
+			];
+			explorerTreeView.viewProvider.refresh(item);
+			explorerTreeView.memoFetcher.unsuppressForceScan();
+		};
+
 		if (!noConfirm && configMaid.get("view.confirmCompleteMemo")) {
-			clearTimeout(this.confirmTimeout);
-			clearInterval(this.confirmInterval);
+			if (this !== item) {
+				reset();
+				confirmingItem.item = this;
+				[confirmingItem.label, confirmingItem.desc, confirmingItem.icon, confirmingItem.context] = [
+					this.label,
+					this.description,
+					this.iconPath,
+					this.contextValue,
+				];
+			}
 			explorerTreeView.memoFetcher.unsuppressForceScan();
 
-			if (this.attemptedToComplete) {
-				this.attemptedToComplete = false;
-				return true;
-			}
-			this.attemptedToComplete = true;
+			if (confirmingItem.attemptedToComplete) return true;
+			confirmingItem.attemptedToComplete = true;
 
-			const [label, desc, icon, context] = [this.label, this.description, this.iconPath, this.contextValue];
 			let abbrevLabel = `${this.label
 				.toString()
 				.split(/\s/, labelOptions.words ?? 1)
@@ -287,7 +314,6 @@ class CompletableItem extends vscode.TreeItem {
 			this.contextValue = confirmContext;
 
 			explorerTreeView.memoFetcher.suppressForceScan();
-
 			const timeout = configMaid.get("view.confirmCompleteTimeout");
 			let time = timeout;
 			const updateTime = (time: number) => {
@@ -297,16 +323,12 @@ class CompletableItem extends vscode.TreeItem {
 				explorerTreeView.viewProvider.refresh(this);
 			};
 			updateTime(timeout);
-			this.confirmInterval = setInterval(() => updateTime((time -= 1000)), timeout / Math.round(time / 1000));
+			confirmingItem.confirmInterval = setInterval(
+				() => updateTime((time -= 1000)),
+				timeout / Math.round(time / 1000),
+			);
 
-			this.confirmTimeout = setTimeout(() => {
-				this.attemptedToComplete = false;
-				clearInterval(this.confirmInterval);
-
-				[this.label, this.description, this.iconPath, this.contextValue] = [label, desc, icon, context];
-				explorerTreeView.viewProvider.refresh(this);
-				explorerTreeView.memoFetcher.unsuppressForceScan();
-			}, timeout);
+			confirmingItem.confirmTimeout = setTimeout(() => reset(), timeout);
 			return false;
 		}
 		return true;

@@ -27,8 +27,8 @@
 			},
 			{
 				"command": "better-memo.reloadExplorer",
-				"title": "Reload Explorer",
-				"enablement": "treeView.better-memo.memoExplorer.toggleCollapseAll",
+				"title": "Refresh Explorer",
+				"enablement": "better-memo.explorerInitFinished",
 				"icon": "$(refresh)"
 			},
 			{
@@ -231,17 +231,23 @@
 					"better-memo.fetcher.scanDelay": {
 						"order": 221,
 						"type": "integer",
-						"default": 1000
+						"default": 1000,
+						"minimum": 500,
+						"maximum": 10000
 					},
 					"better-memo.fetcher.forceScanDelay": {
 						"order": 222,
 						"type": "integer",
-						"default": 10000
+						"default": 5000,
+						"minimum": 1000,
+						"maximum": 30000
 					},
 					"better-memo.fetcher.workspaceScanDelay": {
 						"order": 223,
 						"type": "integer",
-						"default": 10000
+						"default": 10000,
+						"minimum": 2000,
+						"maximum": 70000
 					}
 				}
 			},
