@@ -58,8 +58,8 @@ export class MemoFetcher {
 		this.janitor.add(
 			configMaid.onChange("customTags", () => this.fetchCustomTags()),
 
-			workspace.onDidCreateFiles(() => this.fetchDocs(true)),
-			workspace.onDidDeleteFiles(() => this.fetchDocs(true)),
+			workspace.onDidCreateFiles(() => this.fetchDocs()),
+			workspace.onDidDeleteFiles(() => this.fetchDocs()),
 
 			workspace.onDidSaveTextDocument(async (doc) => {
 				if (this.validForScan(doc)) this.scanDoc(doc, true);
@@ -80,7 +80,7 @@ export class MemoFetcher {
 			if (!doc || !this.watchedDocs.has(doc)) return;
 			this.scanDoc(doc, true);
 		}, "fetcher.forceScanDelay");
-		this.intervalMaid.add(() => this.fetchDocs(true), "fetcher.workspaceScanDelay");
+		this.intervalMaid.add(() => this.fetchDocs(), "fetcher.workspaceScanDelay");
 		eventEmitter.emitWait("fetcherInitFinished");
 	}
 
@@ -124,13 +124,13 @@ export class MemoFetcher {
 	}
 
 	private async forceScan(updateView?: boolean): Promise<void> {
-		this.fetchDocs(true).then(() => {
+		await this.fetchDocs().then(() => {
 			for (const doc of this.watchedDocs.keys()) this.scanDoc(doc);
 			if (updateView) eventEmitter.emit("updateView");
 		});
 	}
 
-	private async fetchDocs(refreshMemos?: boolean): Promise<void> {
+	private async fetchDocs(): Promise<void> {
 		const documents: TextDocument[] = (
 			await Promise.all(
 				await workspace
@@ -150,7 +150,6 @@ export class MemoFetcher {
 		commands.executeCommand("setContext", "better-memo.noFiles", documents.length === 0);
 		this.watchedDocs.clear();
 		for (const doc of documents) this.watchedDocs.set(doc, { version: doc.version, lang: doc.languageId });
-		if (!refreshMemos) return;
 		for (const doc of this.docMemos.keys()) if (!this.watchedDocs.has(doc)) this.docMemos.delete(doc);
 		for (const doc of this.watchedDocs.keys()) if (!this.docMemos.has(doc)) this.scanDoc(doc);
 	}

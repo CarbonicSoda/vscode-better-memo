@@ -274,7 +274,6 @@ class CompletableItem extends vscode.TreeItem {
 		const item = confirmingItem?.item ?? this;
 
 		const reset = () => {
-			confirmingItem.attemptedToComplete = false;
 			clearInterval(confirmingItem.confirmInterval);
 			clearTimeout(confirmingItem.confirmTimeout);
 
@@ -328,7 +327,10 @@ class CompletableItem extends vscode.TreeItem {
 				timeout / Math.round(time / 1000),
 			);
 
-			confirmingItem.confirmTimeout = setTimeout(() => reset(), timeout);
+			confirmingItem.confirmTimeout = setTimeout(() => {
+				reset();
+				confirmingItem.attemptedToComplete = false;
+			}, timeout);
 			return false;
 		}
 		return true;
