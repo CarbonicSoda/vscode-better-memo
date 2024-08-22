@@ -1,3 +1,4 @@
+import { Aux } from "./auxiliary";
 import { ThemeColor } from "vscode";
 import VscodeColors from "../vscode-colors.json";
 
@@ -8,12 +9,26 @@ export function getColorMaid(): typeof ColorMaid {
 }
 
 const ColorMaid: {
+	/**
+	 * Returns the closest ThemeColor to param, interpolated using RGB color space
+	 * @param rgbOrHex [R, G, B] or "#rrggbb", "#rgb" (case insensitive, # could be omitted)
+	 */
 	interpolate(rgbOrHex: RGB3 | string): ThemeColor;
 
+	/**
+	 * Gets random RGB and then interpolates to get ThemeColor
+	 */
 	randomColor(): ThemeColor;
 
+	/**
+	 * Returns a ThemeColor for a string which will not change over sessions or devices, like a hash code
+	 */
 	hashColor(hashString: string): ThemeColor;
 
+	/**
+	 * Converts HEX to RGB
+	 * @param hex "#rrggbb", "#rgb" (case insensitive, # could be omitted)
+	 */
 	hex2rgb(hex: string): RGB3;
 } = {
 	interpolate(rgbOrHex: RGB3 | string): ThemeColor {
@@ -32,7 +47,7 @@ const ColorMaid: {
 	},
 
 	randomColor(): ThemeColor {
-		const rgb = [randInt(0, 255), randInt(0, 255), randInt(0, 255)];
+		const rgb = [Aux.randInt(0, 255), Aux.randInt(0, 255), Aux.randInt(0, 255)];
 		return this.interpolate(<RGB3>rgb);
 	},
 
@@ -43,11 +58,10 @@ const ColorMaid: {
 
 	hex2rgb(hex: string): RGB3 {
 		hex = hex.replace("#", "");
+		if (hex.length === 3) hex = hex[0].repeat(2) + hex[1].repeat(2) + hex[2].repeat(2);
 		return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
 	},
 };
-
-const randInt = (min: number, max: number) => Math.round(Math.random() * (max - min) + min);
 
 // Hash function from https://github.com/RolandR/ColorHash, modified to make permutations of characters be treated differently etc
 function colorHash(hashString: string): RGB3 {
