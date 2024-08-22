@@ -39,6 +39,7 @@ export class ExplorerTreeView {
 			showCollapseAll: true,
 			canSelectMany: false,
 		});
+
 		this.janitor.add(
 			this.view,
 
@@ -53,6 +54,7 @@ export class ExplorerTreeView {
 			vscode.commands.registerCommand("better-memo.explorerExpandAll", () => {
 				for (const item of this.viewProvider.items) this.view.reveal(item, { select: false, expand: 2 });
 			}),
+			vscode.commands.registerCommand("better-memo.reloadExplorer", () => this.viewProvider.reloadItems()),
 			vscode.commands.registerCommand("better-memo.switchToFileView", () => this.updateViewType("File")),
 			vscode.commands.registerCommand("better-memo.switchToTagView", () => this.updateViewType("Tag")),
 			vscode.commands.registerCommand("better-memo.navigateToMemo", (memo: MemoEntry) =>
@@ -65,6 +67,7 @@ export class ExplorerTreeView {
 				memo.complete(this, true),
 			),
 		);
+
 		vscode.commands.executeCommand("setContext", "better-memo.explorerInitFinished", true);
 	}
 
@@ -73,13 +76,8 @@ export class ExplorerTreeView {
 	}
 
 	private updateViewType(view?: "File" | "Tag", noReload?: boolean): void {
-		this.viewProvider.currentView = view ?? configMaid.get("view.defaultView");
-		vscode.commands.executeCommand(
-			"setContext",
-			`better-memo.explorerIs${view === "File" ? "Tag" : "File"}View`,
-			false,
-		);
-		vscode.commands.executeCommand("setContext", `better-memo.explorerIs${view}View`, true);
+		this.viewProvider.currentView = view = view ?? configMaid.get("view.defaultView");
+		vscode.commands.executeCommand("setContext", "better-memo.explorerView", view);
 		if (noReload) return;
 		this.viewProvider.reloadItems();
 	}
@@ -159,8 +157,10 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<ExplorerTreeItem> 
 	}
 
 	reloadItems(): void {
+		vscode.commands.executeCommand("setContext", "better-memo.explorerReloading", true);
 		this.items = this.getItems();
 		this._onDidChangeTreeData.fire();
+		vscode.commands.executeCommand("setContext", "better-memo.explorerReloading", false);
 	}
 
 	refresh(item?: ExplorerTreeItem): void {
@@ -173,16 +173,19 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<ExplorerTreeItem> 
 		const expandSecondaryGroup = configMaid.get("view.expandSecondaryByDefault");
 
 		const memos = this._memoFetcher.getMemos();
-		this.memoCount = memos.length;
+		const tags = this._memoFetcher.getTags();
 		const inner = Aux.groupObjects(memos, isFileView ? "path" : "tag");
 		const innerLabels = Object.keys(inner).sort();
 		const innerItems = innerLabels.map((label) => new (isFileView ? FileItem : TagItem)(label, expandPrimaryGroup));
+		this.memoCount = memos.length;
 
 		for (let i = 0; i < innerLabels.length; i++) {
-			const halfLeaves = Aux.groupObjects(inner[innerLabels[i]], isFileView ? "tag" : "path");
-			const halfLeafLabels = Object.keys(halfLeaves).sort();
-
+			const innerLabel = innerLabels[i];
 			const innerItem = innerItems[i];
+			if (!isFileView) innerItem.iconPath = new vscode.ThemeIcon("bookmark", tags[innerLabel]);
+
+			const halfLeaves = Aux.groupObjects(inner[innerLabel], isFileView ? "tag" : "path");
+			const halfLeafLabels = Object.keys(halfLeaves).sort();
 			const halfLeafItems = halfLeafLabels.map(
 				(label) => new (isFileView ? TagItem : FileItem)(label, expandSecondaryGroup, innerItem),
 			);
@@ -190,7 +193,11 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<ExplorerTreeItem> 
 
 			let childMemoCount = 0;
 			for (let j = 0; j < innerItem.children.length; j++) {
-				let memos = halfLeaves[halfLeafLabels[j]].sort((a, b) => a._offset - b._offset);
+				const halfLeafItem = innerItem.children[j];
+				const halfLeafLabel = halfLeafLabels[j];
+				if (isFileView) halfLeafItem.iconPath = new vscode.ThemeIcon("bookmark", tags[halfLeafLabel]);
+
+				let memos = halfLeaves[halfLeafLabel].sort((a, b) => a._offset - b._offset);
 				const urgent = [];
 				const normal = [];
 				for (const memo of memos) {
@@ -201,7 +208,6 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<ExplorerTreeItem> 
 					normal.push(memo);
 				}
 				memos = urgent.sort((a, b) => b.priority - a.priority).concat(normal);
-				const halfLeafItem = innerItem.children[j];
 				const tagColor = (<vscode.ThemeIcon>(isFileView ? halfLeafItem : innerItem).iconPath).color;
 				const maxPriority = Math.max(...memos.map((memo) => (<MemoEntry>memo).priority));
 				const memoItems = memos.map(
@@ -368,7 +374,7 @@ class FileItem extends CompletableInnerItem {
 	// 	edit.delete(doc.uri, range);
 	// 	edit.apply({ isRefactoring: true }, false, configMaid.get("view.alwaysOpenFileOnCompleteSingleMemo")).then(() => {
 	// 		const editor = vscode.window.activeTextEditor;
-	// 		if (editor.document === doc) {
+	// 		if (editor?.document === doc) {
 	// 			editor.revealRange(new vscode.Range(start, start));
 	// 			editor.selection = new vscode.Selection(start, start);
 	// 		}
@@ -380,13 +386,9 @@ class FileItem extends CompletableInnerItem {
 }
 
 class TagItem extends CompletableInnerItem {
-	readonly idleIconColor = colorMaid.hashColor(this.label.toString());
-	readonly idleIcon = new vscode.ThemeIcon("bookmark", this.idleIconColor);
-
 	constructor(tag: string, expand: boolean, parent?: CompletableInnerItem) {
 		super(tag, expand, parent);
 
-		this.iconPath = this.idleIcon;
 		this.contextValue = "tag";
 	}
 }
@@ -447,8 +449,9 @@ class MemoItem extends CompletableItem {
 			edit.delete(doc.uri, range);
 			edit.apply({ isRefactoring: true }, false, configMaid.get("view.alwaysOpenFileOnCompleteSingleMemo")).then(
 				() => {
+					vscode.window.showInformationMessage(`finished\${}`);
 					const editor = vscode.window.activeTextEditor;
-					if (editor.document === doc) {
+					if (editor?.document === doc) {
 						editor.revealRange(new vscode.Range(start, start));
 						editor.selection = new vscode.Selection(start, start);
 					}

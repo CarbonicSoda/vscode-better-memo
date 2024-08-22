@@ -78,6 +78,7 @@ export namespace FE {
 		): Promise<void> {
 			workspace.openTextDocument(uri).then(async (doc) => {
 				if (!doc.isDirty && (background || !this.getFsPathOfOpenDocs().includes(doc.fileName))) {
+					window.showInformationMessage(`using FS\${}`); //FS IS BROKEN HELP MEE
 					await this.editFileWithFs(edits, doc).then(
 						() => {
 							if (alwaysOpenFile) window.showTextDocument(doc);
@@ -88,6 +89,7 @@ export namespace FE {
 					);
 					return;
 				}
+				window.showInformationMessage(`using WE\${}`);
 				await window
 					.showTextDocument(doc)
 					.then(() => commands.executeCommand("workbench.action.files.saveWithoutFormatting", doc));

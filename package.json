@@ -26,15 +26,21 @@
 				"icon": "$(expand-all)"
 			},
 			{
+				"command": "better-memo.reloadExplorer",
+				"title": "Reload Explorer",
+				"enablement": "treeView.better-memo.memoExplorer.toggleCollapseAll",
+				"icon": "$(refresh)"
+			},
+			{
 				"command": "better-memo.switchToFileView",
 				"title": "Switch to File View",
-				"enablement": "treeView.better-memo.memoExplorer.toggleCollapseAll && better-memo.explorerIsTagView",
+				"enablement": "treeView.better-memo.memoExplorer.toggleCollapseAll && better-memo.explorerView == Tag",
 				"icon": "$(folder-library)"
 			},
 			{
 				"command": "better-memo.switchToTagView",
 				"title": "Switch to Tag View",
-				"enablement": "treeView.better-memo.memoExplorer.toggleCollapseAll && better-memo.explorerIsFileView",
+				"enablement": "treeView.better-memo.memoExplorer.toggleCollapseAll && better-memo.explorerView == File",
 				"icon": "$(symbol-parameter)"
 			},
 			{
@@ -98,18 +104,23 @@
 			"view/title": [
 				{
 					"command": "better-memo.switchToFileView",
-					"when": "view.better-memo.memoExplorer.visible && better-memo.explorerInitFinished && better-memo.explorerIsTagView",
+					"when": "view.better-memo.memoExplorer.visible && better-memo.explorerInitFinished && better-memo.explorerView == Tag",
 					"group": "navigation@1"
 				},
 				{
 					"command": "better-memo.switchToTagView",
-					"when": "view.better-memo.memoExplorer.visible && better-memo.explorerInitFinished && better-memo.explorerIsFileView",
+					"when": "view.better-memo.memoExplorer.visible && better-memo.explorerInitFinished && better-memo.explorerView == File",
 					"group": "navigation@1"
+				},
+				{
+					"command": "better-memo.reloadExplorer",
+					"when": "view.better-memo.memoExplorer.visible && better-memo.explorerInitFinished",
+					"group": "navigation@2"
 				},
 				{
 					"command": "better-memo.explorerExpandAll",
 					"when": "view.better-memo.memoExplorer.visible && better-memo.explorerInitFinished",
-					"group": "navigation@2"
+					"group": "navigation@3"
 				}
 			],
 			"view/item/context": [
@@ -183,7 +194,7 @@
 						"type": "object",
 						"uniqueItems": true,
 						"additionalProperties": {
-							"type": "string"							
+							"type": "string"
 						},
 						"default": {
 							"TODO": "#fff86b",

@@ -1,7 +1,8 @@
-import { commands, TabGroup, TextDocument, window, workspace } from "vscode";
+import { commands, TabGroup, TextDocument, ThemeColor, window, workspace } from "vscode";
 import { Aux } from "./utils/auxiliary";
 import { EE } from "./utils/event-emitter";
 import { FE } from "./utils/file-edit";
+import { getColorMaid } from "./utils/color-maid";
 import { getConfigMaid } from "./utils/config-maid";
 import { IntervalMaid } from "./utils/interval-maid";
 import { Janitor } from "./utils/janitor";
@@ -21,10 +22,11 @@ export type MemoEntry = {
 };
 
 const eventEmitter = EE.getEventEmitter();
+const colorMaid = getColorMaid();
 const configMaid = getConfigMaid();
 
 export class MemoFetcher {
-	customTags: { [tag: string]: string } = {};
+	customTags: { [tag: string]: ThemeColor } = {};
 	readonly closeCharacters = Array.from(
 		new Set(
 			Object.values(LangComments)
@@ -87,13 +89,11 @@ export class MemoFetcher {
 		return memos;
 	}
 
-	getTags(): string[] {
+	getTags(): { [tag: string]: ThemeColor } {
+		let tags: { [tag: string]: ThemeColor } = {};
 		const memoTags = this.getMemos().map((memo) => memo.tag);
-		return [...new Set(memoTags.concat(Object.keys(this.customTags)))];
-	}
-
-	getCustomTagColor(memo: MemoEntry): string | undefined {
-		return this.customTags[memo.tag];
+		for (const tag of memoTags) tags[tag] = colorMaid.hashColor(tag);
+		return Object.assign(tags, this.customTags);
 	}
 
 	suppressForceScan(): void {
@@ -113,11 +113,11 @@ export class MemoFetcher {
 		const userDefinedCustomTags = configMaid.get("customTags");
 		const validTagRE = new RegExp(`^[^\\r\\n\t ${Aux.reEscape(this.closeCharacters)}]+$`);
 		const validHexRE = /^#[0-9a-fA-F]{6}$/;
-		const validCustomTags: { [tag: string]: string } = {};
-		for (let [tag, hex] of userDefinedCustomTags) {
-			[tag, hex] = [tag.trim(), hex.trim()];
-			if (!validTagRE.test(tag) || !validHexRE.test(hex)) continue;
-			validCustomTags[tag.toUpperCase()] = hex;
+		const validCustomTags: { [tag: string]: ThemeColor } = {};
+		for (let [tag, hex] of Object.entries(userDefinedCustomTags)) {
+			[tag, hex] = [tag.trim(), (<string>hex).trim()];
+			if (!validTagRE.test(tag) || !validHexRE.test(<string>hex)) continue;
+			validCustomTags[tag.toUpperCase()] = colorMaid.interpolate(<string>hex);
 		}
 		this.customTags = validCustomTags;
 	}
@@ -152,7 +152,7 @@ export class MemoFetcher {
 		const langId = <keyof typeof LangComments>doc.languageId;
 		const commentData = LangComments[langId];
 		//@ts-ignore
-		const close = reEscape(commentData.close) ?? "";
+		const close = Aux.reEscape(commentData.close) ?? "";
 		const matchPattern = new RegExp(
 			`${Aux.reEscape(commentData.open)}[\t ]*mo[\t ]+(?<tag>[^\\r\\n\t ${Aux.reEscape(
 				this.closeCharacters,
