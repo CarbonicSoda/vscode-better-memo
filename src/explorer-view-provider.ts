@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { Aux } from "./utils/auxiliary";
 import { EE } from "./utils/event-emitter";
 import { FE } from "./utils/file-edit";
 import { getConfigMaid } from "./utils/config-maid";
@@ -173,12 +174,12 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<ExplorerTreeItem> 
 
 		const memos = this._memoFetcher.getMemos();
 		this.memoCount = memos.length;
-		const inner = groupObjects(memos, isFileView ? "path" : "tag");
+		const inner = Aux.groupObjects(memos, isFileView ? "path" : "tag");
 		const innerLabels = Object.keys(inner).sort();
 		const innerItems = innerLabels.map((label) => new (isFileView ? FileItem : TagItem)(label, expandPrimaryGroup));
 
 		for (let i = 0; i < innerLabels.length; i++) {
-			const halfLeaves = groupObjects(inner[innerLabels[i]], isFileView ? "tag" : "path");
+			const halfLeaves = Aux.groupObjects(inner[innerLabels[i]], isFileView ? "tag" : "path");
 			const halfLeafLabels = Object.keys(halfLeaves).sort();
 
 			const innerItem = innerItems[i];
@@ -209,7 +210,7 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<ExplorerTreeItem> 
 				(<InnerItemType>halfLeafItem).children = memoItems;
 				childMemoCount += memoItems.length;
 
-				halfLeafItem.description = `${memoItems.length} Memo${multiplicity(memoItems)}`;
+				halfLeafItem.description = `${memoItems.length} Memo${Aux.plural(memoItems)}`;
 				halfLeafItem.tooltip = new vscode.MarkdownString(
 					`### ${isFileView ? "Tag: **" : "File: *"}${halfLeafItem.label}${isFileView ? "**" : "*"} - ${
 						memoItems.length
@@ -218,9 +219,9 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<ExplorerTreeItem> 
 				);
 			}
 
-			innerItem.description = `${halfLeafItems.length} ${isFileView ? "Tag" : "File"}${multiplicity(
+			innerItem.description = `${halfLeafItems.length} ${isFileView ? "Tag" : "File"}${Aux.plural(
 				halfLeafItems,
-			)} > ${childMemoCount} Memo${multiplicity(childMemoCount)}`;
+			)} > ${childMemoCount} Memo${Aux.plural(childMemoCount)}`;
 			innerItem.tooltip = new vscode.MarkdownString(
 				`### ${isFileView ? "File: *" : "Tag: **"}${innerItem.label}${isFileView ? "*" : "**"} - ${
 					halfLeafItems.length
@@ -437,7 +438,7 @@ class MemoItem extends CompletableItem {
 				memo.line < doc.lineCount - 1 &&
 				doc
 					.lineAt(memo.line)
-					.text.replace(new RegExp(`${reEscape(memo.raw)}|${reEscape(getFormattedMemo(memo))}`), "")
+					.text.replace(new RegExp(`${Aux.reEscape(memo.raw)}|${Aux.reEscape(getFormattedMemo(memo))}`), "")
 					.trim().length === 0;
 			const start = doc.positionAt(memo.offset);
 			const end = removeLine ? new vscode.Position(memo.line + 1, 0) : start.translate(0, memo.rawLength);
@@ -457,24 +458,6 @@ class MemoItem extends CompletableItem {
 		});
 	}
 }
-
-function groupObjects(
-	arrayOrIterable: { [key: string]: any }[],
-	grouper: string,
-): { [group: string]: { [key: string]: any }[] } {
-	const groups: { [group: string]: { [key: string]: any }[] } = {};
-	for (const object of arrayOrIterable) {
-		if (!groups[object[grouper]]) groups[object[grouper]] = [];
-
-		groups[object[grouper]].push(object);
-	}
-	return groups;
-}
-
-//@ts-ignore
-const multiplicity = (countable: number | any[]) => ((countable.length ?? countable) === 1 ? "" : "s");
-
-const reEscape = (str?: string) => str?.replace(/[[\]*+?{}.()^$|/\\-]/g, "\\$&");
 
 function deleteItem(item: ExplorerTreeItem, viewProvider: ExplorerViewProvider): CompletableInnerItem {
 	const parent = item.parent ?? viewProvider;

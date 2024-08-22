@@ -1,4 +1,5 @@
 import { commands, TabGroup, TextDocument, window, workspace } from "vscode";
+import { Aux } from "./utils/auxiliary";
 import { EE } from "./utils/event-emitter";
 import { FE } from "./utils/file-edit";
 import { getConfigMaid } from "./utils/config-maid";
@@ -110,7 +111,7 @@ export class MemoFetcher {
 
 	private fetchCustomTags(): void {
 		const userDefinedCustomTags = configMaid.get("customTags");
-		const validTagRE = new RegExp(`^[^\\r\\n\t ${reEscape(this.closeCharacters)}]+$`);
+		const validTagRE = new RegExp(`^[^\\r\\n\t ${Aux.reEscape(this.closeCharacters)}]+$`);
 		const validHexRE = /^#[0-9a-fA-F]{6}$/;
 		const validCustomTags: { [tag: string]: string } = {};
 		for (let [tag, hex] of userDefinedCustomTags) {
@@ -153,13 +154,13 @@ export class MemoFetcher {
 		//@ts-ignore
 		const close = reEscape(commentData.close) ?? "";
 		const matchPattern = new RegExp(
-			`${reEscape(commentData.open)}[\t ]*mo[\t ]+(?<tag>[^\\r\\n\t ${reEscape(
+			`${Aux.reEscape(commentData.open)}[\t ]*mo[\t ]+(?<tag>[^\\r\\n\t ${Aux.reEscape(
 				this.closeCharacters,
 			)}]+)[\t ]*(?<priority>!*)(?<content>.*${close ? "?" : ""})${close}`,
 			"gim",
 		);
 		let memos = [];
-		const leftoverCloseCharacters = new RegExp(`^[${reEscape(this.closeCharacters)}]*`);
+		const leftoverCloseCharacters = new RegExp(`^[${Aux.reEscape(this.closeCharacters)}]*`);
 		for (const match of content.matchAll(matchPattern)) {
 			const [tag, priority, content] = [
 				match.groups["tag"].toUpperCase(),
@@ -235,5 +236,3 @@ export function getFormattedMemo(memo: MemoEntry): string {
 		commentData.close ?? ""
 	}`;
 }
-
-const reEscape = (str?: string) => str?.replace(/[[\]*+?{}.()^$|/\\-]/g, "\\$&");
