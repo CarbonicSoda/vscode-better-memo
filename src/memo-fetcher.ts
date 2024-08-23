@@ -176,7 +176,7 @@ export class MemoFetcher {
 			let priority;
 			let content;
 			for (const [groupName, value] of Object.entries(match.groups)) {
-				if (!value) continue;
+				if (value === undefined) continue;
 				if (groupName.startsWith("tag")) {
 					tag = value.toUpperCase();
 					continue;
@@ -208,13 +208,13 @@ export class MemoFetcher {
 		if (updateView) eventEmitter.emit("updateView");
 	}
 
-	private async formatMemos(doc: TextDocument, background?: boolean): Promise<void> {
+	private async formatMemos(doc: TextDocument): Promise<void> {
 		const memos = this.docMemos.get(doc);
 		if (!memos) return;
 		const edit = new FE.FileEdit();
 		for (const memo of memos)
 			edit.replace(doc.uri, [memo.offset, memo.offset + memo.rawLength], getFormattedMemo(memo));
-		edit.apply({ isRefactoring: true }, background);
+		edit.apply({ isRefactoring: true });
 	}
 
 	private async handleTabChange(changed: readonly TabGroup[]): Promise<void> {
@@ -230,7 +230,7 @@ export class MemoFetcher {
 			return;
 		if (this.prevDoc.isDirty) return;
 		if (this.validForScan(this.prevDoc)) await this.scanDoc(this.prevDoc, true);
-		this.formatMemos(this.prevDoc, true);
+		this.formatMemos(this.prevDoc);
 		if (!input) return;
 		//@ts-ignore
 		workspace.openTextDocument(input.uri).then((doc) => {

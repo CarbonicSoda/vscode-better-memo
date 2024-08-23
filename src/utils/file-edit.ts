@@ -1,14 +1,12 @@
 import { commands, Position, Range, TextDocument, Uri, window, workspace, WorkspaceEdit } from "vscode";
-import { readFile, writeFile } from "fs";
+import { readFileSync, writeFileSync } from "fs";
 
 export namespace FE {
-	const textEncoder = new TextEncoder();
+	const textDecoder = new TextDecoder();
 
 	type EditRange = [start: number | Position, end: number | Position];
 	type FileEdits = Map<EditRange, string>;
 	type FileEditMetaData = { isRefactoring?: boolean };
-
-	let debugCount = 0;
 
 	export class FileEdit {
 		private edits: Map<Uri, FileEdits> = new Map();
@@ -28,9 +26,9 @@ export namespace FE {
 			this.replace(uri, [offset, offset], text);
 		}
 
-		async apply(metaData?: FileEditMetaData, background?: boolean, alwaysOpenFile?: boolean): Promise<void> {
+		async apply(metaData?: FileEditMetaData, alwaysOpenFile?: boolean): Promise<void> {
 			this.edits.forEach((fileEdits, uri) => {
-				this.editFile(fileEdits, uri, metaData, background, alwaysOpenFile).catch((err) => {
+				this.editFile(fileEdits, uri, metaData, alwaysOpenFile).catch((err) => {
 					throw new Error(`Error when applying edits to files: ${err}`);
 				});
 			});
@@ -40,45 +38,30 @@ export namespace FE {
 			this.edits.clear();
 		}
 
-		private async editFileWithFs(edits: FileEdits, doc: TextDocument): Promise<void> {
+		private editFileWithFs(edits: FileEdits, doc: TextDocument): void {
 			const uri = doc.uri;
-			readFile(uri.fsPath, (err, data) => {
-				if (err) throw new Error(`Error when reading file with NodeJS fs: ${err}`);
-				let bits = [...data];
-				let delta = 0;
-				edits.forEach((text, [start, end]) => {
-					if (typeof start !== "number") start = doc.offsetAt(start);
-					if (typeof end !== "number") end = doc.offsetAt(end);
-					bits = bits.slice(0, start - delta).concat([...textEncoder.encode(text)], bits.slice(end - delta));
-					delta += end - start - text.length;
-				});
-				writeFile(uri.fsPath, Buffer.from(bits), (err) => {
-					throw new Error(`Error when writing to file with NodeJS fs: ${err}`);
-				});
+			let text = textDecoder.decode(readFileSync(uri.fsPath));
+			let delta = 0;
+			edits.forEach((edit, [start, end]) => {
+				if (typeof start !== "number") start = doc.offsetAt(start);
+				if (typeof end !== "number") end = doc.offsetAt(end);
+				text = text.slice(0, start - delta) + edit + text.slice(end - delta);
+				delta += end - start - text.length;
 			});
+			writeFileSync(uri.fsPath, text);
 		}
 
 		private async editFile(
 			edits: FileEdits,
 			uri: Uri,
 			metaData?: FileEditMetaData,
-			background?: boolean,
 			alwaysOpenFile?: boolean,
 		): Promise<void> {
 			workspace.openTextDocument(uri).then(async (doc) => {
-				if (!alwaysOpenFile && !doc.isDirty && (background || !getFsPathOfOpenDocs().includes(doc.fileName))) {
-					window.showInformationMessage(`using FS ${debugCount++}`); //FS IS BROKEN HELP MEE
-					await this.editFileWithFs(edits, doc).then(
-						() => {
-							if (alwaysOpenFile) window.showTextDocument(doc);
-						},
-						(err) => {
-							throw new Error(`Error when editing with NodeJS fs: ${err}`);
-						},
-					);
+				if (!alwaysOpenFile && !doc.isDirty) {
+					this.editFileWithFs(edits, doc);
 					return;
 				}
-				window.showInformationMessage(`using WE ${debugCount++}`);
 				await window
 					.showTextDocument(doc)
 					.then(() => commands.executeCommand("workbench.action.files.saveWithoutFormatting", doc));
@@ -88,14 +71,22 @@ export namespace FE {
 					if (typeof end === "number") end = doc.positionAt(end);
 					edit.replace(uri, new Range(start, end), text);
 				});
-				workspace.applyEdit(edit, metaData).then(() =>
-					doc.save().then(
-						(succeed) => {
-							if (!succeed) throw new Error(`Error when saving document: ${doc.fileName}`);
-						},
+				workspace
+					.applyEdit(edit, metaData)
+					.then(() =>
+						doc.save().then(
+							(succeed) => {
+								if (!succeed) throw new Error(`Error when saving ${uri.path}`);
+							},
+							() => null,
+						),
+					)
+					.then(
 						() => null,
-					),
-				);
+						(err) => {
+							throw new Error(`Error when modifying ${uri.path}: ${err}`);
+						},
+					);
 			});
 		}
 	}

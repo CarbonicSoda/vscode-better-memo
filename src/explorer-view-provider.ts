@@ -28,7 +28,9 @@ export class ExplorerTreeView {
 		configMaid.listen("view.askForConfirmationOnCompletionOfMemo");
 		configMaid.listen("view.askForConfirmationOnCompletionOfAllMemos");
 		configMaid.listen("view.timeoutOfConfirmationOnCompletionOfMemo");
-		configMaid.listen("view.alwaysOpenChangedFileOnCompletionOfMemo");
+
+		configMaid.listen("actions.alwaysOpenChangedFileOnCompletionOfMemo");
+		configMaid.listen("actions.removeLineIfMemoIsOnSingleLine");
 
 		this.memoFetcher = memoFetcher;
 		this.viewProvider = new ExplorerViewProvider(memoFetcher);
@@ -137,7 +139,7 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<ExplorerTreeItemTy
 		await eventEmitter.wait("fetcherInitFinished").then(() => this.reloadItems());
 	}
 
-	getChildItems(): ExplorerTreeItemType[] {
+	getChildItems(): InnerItemType[] {
 		return this.items;
 	}
 
@@ -253,9 +255,12 @@ class ExplorerTreeItem extends vscode.TreeItem {
 	}
 
 	removeFromTree(viewProvider: ExplorerViewProvider): InnerItem | undefined {
-		const parent = this.parent ?? viewProvider;
-		parent.setChildItems(<any>parent.getChildItems().filter((_item) => _item !== this));
-		if (this.parent && parent.getChildItems().length === 0) (<ExplorerTreeItem>parent).removeFromTree(viewProvider);
+		if (!this.parent) {
+			viewProvider.setChildItems(viewProvider.getChildItems().filter((item) => item !== <unknown>this));
+			return;
+		}
+		this.parent.setChildItems(this.parent.getChildItems().filter((item) => item !== this));
+		if (this.parent.getChildItems().length === 0) return this.parent.removeFromTree(viewProvider);
 		return this.parent;
 	}
 }
@@ -360,6 +365,7 @@ class MemoItem extends ExplorerTreeItem {
 		const memo = this.memo;
 		vscode.workspace.openTextDocument(memo.path).then((doc) => {
 			const removeLine =
+				configMaid.get("actions.removeLineIfMemoIsOnSingleLine") &&
 				memo.line < doc.lineCount - 1 &&
 				doc
 					.lineAt(memo.line)
@@ -370,14 +376,8 @@ class MemoItem extends ExplorerTreeItem {
 			const range = new vscode.Range(start, end);
 			const edit = new FE.FileEdit();
 			edit.delete(doc.uri, range);
-			edit.apply(
-				{ isRefactoring: true },
-				false,
-				configMaid.get("view.alwaysOpenChangedFileOnCompletionOfMemo"),
-			).then(
-				//FS is broken
+			edit.apply({ isRefactoring: true }, configMaid.get("actions.alwaysOpenChangedFileOnCompletionOfMemo")).then(
 				() => {
-					vscode.window.showInformationMessage(`finished\${}`);
 					const editor = vscode.window.activeTextEditor;
 					if (editor?.document === doc) {
 						editor.revealRange(new vscode.Range(start, start));
@@ -385,7 +385,9 @@ class MemoItem extends ExplorerTreeItem {
 					}
 				},
 			);
-			explorerTreeView.viewProvider.refresh(this.removeFromTree(explorerTreeView.viewProvider));
+			const tmp = this.removeFromTree(explorerTreeView.viewProvider);
+			console.log(tmp);
+			explorerTreeView.viewProvider.refresh(tmp);
 		});
 	}
 

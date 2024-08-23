@@ -300,10 +300,22 @@
 						"title": "Ask for Confirmation on Completion of All Memos",
 						"type": "boolean",
 						"default": true
-					},
-					"better-memo.view.alwaysOpenChangedFileOnCompletionOfMemo": {
-						"order": 334,
+					}
+				}
+			},
+			{
+				"title": "Actions",
+				"order": 4,
+				"properties": {
+					"better-memo.actions.alwaysOpenChangedFileOnCompletionOfMemo": {
+						"order": 411,
 						"title": "Always Open Changed File on Completion of Memo",
+						"type": "boolean",
+						"default": true
+					},
+					"better-memo.actions.removeLineIfMemoIsOnSingleLine": {
+						"order": 421,
+						"title": "Remove Line if Memo Is on Single Line",
 						"type": "boolean",
 						"default": true
 					}
