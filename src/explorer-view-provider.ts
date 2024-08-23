@@ -400,14 +400,18 @@ class MemoItem extends ExplorerTreeItem {
 			};
 		}
 
-		function reset(confirmingItem: MemoItem) {
-			vscode.window.showInformationMessage(`${confirmingItem.label}`);
+		function reset(confirmingItem: MemoItem, noRefresh?: boolean) {
 			explorerTreeView.memoFetcher.unsuppressForceScan();
 			clearInterval(confirmingItem.confirmInterval);
 			clearTimeout(confirmingItem.confirmTimeout);
 			confirmingItem.attemptedToComplete = false;
-			[confirmingItem.label, confirmingItem.description, confirmingItem.iconPath, confirmingItem.contextValue] =
-			[currentBackup.label, currentBackup.description, currentBackup.iconPath, currentBackup.contextValue];
+			[confirmingItem.label, confirmingItem.description, confirmingItem.iconPath, confirmingItem.contextValue] = [
+				currentBackup.label,
+				currentBackup.description,
+				currentBackup.iconPath,
+				currentBackup.contextValue,
+			];
+			if (noRefresh) return;
 			explorerTreeView.viewProvider.refresh(confirmingItem);
 		}
 
@@ -420,7 +424,10 @@ class MemoItem extends ExplorerTreeItem {
 			setConfirmingItem(this);
 		}
 
-		if (this.attemptedToComplete) return true;
+		if (this.attemptedToComplete) {
+			reset(this, true);
+			return true;
+		}
 		this.attemptedToComplete = true;
 
 		let abbrevLabel = `${this.label
