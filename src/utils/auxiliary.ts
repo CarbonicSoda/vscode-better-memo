@@ -31,7 +31,7 @@ export namespace Aux {
 	 * @returns escaped RE for RegExp()
 	 * @example "[(1+1)-2]*3" becomes "\[\(1\+1\)\-2\]\*3"
 	 */
-	export const reEscape = (str?: string) => str?.replace(/[[\]*+?{}.()^$|/\\-]/g, "\\$&");
+	export const reEscape = (str: string) => str.replace(/[[\]*+?{}.()^$|/\\-]/g, "\\$&");
 
 	/**
 	 * Returns a random integer within the ranges

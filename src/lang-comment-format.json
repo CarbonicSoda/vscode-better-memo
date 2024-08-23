@@ -74,18 +74,42 @@
 	"java": {
 		"open": "//"
 	},
-	"javascript": {
-		"open": "//"
-	},
-	"javascriptreact": {
-		"open": "//"
-	},
-	"jsonl": {
-		"open": "//"
-	},
-	"jsonc": {
-		"open": "//"
-	},
+	"javascript": [
+		{
+			"open": "//"
+		},
+		{
+			"open": "/*",
+			"close": "*/"
+		}
+	],
+	"javascriptreact": [
+		{
+			"open": "//"
+		},
+		{
+			"open": "/*",
+			"close": "*/"
+		}
+	],
+	"jsonl": [
+		{
+			"open": "//"
+		},
+		{
+			"open": "/*",
+			"close": "*/"
+		}
+	],
+	"jsonc": [
+		{
+			"open": "//"
+		},
+		{
+			"open": "/*",
+			"close": "*/"
+		}
+	],
 	"julia": {
 		"open": "#"
 	},
@@ -167,12 +191,24 @@
 	"tex": {
 		"open": "%"
 	},
-	"typescript": {
-		"open": "//"
-	},
-	"typescriptreact": {
-		"open": "//"
-	},
+	"typescript": [
+		{
+			"open": "//"
+		},
+		{
+			"open": "/*",
+			"close": "*/"
+		}
+	],
+	"typescriptreact": [
+		{
+			"open": "//"
+		},
+		{
+			"open": "/*",
+			"close": "*/"
+		}
+	],
 	"vb": {
 		"open": "'"
 	},

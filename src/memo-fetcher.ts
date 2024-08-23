@@ -6,7 +6,7 @@ import { getColorMaid } from "./utils/color-maid";
 import { getConfigMaid } from "./utils/config-maid";
 import { IntervalMaid } from "./utils/interval-maid";
 import { Janitor } from "./utils/janitor";
-import LangComments from "./lang-comments.json";
+import LangCommentFormat from "./lang-comment-format.json";
 
 export type MemoEntry = {
 	readonly content: string;
@@ -18,7 +18,7 @@ export type MemoEntry = {
 	readonly offset: number;
 	readonly rawLength: number;
 	readonly raw: string;
-	readonly langId: keyof typeof LangComments;
+	readonly langId: keyof typeof LangCommentFormat;
 };
 
 const eventEmitter = EE.getEventEmitter();
@@ -29,9 +29,9 @@ export class MemoFetcher {
 	customTags: { [tag: string]: ThemeColor } = {};
 	readonly closeCharacters = Array.from(
 		new Set(
-			Object.values(LangComments)
-				//@ts-ignore
-				.map((data) => data.close)
+			Object.values(LangCommentFormat)
+				.flat()
+				.map((data) => (<{ open: string; close?: string }>data).close)
 				.join("")
 				.split(""),
 		),
@@ -146,7 +146,7 @@ export class MemoFetcher {
 			).catch((err) => {
 				throw new Error(`Error when fetching documents: ${err}`);
 			})
-		).filter((doc) => Object.hasOwn(LangComments, doc?.languageId));
+		).filter((doc) => Object.hasOwn(LangCommentFormat, doc?.languageId));
 		commands.executeCommand("setContext", "better-memo.noFiles", documents.length === 0);
 		this.watchedDocs.clear();
 		for (const doc of documents) this.watchedDocs.set(doc, { version: doc.version, lang: doc.languageId });
@@ -156,23 +156,41 @@ export class MemoFetcher {
 
 	private async scanDoc(doc: TextDocument, updateView?: boolean): Promise<void> {
 		const content = doc.getText();
-		const langId = <keyof typeof LangComments>doc.languageId;
-		const commentData = LangComments[langId];
-		//@ts-ignore
-		const close = Aux.reEscape(commentData.close) ?? "";
-		const matchPattern = new RegExp(
-			`${Aux.reEscape(commentData.open)}[\t ]*mo[\t ]+(?<tag>[^\\r\\n\\t ${Aux.reEscape(
-				this.closeCharacters,
-			)}]+)[\\t ]*(?<priority>!*)(?<content>.*${close ? "?" : ""})${close}`,
-			"gim",
-		);
+		const langId = <keyof typeof LangCommentFormat>doc.languageId;
+		const commentFormats: { open: string; close?: string }[] = [LangCommentFormat[langId]].flat();
+		const matchPatternRaw =
+			"(?:" +
+			commentFormats
+				.map((data, i) => {
+					const close = Aux.reEscape(data.close ?? "");
+					return `${Aux.reEscape(data.open)}[\t ]*mo[\t ]+(?<tag${i}>[^\\r\\n\\t ${Aux.reEscape(
+						this.closeCharacters,
+					)}]+)[\\t ]*(?<priority${i}>!*)(?<content${i}>.*${close ? "?" : ""})${close}`;
+				})
+				.join(")|(?:") +
+			")";
+		const matchPattern = new RegExp(matchPatternRaw, "gim");
 		let memos = [];
 		for (const match of content.matchAll(matchPattern)) {
-			const [tag, priority, content] = [
-				match.groups["tag"].toUpperCase(),
-				match.groups["priority"].length,
-				match.groups["content"].trimEnd(),
-			];
+			let tag;
+			let priority;
+			let content;
+			for (const [groupName, value] of Object.entries(match.groups)) {
+				if (!value) continue;
+				if (groupName.startsWith("tag")) {
+					tag = value.toUpperCase();
+					continue;
+				}
+				if (groupName.startsWith("priority")) {
+					priority = value.length;
+					continue;
+				}
+				if (groupName.startsWith("content")) {
+					content = value.trimEnd();
+					continue;
+				}
+				break;
+			}
 			memos.push({
 				content: content,
 				tag: tag,
@@ -232,13 +250,9 @@ export class MemoFetcher {
 }
 
 export function getFormattedMemo(memo: MemoEntry): string {
-	const commentData = LangComments[memo.langId];
-	//@ts-ignore
-	const padding = commentData.close ? " " : "";
-	return `${commentData.open}${padding}MO ${memo.tag}${memo.content ? " " : ""}${"!".repeat(memo.priority)}${
+	const commentFormat: { open: string; close?: string } = [LangCommentFormat[memo.langId]].flat()[0];
+	const padding = commentFormat.close ? " " : "";
+	return `${commentFormat.open}${padding}MO ${memo.tag}${memo.content ? " " : ""}${"!".repeat(memo.priority)}${
 		memo.content
-	}${padding}${
-		//@ts-ignore
-		commentData.close ?? ""
-	}`;
+	}${padding}${commentFormat.close ?? ""}`;
 }
