@@ -8,6 +8,8 @@ export namespace FE {
 	type FileEdits = Map<EditRange, string>;
 	type FileEditMetaData = { isRefactoring?: boolean };
 
+	let debugCount = 0;
+
 	export class FileEdit {
 		private edits: Map<Uri, FileEdits> = new Map();
 
@@ -24,19 +26,6 @@ export namespace FE {
 
 		insert(uri: Uri, offset: number, text: string): void {
 			this.replace(uri, [offset, offset], text);
-		}
-
-		getFsPathOfOpenDocs(): string[] {
-			const tabGroups = window.tabGroups.all;
-			const fsPaths = [];
-			for (const tabGroup of tabGroups) {
-				for (const tab of tabGroup.tabs) {
-					if (!tab.input || Object.getPrototypeOf(tab.input).constructor.name !== "Kn") continue;
-					//@ts-ignore
-					fsPaths.push(tab.input.uri.fsPath);
-				}
-			}
-			return fsPaths;
 		}
 
 		async apply(metaData?: FileEditMetaData, background?: boolean, alwaysOpenFile?: boolean): Promise<void> {
@@ -77,8 +66,8 @@ export namespace FE {
 			alwaysOpenFile?: boolean,
 		): Promise<void> {
 			workspace.openTextDocument(uri).then(async (doc) => {
-				if (!doc.isDirty && (background || !this.getFsPathOfOpenDocs().includes(doc.fileName))) {
-					window.showInformationMessage(`using FS\${}`); //FS IS BROKEN HELP MEE
+				if (!alwaysOpenFile && !doc.isDirty && (background || !getFsPathOfOpenDocs().includes(doc.fileName))) {
+					window.showInformationMessage(`using FS ${debugCount++}`); //FS IS BROKEN HELP MEE
 					await this.editFileWithFs(edits, doc).then(
 						() => {
 							if (alwaysOpenFile) window.showTextDocument(doc);
@@ -89,7 +78,7 @@ export namespace FE {
 					);
 					return;
 				}
-				window.showInformationMessage(`using WE\${}`);
+				window.showInformationMessage(`using WE ${debugCount++}`);
 				await window
 					.showTextDocument(doc)
 					.then(() => commands.executeCommand("workbench.action.files.saveWithoutFormatting", doc));
@@ -109,5 +98,18 @@ export namespace FE {
 				);
 			});
 		}
+	}
+
+	function getFsPathOfOpenDocs(): string[] {
+		const tabGroups = window.tabGroups.all;
+		const fsPaths = [];
+		for (const tabGroup of tabGroups) {
+			for (const tab of tabGroup.tabs) {
+				if (!tab.input || Object.getPrototypeOf(tab.input).constructor.name !== "Kn") continue;
+				//@ts-ignore
+				fsPaths.push(tab.input.uri.fsPath);
+			}
+		}
+		return fsPaths;
 	}
 }

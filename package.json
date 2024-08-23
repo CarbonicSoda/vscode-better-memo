@@ -186,11 +186,12 @@
 		],
 		"configuration": [
 			{
-				"title": "Better Memo",
+				"title": "General",
 				"order": 1,
 				"properties": {
 					"better-memo.customTags": {
 						"order": 111,
+						"title": "Custom Tags",
 						"type": "object",
 						"uniqueItems": true,
 						"additionalProperties": {
@@ -210,6 +211,7 @@
 				"properties": {
 					"better-memo.fetcher.watch": {
 						"order": 211,
+						"title": "Watch",
 						"type": "array",
 						"items": {
 							"type": "string"
@@ -220,6 +222,7 @@
 					},
 					"better-memo.fetcher.ignore": {
 						"order": 212,
+						"title": "Ignore",
 						"type": "array",
 						"items": {
 							"type": "string"
@@ -230,6 +233,7 @@
 					},
 					"better-memo.fetcher.scanDelay": {
 						"order": 221,
+						"title": "Scan Delay",
 						"type": "integer",
 						"default": 1000,
 						"minimum": 500,
@@ -237,6 +241,7 @@
 					},
 					"better-memo.fetcher.forceScanDelay": {
 						"order": 222,
+						"title": "Force Scan Delay",
 						"type": "integer",
 						"default": 5000,
 						"minimum": 1000,
@@ -244,6 +249,7 @@
 					},
 					"better-memo.fetcher.workspaceScanDelay": {
 						"order": 223,
+						"title": "Workspace Scan Delay",
 						"type": "integer",
 						"default": 10000,
 						"minimum": 2000,
@@ -257,6 +263,7 @@
 				"properties": {
 					"better-memo.view.defaultView": {
 						"order": 311,
+						"title": "Default View",
 						"type": "string",
 						"enum": [
 							"File",
@@ -264,33 +271,39 @@
 						],
 						"default": "File"
 					},
-					"better-memo.view.expandPrimaryByDefault": {
+					"better-memo.view.expandPrimaryItemsByDefault": {
 						"order": 321,
+						"title": "Expand Primary Items by Default",
 						"type": "boolean",
 						"default": true
 					},
-					"better-memo.view.expandSecondaryByDefault": {
+					"better-memo.view.expandSecondaryItemsByDefault": {
 						"order": 322,
+						"title": "Expand Secondary Items by Default",
 						"type": "boolean",
 						"default": true
 					},
-					"better-memo.view.confirmCompletionOfMemo": {
+					"better-memo.view.askForConfirmationOnCompletionOfMemo": {
 						"order": 331,
+						"title": "Ask for Confirmation on Completion of Memo",
 						"type": "boolean",
 						"default": false
 					},
-					"better-memo.view.confirmCompletionOfMemosTimeout": {
+					"better-memo.view.timeoutOfConfirmationOnCompletionOfMemo": {
 						"order": 332,
+						"title": "Timeout of Confirmation on Completion of Memo",
 						"type": "integer",
 						"default": 3000
 					},
-					"better-memo.view.confirmCompletionOfMultipleMemos": {
+					"better-memo.view.askForConfirmationOnCompletionOfAllMemos": {
 						"order": 333,
+						"title": "Ask for Confirmation on Completion of All Memos",
 						"type": "boolean",
 						"default": true
 					},
-					"better-memo.view.alwaysOpenFileOnCompletionOfMemo": {
+					"better-memo.view.alwaysOpenChangedFileOnCompletionOfMemo": {
 						"order": 334,
+						"title": "Always Open Changed File on Completion of Memo",
 						"type": "boolean",
 						"default": true
 					}

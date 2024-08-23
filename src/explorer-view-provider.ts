@@ -23,12 +23,12 @@ export class ExplorerTreeView {
 
 	async init(memoFetcher: MemoFetcher): Promise<void> {
 		configMaid.listen("view.defaultView");
-		configMaid.listen("view.expandPrimaryByDefault");
-		configMaid.listen("view.expandSecondaryByDefault");
-		configMaid.listen("view.confirmCompletionOfMemo");
-		configMaid.listen("view.confirmCompletionOfMultipleMemos");
-		configMaid.listen("view.confirmCompletionOfMemosTimeout");
-		configMaid.listen("view.alwaysOpenFileOnCompletionOfMemo");
+		configMaid.listen("view.expandPrimaryItemsByDefault");
+		configMaid.listen("view.expandSecondaryItemsByDefault");
+		configMaid.listen("view.askForConfirmationOnCompletionOfMemo");
+		configMaid.listen("view.askForConfirmationOnCompletionOfAllMemos");
+		configMaid.listen("view.timeoutOfConfirmationOnCompletionOfMemo");
+		configMaid.listen("view.alwaysOpenChangedFileOnCompletionOfMemo");
 
 		this.memoFetcher = memoFetcher;
 		this.viewProvider = new ExplorerViewProvider(memoFetcher);
@@ -44,7 +44,7 @@ export class ExplorerTreeView {
 			this.view,
 
 			configMaid.onChange("view.defaultView", (view) => this.updateViewType(view)),
-			configMaid.onChange(["view.expandPrimaryByDefault", "view.expandSecondaryByDefault"], () =>
+			configMaid.onChange(["view.expandPrimaryItemsByDefault", "view.expandSecondaryItemsByDefault"], () =>
 				eventEmitter.emit("updateItemCollapsibleState"),
 			),
 
@@ -96,7 +96,7 @@ export class ExplorerTreeView {
 	private updateItemCollapsibleState(): void {
 		this.view.reveal(this.viewProvider.items[0], { select: false, focus: true }).then(() => {
 			Promise.resolve(vscode.commands.executeCommand("list.collapseAll")).finally(async () => {
-				if (configMaid.get("view.expandSecondaryByDefault")) {
+				if (configMaid.get("view.expandSecondaryItemsByDefault")) {
 					const reveals = [];
 					for (const item of this.viewProvider.items) {
 						for (const child of item.children)
@@ -105,7 +105,7 @@ export class ExplorerTreeView {
 					await Promise.allSettled(reveals);
 				}
 				for (const item of this.viewProvider.items) {
-					if (configMaid.get("view.expandPrimaryByDefault")) {
+					if (configMaid.get("view.expandPrimaryItemsByDefault")) {
 						this.view.reveal(item, { select: false, expand: true });
 						continue;
 					}
@@ -169,8 +169,8 @@ class ExplorerViewProvider implements vscode.TreeDataProvider<ExplorerTreeItemTy
 
 	private getItems(): InnerItemType[] {
 		const isFileView = this.currentView === "File";
-		const expandPrimaryGroup = configMaid.get("view.expandPrimaryByDefault");
-		const expandSecondaryGroup = configMaid.get("view.expandSecondaryByDefault");
+		const expandPrimaryGroup = configMaid.get("view.expandPrimaryItemsByDefault");
+		const expandSecondaryGroup = configMaid.get("view.expandSecondaryItemsByDefault");
 
 		const memos = this.memoFetcher.getMemos();
 		const tags = this.memoFetcher.getTags();
@@ -370,7 +370,11 @@ class MemoItem extends ExplorerTreeItem {
 			const range = new vscode.Range(start, end);
 			const edit = new FE.FileEdit();
 			edit.delete(doc.uri, range);
-			edit.apply({ isRefactoring: true }, false, configMaid.get("view.alwaysOpenFileOnCompletionOfMemo")).then(
+			edit.apply(
+				{ isRefactoring: true },
+				false,
+				configMaid.get("view.alwaysOpenChangedFileOnCompletionOfMemo"),
+			).then(
 				//FS is broken
 				() => {
 					vscode.window.showInformationMessage(`finished\${}`);
@@ -440,7 +444,7 @@ class MemoItem extends ExplorerTreeItem {
 		this.contextValue = waitingForConfirmationContext;
 
 		explorerTreeView.memoFetcher.suppressForceScan();
-		const timeout = configMaid.get("view.confirmCompletionOfMemosTimeout");
+		const timeout = configMaid.get("view.timeoutOfConfirmationOnCompletionOfMemo");
 		let time = timeout;
 		const updateTime = (time: number) => {
 			this.description = `Confirm in ${Math.round(time / 1000)}`;
