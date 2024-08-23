@@ -350,7 +350,7 @@ class MemoItem extends ExplorerTreeItem {
 	complete(explorerTreeView: ExplorerTreeView, noConfirmation?: boolean): void {
 		if (
 			!noConfirmation &&
-			!this.confirmationHandle(
+			!this.completionConfirmationHandle(
 				explorerTreeView,
 				{ words: 3, maxLength: 12 },
 				"memoWaitingForCompletionConfirmation",
@@ -385,60 +385,70 @@ class MemoItem extends ExplorerTreeItem {
 		});
 	}
 
-	private confirmationHandle(
+	private completionConfirmationHandle(
 		explorerTreeView: ExplorerTreeView,
 		labelOptions: { words?: number; maxLength: number },
 		waitingForConfirmationContext: string,
 	): boolean {
-		// let currentTarget = MemoItem.currentCompletionConfirmationTarget;
-		// const currentBackup = MemoItem.currentCompletionConfirmationBackup;
-		// if (!currentTarget) MemoItem.currentCompletionConfirmationTarget = currentTarget = this;
-		// if (this !== currentTarget) {
-		// 	clearInterval(currentTarget.confirmInterval);
-		// 	clearTimeout(currentTarget.confirmTimeout);
-		// 	currentTarget.attemptedToComplete = false;
-		// 	Object.assign(currentTarget, currentBackup);
+		function setConfirmingItem(item: MemoItem) {
+			MemoItem.currentCompletionConfirmationTarget = currentTarget = item;
+			MemoItem.currentCompletionConfirmationBackup = {
+				label: item.label,
+				description: item.description,
+				iconPath: item.iconPath,
+				contextValue: item.contextValue,
+			};
+		}
 
-		// 	MemoItem.currentCompletionConfirmationTarget = this;
-		// 	MemoItem.currentCompletionConfirmationBackup = {
-		// 		label: this.label,
-		// 		description: this.description,
-		// 		iconPath: this.iconPath,
-		// 		contextValue: this.contextValue,
-		// 	}
-		// }
+		function reset(confirmingItem: MemoItem) {
+			vscode.window.showInformationMessage(`${confirmingItem.label}`);
+			explorerTreeView.memoFetcher.unsuppressForceScan();
+			clearInterval(confirmingItem.confirmInterval);
+			clearTimeout(confirmingItem.confirmTimeout);
+			confirmingItem.attemptedToComplete = false;
+			[confirmingItem.label, confirmingItem.description, confirmingItem.iconPath, confirmingItem.contextValue] =
+			[currentBackup.label, currentBackup.description, currentBackup.iconPath, currentBackup.contextValue];
+			explorerTreeView.viewProvider.refresh(confirmingItem);
+		}
 
-		// if (this.attemptedToComplete) return true;
-		// this.attemptedToComplete = true;
+		let currentTarget = MemoItem.currentCompletionConfirmationTarget;
+		const currentBackup = MemoItem.currentCompletionConfirmationBackup;
+		if (!currentTarget) setConfirmingItem(this);
 
-		// let abbrevLabel = `${this.label
-		// 	.toString()
-		// 	.split(/\s/, labelOptions.words ?? 1)
-		// 	.join(" ")}`;
-		// if (abbrevLabel.length > labelOptions.maxLength)
-		// 	abbrevLabel = `${abbrevLabel.slice(0, labelOptions.maxLength)}...`;
-		// this.label = abbrevLabel;
-		// this.contextValue = waitingForConfirmationContext;
+		if (this !== currentTarget) {
+			reset(currentTarget);
+			setConfirmingItem(this);
+		}
 
-		// explorerTreeView.memoFetcher.suppressForceScan();
-		// const timeout = configMaid.get("view.confirmCompletionOfMemosTimeout");
-		// let time = timeout;
-		// const updateTime = (time: number) => {
-		// 	this.description = `Confirm in ${Math.round(time / 1000)}`;
-		// 	const gbVal = (255 * time) / timeout;
-		// 	this.iconPath = new vscode.ThemeIcon("loading~spin", colorMaid.interpolate([255, gbVal, gbVal]));
-		// 	explorerTreeView.viewProvider.refresh(this);
-		// };
-		// updateTime(timeout);
-		// confirmingItem.confirmInterval = setInterval(
-		// 	() => updateTime((time -= 1000)),
-		// 	timeout / Math.round(time / 1000),
-		// );
+		if (this.attemptedToComplete) return true;
+		this.attemptedToComplete = true;
 
-		// confirmingItem.confirmTimeout = setTimeout(() => {
-		// 	reset();
-		// 	confirmingItem.attemptedToComplete = false;
-		// }, timeout);
+		let abbrevLabel = `${this.label
+			.toString()
+			.split(/\s/, labelOptions.words ?? 1)
+			.join(" ")}`;
+		if (abbrevLabel.length > labelOptions.maxLength)
+			abbrevLabel = `${abbrevLabel.slice(0, labelOptions.maxLength)}...`;
+		this.label = abbrevLabel;
+		this.contextValue = waitingForConfirmationContext;
+
+		explorerTreeView.memoFetcher.suppressForceScan();
+		const timeout = configMaid.get("view.confirmCompletionOfMemosTimeout");
+		let time = timeout;
+		const updateTime = (time: number) => {
+			this.description = `Confirm in ${Math.round(time / 1000)}`;
+			const gbVal = (255 * time) / timeout;
+			this.iconPath = new vscode.ThemeIcon("loading~spin", colorMaid.interpolate([255, gbVal, gbVal]));
+			explorerTreeView.viewProvider.refresh(this);
+		};
+		updateTime(timeout);
+		this.confirmInterval = setInterval(() => updateTime((time -= 1000)), timeout / Math.round(time / 1000));
+
+		this.confirmTimeout = setTimeout(() => {
+			reset(this);
+			MemoItem.currentCompletionConfirmationTarget = null;
+			MemoItem.currentCompletionConfirmationBackup = null;
+		}, timeout);
 		return false;
 	}
 }

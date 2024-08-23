@@ -161,18 +161,17 @@ export class MemoFetcher {
 		//@ts-ignore
 		const close = Aux.reEscape(commentData.close) ?? "";
 		const matchPattern = new RegExp(
-			`${Aux.reEscape(commentData.open)}[\t ]*mo[\t ]+(?<tag>[^\\r\\n\t ${Aux.reEscape(
+			`${Aux.reEscape(commentData.open)}[\t ]*mo[\t ]+(?<tag>[^\\r\\n\\t ${Aux.reEscape(
 				this.closeCharacters,
-			)}]+)[\t ]*(?<priority>!*)(?<content>.*${close ? "?" : ""})${close}`,
+			)}]+)[\\t ]*(?<priority>!*)(?<content>.*${close ? "?" : ""})${close}`,
 			"gim",
 		);
 		let memos = [];
-		const leftoverCloseCharacters = new RegExp(`^[${Aux.reEscape(this.closeCharacters)}]*`);
 		for (const match of content.matchAll(matchPattern)) {
 			const [tag, priority, content] = [
 				match.groups["tag"].toUpperCase(),
 				match.groups["priority"].length,
-				match.groups["content"].trimEnd().replace(leftoverCloseCharacters, ""),
+				match.groups["content"].trimEnd(),
 			];
 			memos.push({
 				content: content,
