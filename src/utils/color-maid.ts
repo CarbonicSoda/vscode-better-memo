@@ -1,6 +1,6 @@
 import { Aux } from "./auxiliary";
-import { ThemeColor } from "vscode";
-import VscodeColors from "../vscode-colors.json";
+import { ColorThemeKind, ThemeColor, window } from "vscode";
+import VScodeColors from "../vscode-colors.json";
 
 type RGB3 = [number, number, number];
 
@@ -10,7 +10,10 @@ export function getColorMaid(): typeof ColorMaid {
 
 const ColorMaid: {
 	/**
-	 * Returns the closest ThemeColor to param, interpolated using RGB color space
+	 * Returns the closest ThemeColor to param, interpolated using RGB color space.
+	 * Also, under different color themes the result might differ significantly (though still the closest match).
+	 * This is intended for higher contrast.
+	 * A demo of original & filtered colors could be seen at https://www.desmos.com/3d/wt60c3p2mk
 	 * @param rgbOrHex [R, G, B] or "#rrggbb", "#rgb" (case insensitive, # could be omitted)
 	 */
 	interpolate(rgbOrHex: RGB3 | string): ThemeColor;
@@ -33,9 +36,10 @@ const ColorMaid: {
 } = {
 	interpolate(rgbOrHex: RGB3 | string): ThemeColor {
 		const rgb = typeof rgbOrHex === "string" ? this.hex2rgb(rgbOrHex) : rgbOrHex;
+		const colorThemeKind = ColorThemeKind[window.activeColorTheme.kind];
 		let bestDist = 999999;
 		let best = "";
-		for (const [colorName, colorRgb] of Object.entries(VscodeColors)) {
+		for (const [colorName, colorRgb] of Object.entries(VScodeColors[<keyof typeof VScodeColors>colorThemeKind])) {
 			let dist = 0;
 			for (let i = 0; i < 3; i++) dist += (rgb[i] - colorRgb[i]) ** 2;
 			if (dist < bestDist) {

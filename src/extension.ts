@@ -1,3 +1,5 @@
+import * as vscode from "vscode";
+
 import { ExplorerTreeView } from "./explorer-view-provider";
 import { MemoFetcher } from "./memo-fetcher";
 

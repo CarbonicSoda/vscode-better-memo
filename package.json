@@ -144,7 +144,7 @@
 				},
 				{
 					"command": "better-memo.confirmCompleteMemo",
-					"when": "view.better-memo.memoExplorer.visible && viewItem == memoWaitingForConfirmComplete",
+					"when": "view.better-memo.memoExplorer.visible && viewItem == memoWaitingForCompletionConfirmation",
 					"group": "inline@1"
 				},
 				{
@@ -170,7 +170,7 @@
 		"viewsWelcome": [
 			{
 				"view": "better-memo.memoExplorer",
-				"contents": "Memos are loading.\nIf this is taking too long, consider changing fetcher configurations.",
+				"contents": "Memos are loading.\nIf this is taking too long, consider to change fetcher configurations.",
 				"when": "!better-memo.explorerInitFinished && !treeView.better-memo.memoExplorer.toggleCollapseAll"
 			},
 			{
@@ -274,22 +274,22 @@
 						"type": "boolean",
 						"default": true
 					},
-					"better-memo.view.confirmCompleteMemo": {
+					"better-memo.view.confirmCompletionOfMemo": {
 						"order": 331,
 						"type": "boolean",
 						"default": false
 					},
-					"better-memo.view.confirmCompleteMultiple": {
+					"better-memo.view.confirmCompletionOfMemosTimeout": {
 						"order": 332,
-						"type": "boolean",
-						"default": true
-					},
-					"better-memo.view.confirmCompleteTimeout": {
-						"order": 333,
 						"type": "integer",
 						"default": 3000
 					},
-					"better-memo.view.alwaysOpenFileOnCompleteSingleMemo": {
+					"better-memo.view.confirmCompletionOfMultipleMemos": {
+						"order": 333,
+						"type": "boolean",
+						"default": true
+					},
+					"better-memo.view.alwaysOpenFileOnCompletionOfMemo": {
 						"order": 334,
 						"type": "boolean",
 						"default": true

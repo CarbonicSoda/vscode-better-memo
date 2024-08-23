@@ -52,11 +52,10 @@ export class MemoFetcher {
 		});
 		configMaid.listen("fetcher.forceScanDelay");
 
-		this.fetchCustomTags();
 		await this.forceScan();
 
 		this.janitor.add(
-			configMaid.onChange("customTags", () => this.fetchCustomTags()),
+			configMaid.onChange("customTags", () => eventEmitter.emit("updateView")),
 
 			workspace.onDidCreateFiles(() => this.fetchDocs()),
 			workspace.onDidDeleteFiles(() => this.fetchDocs()),
@@ -91,6 +90,7 @@ export class MemoFetcher {
 	}
 
 	getTags(): { [tag: string]: ThemeColor } {
+		this.fetchCustomTags();
 		let tags: { [tag: string]: ThemeColor } = {};
 		const memoTags = this.getMemos().map((memo) => memo.tag);
 		for (const tag of memoTags) tags[tag] = colorMaid.hashColor(tag);
@@ -113,12 +113,12 @@ export class MemoFetcher {
 	private fetchCustomTags(): void {
 		const userDefinedCustomTags = configMaid.get("customTags");
 		const validTagRE = new RegExp(`^[^\\r\\n\t ${Aux.reEscape(this.closeCharacters)}]+$`);
-		const validHexRE = /^#[0-9a-fA-F]{6}$/;
+		const validHexRE = /(?:^#?[0-9a-f]{6}$)|(?:^#?[0-9a-f]{3}$)/i;
 		const validCustomTags: { [tag: string]: ThemeColor } = {};
 		for (let [tag, hex] of Object.entries(userDefinedCustomTags)) {
-			[tag, hex] = [tag.trim(), (<string>hex).trim()];
+			[tag, hex] = [tag.trim().toUpperCase(), (<string>hex).trim()];
 			if (!validTagRE.test(tag) || !validHexRE.test(<string>hex)) continue;
-			validCustomTags[tag.toUpperCase()] = colorMaid.interpolate(<string>hex);
+			validCustomTags[tag] = colorMaid.interpolate(<string>hex);
 		}
 		this.customTags = validCustomTags;
 	}
