@@ -25,18 +25,19 @@ export namespace FE {
 		}
 
 		async apply(metaData?: FileEditMetaData, alwaysOpenFile?: boolean): Promise<void> {
-			this.edits.forEach(async (fileEdits, uri) => {
+			for (const [uri, fileEdits] of this.edits.entries()) {
 				await this.editFile(fileEdits, uri, metaData, alwaysOpenFile).catch((err) => {
 					throw new Error(`Error when applying edits to files: ${err}`);
 				});
-			});
+			};
+			console.log("applied");
 		}
 
 		reset(): void {
 			this.edits.clear();
 		}
 
-		private editFileWithFs(edits: FileEdits, doc: TextDocument): void {
+		private async editFileWithFs(edits: FileEdits, doc: TextDocument): Promise<void> {
 			let text = doc.getText();
 			let delta = 0;
 			edits.forEach((edit, [start, end]) => {
@@ -56,11 +57,9 @@ export namespace FE {
 		): Promise<void> {
 			await workspace.openTextDocument(uri).then(async (doc) => {
 				if (!alwaysOpenFile && !doc.isDirty) {
-					window.showInformationMessage(`using fs\${}`);
 					this.editFileWithFs(edits, doc);
 					return;
 				}
-				window.showInformationMessage(`using we\${}`);
 				await window
 					.showTextDocument(doc)
 					.then(() => commands.executeCommand("workbench.action.files.saveWithoutFormatting", doc));

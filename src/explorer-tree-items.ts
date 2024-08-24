@@ -3,6 +3,7 @@ import {
 	Position,
 	Range,
 	Selection,
+	TextDocument,
 	ThemeColor,
 	ThemeIcon,
 	TreeItem,
@@ -13,7 +14,7 @@ import {
 	workspace,
 } from "vscode";
 import { ExplorerTreeView, ExplorerViewProvider } from "./explorer-view-provider";
-import { MemoEntry, getFormattedMemo } from "./memo-fetcher";
+import { MemoEntry, MemoFetcher } from "./memo-fetcher";
 import { Aux } from "./utils/auxiliary";
 import { getColorMaid } from "./utils/color-maid";
 import { getConfigMaid } from "./utils/config-maid";
@@ -22,6 +23,12 @@ import { FE } from "./utils/file-edit";
 export namespace ETItems {
 	const configMaid = getConfigMaid();
 	const colorMaid = getColorMaid();
+
+	configMaid.listen("actions.askForConfirmationOnCompletionOfMemo");
+	configMaid.listen("actions.timeoutOfConfirmationOnCompletionOfMemo");
+	configMaid.listen("actions.alwaysOpenChangedFileOnCompletionOfMemo");
+	configMaid.listen("actions.askForConfirmationOnCompletionOfMemos");
+	configMaid.listen("actions.removeLineIfMemoIsOnSingleLine");
 
 	export type InnerItemType = FileItem | TagItem;
 	export type ExplorerTreeItemType = ExplorerTreeItem | FileItem | TagItem | MemoItem;
@@ -58,7 +65,8 @@ export namespace ETItems {
 		}
 
 		async completeMemos(explorerTreeView: ExplorerTreeView, noConfirm?: boolean): Promise<void> {
-			explorerTreeView.memoFetcher.suppressForceScan();
+			const { memoFetcher, viewProvider } = explorerTreeView;
+			memoFetcher.suppressForceScan();
 			const memoEntries = (
 				this.hierarchy === "primary"
 					? this.children.flatMap((child) => (<InnerItem>child).children)
@@ -68,7 +76,7 @@ export namespace ETItems {
 			if (!noConfirm && configMaid.get("actions.askForConfirmationOnCompletionOfMemos")) {
 				const iconPath = this.iconPath;
 				this.iconPath = InnerItem.waitingForCompletionConfirmationIcon;
-				explorerTreeView.viewProvider.refresh(this);
+				viewProvider.refresh(this);
 
 				const completionDetails = `Are you sure you want to proceed?
 					This will mark ${this.description.toString().toLowerCase()} under the ${
@@ -81,14 +89,16 @@ export namespace ETItems {
 					"No",
 				);
 				this.iconPath = iconPath;
-				explorerTreeView.viewProvider.refresh(this);
-				explorerTreeView.memoFetcher.unsuppressForceScan();
+				viewProvider.refresh(this);
+				memoFetcher.unsuppressForceScan();
 				if (!option || option === "No") return;
 			}
 
 			const edit = new FE.FileEdit();
+			const docs = new Set();
 			for (const memoEntry of memoEntries) {
 				await workspace.openTextDocument(memoEntry.path).then(async (doc) => {
+					docs.add(doc);
 					const doRemoveLine =
 						configMaid.get("actions.removeLineIfMemoIsOnSingleLine") &&
 						memoEntry.line < doc.lineCount - 1 &&
@@ -96,7 +106,9 @@ export namespace ETItems {
 							.lineAt(memoEntry.line)
 							.text.replace(
 								new RegExp(
-									`${Aux.reEscape(memoEntry.raw)}|${Aux.reEscape(getFormattedMemo(memoEntry))}`,
+									`${Aux.reEscape(memoEntry.raw)}|${Aux.reEscape(
+										MemoFetcher.getFormattedMemo(memoEntry),
+									)}`,
 								),
 								"",
 							)
@@ -110,8 +122,12 @@ export namespace ETItems {
 					explorerTreeView.viewProvider.refresh(this.removeFromTree(explorerTreeView.viewProvider));
 				});
 			}
-			explorerTreeView.memoFetcher.unsuppressForceScan();
 			await edit.apply({ isRefactoring: true });
+			setTimeout(() => {
+				for (const doc of docs) memoFetcher.scanDoc(<TextDocument>doc);
+				viewProvider.reloadItems();
+				memoFetcher.unsuppressForceScan();
+			}, 100); //bro I hate this, but vscode wont update doc.getText() immediately somehow...
 		}
 	}
 
@@ -184,7 +200,8 @@ export namespace ETItems {
 		}
 
 		async complete(explorerTreeView: ExplorerTreeView, noConfirmation?: boolean): Promise<void> {
-			explorerTreeView.memoFetcher.unsuppressForceScan();
+			const { memoFetcher, viewProvider } = explorerTreeView;
+			memoFetcher.unsuppressForceScan();
 			if (
 				!noConfirmation &&
 				configMaid.get("actions.askForConfirmationOnCompletionOfMemo") &&
@@ -199,7 +216,11 @@ export namespace ETItems {
 					doc
 						.lineAt(memoEntry.line)
 						.text.replace(
-							new RegExp(`${Aux.reEscape(memoEntry.raw)}|${Aux.reEscape(getFormattedMemo(memoEntry))}`),
+							new RegExp(
+								`${Aux.reEscape(memoEntry.raw)}|${Aux.reEscape(
+									MemoFetcher.getFormattedMemo(memoEntry),
+								)}`,
+							),
 							"",
 						)
 						.trim().length === 0;
@@ -211,7 +232,7 @@ export namespace ETItems {
 				const range = new Range(start, end);
 				const edit = new FE.FileEdit();
 				edit.delete(doc.uri, range);
-				explorerTreeView.viewProvider.refresh(this.removeFromTree(explorerTreeView.viewProvider));
+				viewProvider.refresh(this.removeFromTree(viewProvider));
 				await edit.apply({ isRefactoring: true }, doOpenFile).then(() => {
 					const editor = window.activeTextEditor;
 					if (editor?.document === doc) {

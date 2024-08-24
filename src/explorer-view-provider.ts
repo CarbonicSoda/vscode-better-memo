@@ -33,12 +33,6 @@ export class ExplorerTreeView {
 		configMaid.listen("view.expandPrimaryItemsByDefault");
 		configMaid.listen("view.expandSecondaryItemsByDefault");
 
-		configMaid.listen("actions.askForConfirmationOnCompletionOfMemo");
-		configMaid.listen("actions.timeoutOfConfirmationOnCompletionOfMemo");
-		configMaid.listen("actions.alwaysOpenChangedFileOnCompletionOfMemo");
-		configMaid.listen("actions.askForConfirmationOnCompletionOfMemos");
-		configMaid.listen("actions.removeLineIfMemoIsOnSingleLine");
-
 		this.memoFetcher = memoFetcher;
 		this.viewProvider = new ExplorerViewProvider(memoFetcher);
 		this.updateViewType(null, true);
