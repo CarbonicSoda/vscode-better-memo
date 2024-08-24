@@ -25,11 +25,11 @@ export class ExplorerTreeView {
 		configMaid.listen("view.defaultView");
 		configMaid.listen("view.expandPrimaryItemsByDefault");
 		configMaid.listen("view.expandSecondaryItemsByDefault");
-		configMaid.listen("view.askForConfirmationOnCompletionOfMemo");
-		configMaid.listen("view.askForConfirmationOnCompletionOfAllMemos");
-		configMaid.listen("view.timeoutOfConfirmationOnCompletionOfMemo");
 
+		configMaid.listen("actions.askForConfirmationOnCompletionOfMemo");
+		configMaid.listen("actions.timeoutOfConfirmationOnCompletionOfMemo");
 		configMaid.listen("actions.alwaysOpenChangedFileOnCompletionOfMemo");
+		configMaid.listen("actions.askForConfirmationOnCompletionOfMemos");
 		configMaid.listen("actions.removeLineIfMemoIsOnSingleLine");
 
 		this.memoFetcher = memoFetcher;
@@ -59,12 +59,27 @@ export class ExplorerTreeView {
 			vscode.commands.registerCommand("better-memo.switchToFileView", () => this.updateViewType("File")),
 			vscode.commands.registerCommand("better-memo.switchToTagView", () => this.updateViewType("Tag")),
 
-			vscode.commands.registerCommand("better-memo.navigateToMemo", (memo) => this.navigateToMemo(memo)),
-			vscode.commands.registerCommand("better-memo.navigateToFile", (file) => file.navigate()),
+			vscode.commands.registerCommand("better-memo.navigateToMemo", (memo: MemoEntry) =>
+				this.navigateToMemo(memo),
+			),
+			vscode.commands.registerCommand("better-memo.navigateToFile", (fileItem: FileItem) => fileItem.navigate()),
 
-			vscode.commands.registerCommand("better-memo.completeMemo", (memo) => memo.complete(this)),
-			vscode.commands.registerCommand("better-memo.confirmCompleteMemo", (memo) => memo.complete(this)),
-			vscode.commands.registerCommand("better-memo.completeMemoNoConfirm", (memo) => memo.complete(this, true)),
+			vscode.commands.registerCommand("better-memo.completeMemo", (memoItem: MemoItem) =>
+				memoItem.complete(this),
+			),
+			vscode.commands.registerCommand("better-memo.confirmCompleteMemo", (memoItem: MemoItem) =>
+				memoItem.complete(this),
+			),
+			vscode.commands.registerCommand("better-memo.completeMemoNoConfirm", (memoItem: MemoItem) =>
+				memoItem.complete(this, true),
+			),
+
+			vscode.commands.registerCommand("better-memo.completeFile", (fileItem: FileItem) =>
+				fileItem.completeMemos(this),
+			),
+			vscode.commands.registerCommand("better-memo.completeTag", (tagItem: TagItem) =>
+				tagItem.completeMemos(this),
+			),
 		);
 
 		vscode.commands.executeCommand("setContext", "better-memo.explorerInitFinished", true);
@@ -266,11 +281,16 @@ class ExplorerTreeItem extends vscode.TreeItem {
 }
 
 class InnerItem extends ExplorerTreeItem {
+	static cancellationTokenSource: vscode.CancellationTokenSource = new vscode.CancellationTokenSource();
+	static waitingForCompletionConfirmationIcon = new vscode.ThemeIcon("loading~spin");
+
 	children: ExplorerTreeItem[] = [];
+	hierarchy: "primary" | "secondary";
 
 	constructor(label: string, expand: boolean, context: string, parent?: InnerItem) {
 		super(label, expand, parent);
 		this.contextValue = context;
+		this.hierarchy = parent ? "secondary" : "primary";
 	}
 
 	getChildItems(): ExplorerTreeItemType[] {
@@ -281,7 +301,36 @@ class InnerItem extends ExplorerTreeItem {
 		this.children = items;
 	}
 
-	async completeAll(): Promise<void> {}
+	static cancelCancellationToken(): void {
+		this.cancellationTokenSource.cancel();
+	}
+
+	async completeMemos(explorerTreeView: ExplorerTreeView): Promise<void> {
+		//add noConfirm for actions and for ExplorerCompleteAll
+		InnerItem.cancelCancellationToken();
+		const memos = (
+			this.hierarchy === "primary"
+				? this.getChildItems().flatMap((child) => (<InnerItem>child).getChildItems())
+				: this.getChildItems()
+		).map((memoItem) => (<MemoItem>memoItem).memo);
+		this.iconPath = InnerItem.waitingForCompletionConfirmationIcon;
+		explorerTreeView.viewProvider.refresh(this);
+
+		if (configMaid.get("actions.askForConfirmationOnCompletionOfMemos")) {
+			const option = await vscode.window.showQuickPick(
+				["Yes", "No"],
+				{
+					title: `Are you sure you want to mark ${memos.length} memo${Aux.plural(memos)} under the ${
+						this.contextValue
+					} ${this.label} as completed?`,
+					canPickMany: false,
+					ignoreFocusOut: true,
+				},
+				InnerItem.cancellationTokenSource.token,
+			);
+			console.log(option);
+		}
+	}
 }
 
 class FileItem extends InnerItem {
@@ -352,9 +401,16 @@ class MemoItem extends ExplorerTreeItem {
 				  );
 	}
 
-	complete(explorerTreeView: ExplorerTreeView, noConfirmation?: boolean): void {
+	async complete(
+		explorerTreeView: ExplorerTreeView,
+		noConfirmation?: boolean,
+		noAlwaysOpenFile?: boolean,
+	): Promise<void> {
+		InnerItem.cancelCancellationToken();
+		explorerTreeView.memoFetcher.unsuppressForceScan();
 		if (
 			!noConfirmation &&
+			configMaid.get("actions.askForConfirmationOnCompletionOfMemo") &&
 			!this.completionConfirmationHandle(
 				explorerTreeView,
 				{ words: 3, maxLength: 12 },
@@ -363,31 +419,28 @@ class MemoItem extends ExplorerTreeItem {
 		)
 			return;
 		const memo = this.memo;
-		vscode.workspace.openTextDocument(memo.path).then((doc) => {
-			const removeLine =
+		await vscode.workspace.openTextDocument(memo.path).then(async (doc) => {
+			const doRemoveLine =
 				configMaid.get("actions.removeLineIfMemoIsOnSingleLine") &&
 				memo.line < doc.lineCount - 1 &&
 				doc
 					.lineAt(memo.line)
 					.text.replace(new RegExp(`${Aux.reEscape(memo.raw)}|${Aux.reEscape(getFormattedMemo(memo))}`), "")
 					.trim().length === 0;
+			const doOpenFile = !noAlwaysOpenFile && configMaid.get("actions.alwaysOpenChangedFileOnCompletionOfMemo");
 			const start = doc.positionAt(memo.offset);
-			const end = removeLine ? new vscode.Position(memo.line + 1, 0) : start.translate(0, memo.rawLength);
+			const end = doRemoveLine ? new vscode.Position(memo.line + 1, 0) : start.translate(0, memo.rawLength);
 			const range = new vscode.Range(start, end);
 			const edit = new FE.FileEdit();
 			edit.delete(doc.uri, range);
-			edit.apply({ isRefactoring: true }, configMaid.get("actions.alwaysOpenChangedFileOnCompletionOfMemo")).then(
-				() => {
-					const editor = vscode.window.activeTextEditor;
-					if (editor?.document === doc) {
-						editor.revealRange(new vscode.Range(start, start));
-						editor.selection = new vscode.Selection(start, start);
-					}
-				},
-			);
-			const tmp = this.removeFromTree(explorerTreeView.viewProvider);
-			console.log(tmp);
-			explorerTreeView.viewProvider.refresh(tmp);
+			explorerTreeView.viewProvider.refresh(this.removeFromTree(explorerTreeView.viewProvider));
+			await edit.apply({ isRefactoring: true }, doOpenFile).then(() => {
+				const editor = vscode.window.activeTextEditor;
+				if (editor?.document === doc) {
+					editor.revealRange(new vscode.Range(start, start));
+					editor.selection = new vscode.Selection(start, start);
+				}
+			});
 		});
 	}
 
@@ -446,7 +499,7 @@ class MemoItem extends ExplorerTreeItem {
 		this.contextValue = waitingForConfirmationContext;
 
 		explorerTreeView.memoFetcher.suppressForceScan();
-		const timeout = configMaid.get("view.timeoutOfConfirmationOnCompletionOfMemo");
+		const timeout = configMaid.get("actions.timeoutOfConfirmationOnCompletionOfMemo");
 		let time = timeout;
 		const updateTime = (time: number) => {
 			this.description = `Confirm in ${Math.round(time / 1000)}`;

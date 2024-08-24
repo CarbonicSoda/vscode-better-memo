@@ -74,7 +74,7 @@
 			{
 				"command": "better-memo.completeTag",
 				"title": "Mark All Memos Under Tag as Complete",
-				"icon": "$(tag-remove)"
+				"icon": "$(check-all)"
 			},
 			{
 				"command": "better-memo.completeAll",
@@ -153,17 +153,9 @@
 					"group": "inline@2"
 				},
 				{
-					"command": "better-memo.completeFile",
-					"when": "view.better-memo.memoExplorer.visible && viewItem == file"
-				},
-				{
 					"command": "better-memo.completeTag",
 					"when": "view.better-memo.memoExplorer.visible && viewItem == tag",
 					"group": "inline@1"
-				},
-				{
-					"command": "better-memo.completeTag",
-					"when": "view.better-memo.memoExplorer.visible && viewItem == tag"
 				}
 			]
 		},
@@ -282,24 +274,6 @@
 						"title": "Expand Secondary Items by Default",
 						"type": "boolean",
 						"default": true
-					},
-					"better-memo.view.askForConfirmationOnCompletionOfMemo": {
-						"order": 331,
-						"title": "Ask for Confirmation on Completion of Memo",
-						"type": "boolean",
-						"default": false
-					},
-					"better-memo.view.timeoutOfConfirmationOnCompletionOfMemo": {
-						"order": 332,
-						"title": "Timeout of Confirmation on Completion of Memo",
-						"type": "integer",
-						"default": 3000
-					},
-					"better-memo.view.askForConfirmationOnCompletionOfAllMemos": {
-						"order": 333,
-						"title": "Ask for Confirmation on Completion of All Memos",
-						"type": "boolean",
-						"default": true
 					}
 				}
 			},
@@ -307,14 +281,32 @@
 				"title": "Actions",
 				"order": 4,
 				"properties": {
-					"better-memo.actions.alwaysOpenChangedFileOnCompletionOfMemo": {
+					"better-memo.actions.askForConfirmationOnCompletionOfMemo": {
 						"order": 411,
+						"title": "Ask for Confirmation on Completion of Memo",
+						"type": "boolean",
+						"default": false
+					},
+					"better-memo.actions.timeoutOfConfirmationOnCompletionOfMemo": {
+						"order": 412,
+						"title": "Timeout of Confirmation on Completion of Memo",
+						"type": "integer",
+						"default": 3000
+					},
+					"better-memo.actions.alwaysOpenChangedFileOnCompletionOfMemo": {
+						"order": 413,
 						"title": "Always Open Changed File on Completion of Memo",
 						"type": "boolean",
 						"default": true
 					},
-					"better-memo.actions.removeLineIfMemoIsOnSingleLine": {
+					"better-memo.actions.askForConfirmationOnCompletionOfMemos": {
 						"order": 421,
+						"title": "Ask for Confirmation on Completion of Memos",
+						"type": "boolean",
+						"default": true
+					},
+					"better-memo.actions.removeLineIfMemoIsOnSingleLine": {
+						"order": 431,
 						"title": "Remove Line if Memo Is on Single Line",
 						"type": "boolean",
 						"default": true

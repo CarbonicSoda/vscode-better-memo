@@ -39,16 +39,15 @@ export namespace FE {
 		}
 
 		private editFileWithFs(edits: FileEdits, doc: TextDocument): void {
-			const uri = doc.uri;
-			let text = textDecoder.decode(readFileSync(uri.fsPath));
+			let text = doc.getText();
 			let delta = 0;
 			edits.forEach((edit, [start, end]) => {
 				if (typeof start !== "number") start = doc.offsetAt(start);
 				if (typeof end !== "number") end = doc.offsetAt(end);
 				text = text.slice(0, start - delta) + edit + text.slice(end - delta);
-				delta += end - start - text.length;
+				delta += end - start - edit.length;
 			});
-			writeFileSync(uri.fsPath, text);
+			writeFileSync(doc.uri.fsPath, text);
 		}
 
 		private async editFile(
@@ -57,11 +56,13 @@ export namespace FE {
 			metaData?: FileEditMetaData,
 			alwaysOpenFile?: boolean,
 		): Promise<void> {
-			workspace.openTextDocument(uri).then(async (doc) => {
+			await workspace.openTextDocument(uri).then(async (doc) => {
 				if (!alwaysOpenFile && !doc.isDirty) {
+					window.showInformationMessage(`using fs\${}`);
 					this.editFileWithFs(edits, doc);
 					return;
 				}
+				window.showInformationMessage(`using we\${}`);
 				await window
 					.showTextDocument(doc)
 					.then(() => commands.executeCommand("workbench.action.files.saveWithoutFormatting", doc));
@@ -71,7 +72,7 @@ export namespace FE {
 					if (typeof end === "number") end = doc.positionAt(end);
 					edit.replace(uri, new Range(start, end), text);
 				});
-				workspace
+				await workspace
 					.applyEdit(edit, metaData)
 					.then(() =>
 						doc.save().then(
@@ -89,18 +90,5 @@ export namespace FE {
 					);
 			});
 		}
-	}
-
-	function getFsPathOfOpenDocs(): string[] {
-		const tabGroups = window.tabGroups.all;
-		const fsPaths = [];
-		for (const tabGroup of tabGroups) {
-			for (const tab of tabGroup.tabs) {
-				if (!tab.input || Object.getPrototypeOf(tab.input).constructor.name !== "Kn") continue;
-				//@ts-ignore
-				fsPaths.push(tab.input.uri.fsPath);
-			}
-		}
-		return fsPaths;
 	}
 }

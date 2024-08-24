@@ -162,8 +162,9 @@ export class MemoFetcher {
 			"(?:" +
 			commentFormats
 				.map((data, i) => {
+					const open = Aux.reEscape(data.open);
 					const close = Aux.reEscape(data.close ?? "");
-					return `${Aux.reEscape(data.open)}[\t ]*mo[\t ]+(?<tag${i}>[^\\r\\n\\t ${Aux.reEscape(
+					return `(?<![${open}])${open}[\t ]*mo[\t ]+(?<tag${i}>[^\\r\\n\\t ${Aux.reEscape(
 						this.closeCharacters,
 					)}]+)[\\t ]*(?<priority${i}>!*)(?<content${i}>.*${close ? "?" : ""})${close}`;
 				})
