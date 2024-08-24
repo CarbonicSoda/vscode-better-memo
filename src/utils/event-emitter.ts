@@ -1,4 +1,4 @@
-export namespace EE {
+export namespace EventEmitter {
 	export function getEventEmitter(): typeof EventEmitter {
 		return EventEmitter;
 	}

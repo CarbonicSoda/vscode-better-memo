@@ -1,5 +1,5 @@
-import { Janitor } from "./janitor";
 import { getConfigMaid } from "./config-maid";
+import { Janitor } from "./janitor";
 
 const configMaid = getConfigMaid();
 

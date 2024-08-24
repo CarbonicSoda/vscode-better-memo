@@ -1,5 +1,6 @@
-import { Aux } from "./auxiliary";
 import { ColorThemeKind, ThemeColor, window } from "vscode";
+import { Aux } from "./auxiliary";
+
 import VScodeColors from "../vscode-colors.json";
 
 type RGB3 = [number, number, number];

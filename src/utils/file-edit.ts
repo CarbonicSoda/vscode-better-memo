@@ -1,9 +1,7 @@
+import { writeFileSync } from "fs";
 import { commands, Position, Range, TextDocument, Uri, window, workspace, WorkspaceEdit } from "vscode";
-import { readFileSync, writeFileSync } from "fs";
 
 export namespace FE {
-	const textDecoder = new TextDecoder();
-
 	type EditRange = [start: number | Position, end: number | Position];
 	type FileEdits = Map<EditRange, string>;
 	type FileEditMetaData = { isRefactoring?: boolean };
@@ -27,8 +25,8 @@ export namespace FE {
 		}
 
 		async apply(metaData?: FileEditMetaData, alwaysOpenFile?: boolean): Promise<void> {
-			this.edits.forEach((fileEdits, uri) => {
-				this.editFile(fileEdits, uri, metaData, alwaysOpenFile).catch((err) => {
+			this.edits.forEach(async (fileEdits, uri) => {
+				await this.editFile(fileEdits, uri, metaData, alwaysOpenFile).catch((err) => {
 					throw new Error(`Error when applying edits to files: ${err}`);
 				});
 			});
@@ -72,22 +70,12 @@ export namespace FE {
 					if (typeof end === "number") end = doc.positionAt(end);
 					edit.replace(uri, new Range(start, end), text);
 				});
-				await workspace
-					.applyEdit(edit, metaData)
-					.then(() =>
-						doc.save().then(
-							(succeed) => {
-								if (!succeed) throw new Error(`Error when saving ${uri.path}`);
-							},
-							() => null,
-						),
-					)
-					.then(
-						() => null,
-						(err) => {
-							throw new Error(`Error when modifying ${uri.path}: ${err}`);
-						},
-					);
+				await workspace.applyEdit(edit, metaData).then(
+					() => commands.executeCommand("workbench.action.files.saveWithoutFormatting", doc),
+					(err) => {
+						throw new Error(`Error when modifying ${uri.path}: ${err}`);
+					},
+				);
 			});
 		}
 	}

@@ -1,11 +1,12 @@
 import { commands, TabGroup, TextDocument, ThemeColor, window, workspace } from "vscode";
 import { Aux } from "./utils/auxiliary";
-import { EE } from "./utils/event-emitter";
-import { FE } from "./utils/file-edit";
 import { getColorMaid } from "./utils/color-maid";
 import { getConfigMaid } from "./utils/config-maid";
+import { EventEmitter } from "./utils/event-emitter";
+import { FE } from "./utils/file-edit";
 import { IntervalMaid } from "./utils/interval-maid";
 import { Janitor } from "./utils/janitor";
+
 import LangCommentFormat from "./lang-comment-format.json";
 
 export type MemoEntry = {
@@ -21,7 +22,7 @@ export type MemoEntry = {
 	readonly langId: keyof typeof LangCommentFormat;
 };
 
-const eventEmitter = EE.getEventEmitter();
+const eventEmitter = EventEmitter.getEventEmitter();
 const colorMaid = getColorMaid();
 const configMaid = getConfigMaid();
 
@@ -45,7 +46,7 @@ export class MemoFetcher {
 	private prevDoc: TextDocument;
 
 	async init(): Promise<void> {
-		configMaid.listen("customTags");
+		configMaid.listen("general.customTags");
 		configMaid.listen({
 			"fetcher.watch": (watch) => `{${watch.join(",")}}`,
 			"fetcher.ignore": (ignore) => `{${ignore.join(",")}}`,
@@ -55,7 +56,9 @@ export class MemoFetcher {
 		await this.forceScan();
 
 		this.janitor.add(
-			configMaid.onChange("customTags", () => eventEmitter.emit("updateView")),
+			configMaid.onChange("general.customTags", () => eventEmitter.emit("updateView")),
+
+			//add eventEmitter event listener for scanDoc to prevent ghost memos after completion
 
 			workspace.onDidCreateFiles(() => this.fetchDocs()),
 			workspace.onDidDeleteFiles(() => this.fetchDocs()),
@@ -67,19 +70,10 @@ export class MemoFetcher {
 
 			commands.registerCommand("better-memo.reloadExplorer", () => this.forceScan(true)),
 		);
-		this.intervalMaid.add(() => {
-			const doc = window.activeTextEditor?.document;
-			if (!doc) return;
-			this.prevDoc = doc;
-			if (this.validForScan(doc)) this.scanDoc(doc, true);
-		}, "fetcher.scanDelay");
-		this.intervalMaid.add(() => {
-			if (this.forceScanSuppressed) return;
-			const doc = window.activeTextEditor?.document;
-			if (!doc || !this.watchedDocs.has(doc)) return;
-			this.scanDoc(doc, true);
-		}, "fetcher.forceScanDelay");
+		this.intervalMaid.add(() => this.scanDocInterval(), "fetcher.scanDelay");
+		this.intervalMaid.add(() => this.forceScanInterval(), "fetcher.forceScanDelay");
 		this.intervalMaid.add(() => this.fetchDocs(), "fetcher.workspaceScanDelay");
+
 		eventEmitter.emitWait("fetcherInitFinished");
 	}
 
@@ -111,7 +105,7 @@ export class MemoFetcher {
 	}
 
 	private fetchCustomTags(): void {
-		const userDefinedCustomTags = configMaid.get("customTags");
+		const userDefinedCustomTags = configMaid.get("general.customTags");
 		const validTagRE = new RegExp(`^[^\\r\\n\t ${Aux.reEscape(this.closeCharacters)}]+$`);
 		const validHexRE = /(?:^#?[0-9a-f]{6}$)|(?:^#?[0-9a-f]{3}$)/i;
 		const validCustomTags: { [tag: string]: ThemeColor } = {};
@@ -123,10 +117,54 @@ export class MemoFetcher {
 		this.customTags = validCustomTags;
 	}
 
+	private async scanDocInterval(): Promise<void> {
+		const doc = window.activeTextEditor?.document;
+		if (!doc) return;
+		this.prevDoc = doc;
+		if (this.validForScan(doc)) await this.scanDoc(doc, true);
+	}
+
+	private async forceScanInterval(): Promise<void> {
+		if (this.forceScanSuppressed) return;
+		const doc = window.activeTextEditor?.document;
+		if (!doc || !this.watchedDocs.has(doc)) return;
+		await this.scanDoc(doc, true);
+	}
+
 	private async forceScan(updateView?: boolean): Promise<void> {
 		await this.fetchDocs().then(() => {
 			for (const doc of this.watchedDocs.keys()) this.scanDoc(doc);
 			if (updateView) eventEmitter.emit("updateView");
+		});
+	}
+
+	private async formatMemos(doc: TextDocument): Promise<void> {
+		const memos = this.docMemos.get(doc);
+		if (!memos) return;
+		const edit = new FE.FileEdit();
+		for (const memo of memos)
+			edit.replace(doc.uri, [memo.offset, memo.offset + memo.rawLength], getFormattedMemo(memo));
+		edit.apply({ isRefactoring: true });
+	}
+
+	private async handleTabChange(changed: readonly TabGroup[]): Promise<void> {
+		if (!this.prevDoc || !this.watchedDocs.has(this.prevDoc) || changed.length !== 1) return;
+		const tabGroup = changed[0];
+		const activeTab = tabGroup.activeTab;
+		const input = activeTab?.input;
+		if (
+			!tabGroup.isActive ||
+			(activeTab && !activeTab?.isActive) ||
+			(input && Object.getPrototypeOf(input).constructor.name !== "Kn")
+		)
+			return;
+		if (this.prevDoc.isDirty) return;
+		if (this.validForScan(this.prevDoc)) await this.scanDoc(this.prevDoc, true);
+		this.formatMemos(this.prevDoc);
+		if (!input) return;
+		//@ts-ignore
+		workspace.openTextDocument(input.uri).then((doc) => {
+			this.prevDoc = doc;
 		});
 	}
 
@@ -207,36 +245,6 @@ export class MemoFetcher {
 		}
 		this.docMemos.set(doc, memos);
 		if (updateView) eventEmitter.emit("updateView");
-	}
-
-	private async formatMemos(doc: TextDocument): Promise<void> {
-		const memos = this.docMemos.get(doc);
-		if (!memos) return;
-		const edit = new FE.FileEdit();
-		for (const memo of memos)
-			edit.replace(doc.uri, [memo.offset, memo.offset + memo.rawLength], getFormattedMemo(memo));
-		edit.apply({ isRefactoring: true });
-	}
-
-	private async handleTabChange(changed: readonly TabGroup[]): Promise<void> {
-		if (!this.prevDoc || !this.watchedDocs.has(this.prevDoc) || changed.length !== 1) return;
-		const tabGroup = changed[0];
-		const activeTab = tabGroup.activeTab;
-		const input = activeTab?.input;
-		if (
-			!tabGroup.isActive ||
-			(activeTab && !activeTab?.isActive) ||
-			(input && Object.getPrototypeOf(input).constructor.name !== "Kn")
-		)
-			return;
-		if (this.prevDoc.isDirty) return;
-		if (this.validForScan(this.prevDoc)) await this.scanDoc(this.prevDoc, true);
-		this.formatMemos(this.prevDoc);
-		if (!input) return;
-		//@ts-ignore
-		workspace.openTextDocument(input.uri).then((doc) => {
-			this.prevDoc = doc;
-		});
 	}
 
 	private validForScan(doc?: TextDocument): boolean {

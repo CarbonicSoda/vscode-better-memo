@@ -1,4 +1,4 @@
-import { workspace, Disposable, WorkspaceConfiguration } from "vscode";
+import { Disposable, workspace, WorkspaceConfiguration } from "vscode";
 
 type ListenList = {
 	[configName: string]: null | ((retrieved: any) => any);
