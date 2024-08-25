@@ -237,6 +237,11 @@ export namespace ETItems {
 				return;
 			const memoEntry = this.memoEntry;
 			await workspace.openTextDocument(memoEntry.path).then(async (doc) => {
+				memoFetcher.scanDoc(doc);
+				if (!memoFetcher.includes(memoEntry)) {
+					viewProvider.reloadItems();
+					return;
+				}
 				const doRemoveLine =
 					configMaid.get("actions.removeLineIfMemoIsOnSingleLine") &&
 					memoEntry.line < doc.lineCount - 1 &&

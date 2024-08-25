@@ -52,6 +52,7 @@ export class ExplorerTreeView {
 			eventEmitter.subscribe("updateItemCollapsibleState", () => this.updateItemCollapsibleState()),
 
 			window.onDidChangeActiveColorTheme(() => this.viewProvider.reloadItems()),
+			this.view.onDidChangeVisibility((ev) => this.handleChangeVisibility(ev.visible)),
 
 			commands.registerCommand("better-memo.switchToFileView", () => this.updateViewType("File")),
 			commands.registerCommand("better-memo.switchToTagView", () => this.updateViewType("Tag")),
@@ -92,6 +93,13 @@ export class ExplorerTreeView {
 		this.janitor.clearAll();
 	}
 
+	private updateViewType(view?: "File" | "Tag", noReload?: boolean): void {
+		this.viewProvider.viewType = view = view ?? configMaid.get("view.defaultView");
+		commands.executeCommand("setContext", "better-memo.explorerView", view);
+		if (noReload) return;
+		this.viewProvider.reloadItems();
+	}
+
 	private updateItemCollapsibleState(): void {
 		this.view.reveal(this.viewProvider.items[0], { select: false, focus: true }).then(() => {
 			Promise.resolve(commands.executeCommand("list.collapseAll")).finally(async () => {
@@ -119,14 +127,15 @@ export class ExplorerTreeView {
 		});
 	}
 
-	private updateViewType(view?: "File" | "Tag", noReload?: boolean): void {
-		this.viewProvider.viewType = view = view ?? configMaid.get("view.defaultView");
-		commands.executeCommand("setContext", "better-memo.explorerView", view);
-		if (noReload) return;
-		this.viewProvider.reloadItems();
+	private handleChangeVisibility(visible: boolean): void {
+		if (visible) {
+			this.memoFetcher.disableBackgroundMode();
+			return;
+		}
+		this.memoFetcher.enableBackgroundMode();
 	}
 
-	private async explorerCompleteAll() {
+	private async explorerCompleteAll(): Promise<void> {
 		const { memoFetcher, viewProvider } = this;
 		memoFetcher.suppressForceScan();
 		const memoCount = viewProvider.memoCount;

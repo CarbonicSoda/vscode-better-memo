@@ -44,6 +44,8 @@ export class MemoFetcher {
 	private intervalMaid = new IntervalMaid();
 	private forceScanSuppressed = false;
 	private prevDoc: TextDocument;
+	private backgroundScanQueue: Set<TextDocument> = new Set();
+	private backgroundMode = false;
 
 	async init(): Promise<void> {
 		configMaid.listen("general.customTags");
@@ -84,6 +86,10 @@ export class MemoFetcher {
 	}
 
 	scanDoc(doc: TextDocument, options?: { updateView?: boolean }): void {
+		if (this.backgroundMode) {
+			this.backgroundScanQueue.add(doc);
+			return;
+		}
 		const content = doc.getText();
 		const langId = <keyof typeof LangCommentFormat>doc.languageId;
 		const commentFormats: { open: string; close?: string }[] = [LangCommentFormat[langId]].flat();
@@ -153,6 +159,11 @@ export class MemoFetcher {
 		this.docMemos.clear();
 	}
 
+	includes(memo: MemoEntry): boolean {
+		for (const _memo of this.docMemos.values()) if (JSON.stringify(memo) === JSON.stringify(_memo)) return true;
+		return false;
+	}
+
 	getTags(): { [tag: string]: ThemeColor } {
 		this.fetchCustomTags();
 		let tags: { [tag: string]: ThemeColor } = {};
@@ -167,6 +178,16 @@ export class MemoFetcher {
 
 	unsuppressForceScan(): void {
 		this.forceScanSuppressed = false;
+	}
+
+	enableBackgroundMode(): void {
+		this.backgroundMode = true;
+	}
+
+	disableBackgroundMode(): void {
+		this.backgroundMode = false;
+		for (const doc of this.backgroundScanQueue) this.scanDoc(doc);
+		this.backgroundScanQueue.clear();
 	}
 
 	dispose(): void {
