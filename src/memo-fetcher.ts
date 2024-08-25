@@ -62,11 +62,11 @@ export class MemoFetcher {
 			workspace.onDidDeleteFiles(() => this.fetchDocs()),
 
 			workspace.onDidSaveTextDocument((doc) => {
-				if (this.validForScan(doc)) this.scanDoc(doc, true);
+				if (this.validForScan(doc)) this.scanDoc(doc, { updateView: true });
 			}),
 			window.tabGroups.onDidChangeTabGroups((ev) => this.handleTabChange(ev.changed)),
 
-			commands.registerCommand("better-memo.reloadExplorer", () => this.reloadMemos(true)),
+			commands.registerCommand("better-memo.reloadExplorer", () => this.reloadMemos({ updateView: true })),
 		);
 		this.intervalMaid.add(() => this.scanDocInterval(), "fetcher.scanDelay");
 		this.intervalMaid.add(() => this.forceScanInterval(), "fetcher.forceScanDelay");
@@ -83,7 +83,7 @@ export class MemoFetcher {
 		}${padding}${commentFormat.close ?? ""}`;
 	}
 
-	scanDoc(doc: TextDocument, updateView?: boolean): void {
+	scanDoc(doc: TextDocument, options?: { updateView?: boolean }): void {
 		const content = doc.getText();
 		const langId = <keyof typeof LangCommentFormat>doc.languageId;
 		const commentFormats: { open: string; close?: string }[] = [LangCommentFormat[langId]].flat();
@@ -135,13 +135,22 @@ export class MemoFetcher {
 			});
 		}
 		this.docMemos.set(doc, memos);
-		if (updateView) eventEmitter.emit("updateView");
+		if (options?.updateView) eventEmitter.emit("updateView");
 	}
 
 	getMemos(): MemoEntry[] {
 		const memos = Array.from(this.docMemos.values()).flat();
 		commands.executeCommand("setContext", "better-memo.noMemos", memos.length === 0);
 		return memos;
+	}
+
+	removeMemos(...memos: MemoEntry[]): void {
+		for (const path of Object.keys(Aux.groupObjects(memos, "path")))
+			workspace.openTextDocument(path).then((doc) => this.scanDoc(doc));
+	}
+
+	removeAllMemos(): void {
+		this.docMemos.clear();
 	}
 
 	getTags(): { [tag: string]: ThemeColor } {
@@ -182,20 +191,20 @@ export class MemoFetcher {
 		const doc = window.activeTextEditor?.document;
 		if (!doc) return;
 		this.prevDoc = doc;
-		if (this.validForScan(doc)) this.scanDoc(doc, true);
+		if (this.validForScan(doc)) this.scanDoc(doc, { updateView: true });
 	}
 
 	private forceScanInterval(): void {
 		if (this.forceScanSuppressed) return;
 		const doc = window.activeTextEditor?.document;
 		if (!doc || !this.watchedDocs.has(doc)) return;
-		this.scanDoc(doc, true);
+		this.scanDoc(doc, { updateView: true });
 	}
 
-	private async reloadMemos(updateView?: boolean): Promise<void> {
+	private async reloadMemos(options?: { updateView?: boolean }): Promise<void> {
 		await this.fetchDocs().then(() => {
 			for (const doc of this.watchedDocs.keys()) this.scanDoc(doc);
-			if (updateView) eventEmitter.emit("updateView");
+			if (options?.updateView) eventEmitter.emit("updateView");
 		});
 	}
 
@@ -220,7 +229,7 @@ export class MemoFetcher {
 		)
 			return;
 		if (this.prevDoc.isDirty) return;
-		if (this.validForScan(this.prevDoc)) this.scanDoc(this.prevDoc, true);
+		if (this.validForScan(this.prevDoc)) this.scanDoc(this.prevDoc, { updateView: true });
 		this.formatMemos(this.prevDoc);
 		if (!input) return;
 		//@ts-ignore

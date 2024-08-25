@@ -1,4 +1,4 @@
-import { writeFileSync } from "fs";
+import { readFileSync, writeFileSync } from "fs";
 import { commands, Position, Range, TextDocument, Uri, window, workspace, WorkspaceEdit } from "vscode";
 
 export namespace FE {
@@ -30,7 +30,6 @@ export namespace FE {
 					throw new Error(`Error when applying edits to files: ${err}`);
 				});
 			};
-			console.log("applied");
 		}
 
 		reset(): void {

@@ -2,14 +2,11 @@ import {
 	commands,
 	Event,
 	MarkdownString,
-	Range,
-	Selection,
 	ThemeIcon,
 	TreeDataProvider,
 	TreeView,
 	EventEmitter as VSEventEmitter,
 	window,
-	workspace,
 } from "vscode";
 import { ETItems } from "./explorer-tree-items";
 import { MemoEntry, MemoFetcher } from "./memo-fetcher";
@@ -56,13 +53,27 @@ export class ExplorerTreeView {
 
 			window.onDidChangeActiveColorTheme(() => this.viewProvider.reloadItems()),
 
-			commands.registerCommand("better-memo.explorerExpandAll", () => this.explorerExpandAll()),
 			commands.registerCommand("better-memo.switchToFileView", () => this.updateViewType("File")),
 			commands.registerCommand("better-memo.switchToTagView", () => this.updateViewType("Tag")),
+			commands.registerCommand("better-memo.explorerCompleteAll", () => this.explorerCompleteAll()),
+			commands.registerCommand("better-memo.explorerExpandAll", () => this.explorerExpandAll()),
 
-			commands.registerCommand("better-memo.navigateToMemo", (memo: MemoEntry) => this.navigateToMemo(memo)),
 			commands.registerCommand("better-memo.navigateToFile", (fileItem: ETItems.FileItem) => fileItem.navigate()),
+			commands.registerCommand("better-memo.completeFile", (fileItem: ETItems.FileItem) =>
+				fileItem.completeMemos(this),
+			),
+			commands.registerCommand("better-memo.completeFileNoConfirm", (fileItem: ETItems.FileItem) =>
+				fileItem.completeMemos(this, { noConfirmation: true }),
+			),
 
+			commands.registerCommand("better-memo.completeTag", (tagItem: ETItems.TagItem) =>
+				tagItem.completeMemos(this),
+			),
+			commands.registerCommand("better-memo.completeTagNoConfirm", (tagItem: ETItems.TagItem) =>
+				tagItem.completeMemos(this, { noConfirmation: true }),
+			),
+
+			commands.registerCommand("better-memo.navigateToMemo", (memoItem: ETItems.MemoItem) => memoItem.navigate()),
 			commands.registerCommand("better-memo.completeMemo", (memoItem: ETItems.MemoItem) =>
 				memoItem.complete(this),
 			),
@@ -70,14 +81,7 @@ export class ExplorerTreeView {
 				memoItem.complete(this),
 			),
 			commands.registerCommand("better-memo.completeMemoNoConfirm", (memoItem: ETItems.MemoItem) =>
-				memoItem.complete(this, true),
-			),
-
-			commands.registerCommand("better-memo.completeFile", (fileItem: ETItems.FileItem) =>
-				fileItem.completeMemos(this),
-			),
-			commands.registerCommand("better-memo.completeTag", (tagItem: ETItems.TagItem) =>
-				tagItem.completeMemos(this),
+				memoItem.complete(this, { noConfirmation: true }),
 			),
 		);
 
@@ -86,27 +90,6 @@ export class ExplorerTreeView {
 
 	dispose(): void {
 		this.janitor.clearAll();
-	}
-
-	private explorerExpandAll() {
-		for (const item of this.viewProvider.items) this.view.reveal(item, { select: false, expand: 2 });
-	}
-
-	private updateViewType(view?: "File" | "Tag", noReload?: boolean): void {
-		this.viewProvider.currentView = view = view ?? configMaid.get("view.defaultView");
-		commands.executeCommand("setContext", "better-memo.explorerView", view);
-		if (noReload) return;
-		this.viewProvider.reloadItems();
-	}
-
-	private navigateToMemo(memo: MemoEntry): void {
-		workspace.openTextDocument(memo.path).then((doc) => {
-			window.showTextDocument(doc).then((editor) => {
-				let pos = doc.positionAt(memo.offset + memo.rawLength);
-				editor.selection = new Selection(pos, pos);
-				editor.revealRange(new Range(pos, pos));
-			});
-		});
 	}
 
 	private updateItemCollapsibleState(): void {
@@ -135,12 +118,48 @@ export class ExplorerTreeView {
 			});
 		});
 	}
+
+	private updateViewType(view?: "File" | "Tag", noReload?: boolean): void {
+		this.viewProvider.viewType = view = view ?? configMaid.get("view.defaultView");
+		commands.executeCommand("setContext", "better-memo.explorerView", view);
+		if (noReload) return;
+		this.viewProvider.reloadItems();
+	}
+
+	private async explorerCompleteAll() {
+		const { memoFetcher, viewProvider } = this;
+		memoFetcher.suppressForceScan();
+		const memoCount = viewProvider.memoCount;
+		const items = viewProvider.items;
+		const completionDetails = `Are you sure you want to proceed?
+			This will mark all ${memoCount} memo${Aux.plural(memoCount)} ${viewProvider.viewType === "File" ? "in" : "under"} ${
+			items.length
+		} ${viewProvider.viewType.toLowerCase()}${Aux.plural(items)} as completed.`;
+		const option = await window.showInformationMessage(
+			"Confirm Completion of Memos",
+			{ modal: true, detail: completionDetails },
+			"Yes",
+			"No",
+		);
+		if (!option || option === "No") {
+			memoFetcher.unsuppressForceScan();
+			return;
+		}
+		for (const item of items) await item.completeMemos(this, { noConfirmation: true, _noExtraTasks: true });
+		memoFetcher.removeAllMemos();
+		viewProvider.items = [];
+		viewProvider.refresh();
+	}
+
+	private explorerExpandAll() {
+		for (const item of this.viewProvider.items) this.view.reveal(item, { select: false, expand: 2 });
+	}
 }
 
 export class ExplorerViewProvider implements TreeDataProvider<ETItems.ExplorerTreeItemType> {
 	items: ETItems.InnerItemType[] = [];
 	memoCount = 0;
-	currentView: "File" | "Tag";
+	viewType: "File" | "Tag";
 
 	private _onDidChangeTreeData: VSEventEmitter<void | undefined | ETItems.ExplorerTreeItemType> = new VSEventEmitter<
 		void | undefined | ETItems.ExplorerTreeItemType
@@ -167,6 +186,18 @@ export class ExplorerViewProvider implements TreeDataProvider<ETItems.ExplorerTr
 		return this.items;
 	}
 
+	removeItems(...items: ETItems.InnerItemType[]): void {
+		for (const item of items) {
+			if (!this.items.includes(item)) continue;
+			const itemIndex = this.items.indexOf(item);
+			this.items = this.items.filter((_, i) => i !== itemIndex);
+		}
+	}
+
+	removeAllItems(): void {
+		this.items = [];
+	}
+
 	reloadItems(): void {
 		this.items = this.getItems();
 		this._onDidChangeTreeData.fire();
@@ -177,7 +208,7 @@ export class ExplorerViewProvider implements TreeDataProvider<ETItems.ExplorerTr
 	}
 
 	private getItems(): ETItems.InnerItemType[] {
-		const isFileView = this.currentView === "File";
+		const isFileView = this.viewType === "File";
 		const expandPrimaryGroup = configMaid.get("view.expandPrimaryItemsByDefault");
 		const expandSecondaryGroup = configMaid.get("view.expandSecondaryItemsByDefault");
 
@@ -197,10 +228,13 @@ export class ExplorerViewProvider implements TreeDataProvider<ETItems.ExplorerTr
 
 			const halfLeaves = Aux.groupObjects(inner[innerLabel], isFileView ? "tag" : "path");
 			const halfLeafLabels = Object.keys(halfLeaves).sort();
-			const halfLeafItems = halfLeafLabels.map(
-				(label) =>
-					new (isFileView ? ETItems.TagItem : ETItems.FileItem)(label, expandSecondaryGroup, innerItem),
-			);
+			const halfLeafItems = isFileView
+				? halfLeafLabels.map(
+						(label) => new ETItems.TagItem(label, expandSecondaryGroup, <ETItems.FileItem>innerItem),
+				  )
+				: halfLeafLabels.map(
+						(label) => new ETItems.FileItem(label, expandSecondaryGroup, <ETItems.TagItem>innerItem),
+				  );
 			innerItem.children = halfLeafItems;
 
 			let childMemoCount = 0;
