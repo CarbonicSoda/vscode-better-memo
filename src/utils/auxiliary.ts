@@ -38,4 +38,29 @@ export namespace Aux {
 	 * @returns integer within [min, max] (!!includes max)
 	 */
 	export const randInt = (min: number, max: number) => Math.round(Math.random() * (max - min) + min);
+
+	/**
+	 * Returns index of the latest element in array <= candid. If sorted[0] > candid, returns -1
+	 * @param compare optional compare function that returns a number > 0 if a is larger than b, < 0 if a is smaller than b, 0 if a === b
+	 */
+	export function binaryMinSearch<T>(
+		sorted: T[],
+		candid: T,
+		compare: (a: T, b: T) => number = (a, b) => (a === b ? 0 : a > b ? 1 : -1),
+	) {
+		if (compare(sorted[0], candid) >= 0) return -1;
+		if (compare(sorted[0], candid) === 0) return 0;
+		if (compare(candid, sorted.at(-1)) >= 0) return sorted.length - 1;
+		let left = 0;
+		let right = sorted.length - 1;
+		while (true) {
+			const mid = Math.trunc((left + right) / 2);
+			if (compare(candid, sorted[mid]) >= 0) {
+				if (compare(sorted[mid + 1], candid) > 0) return mid;
+				left = mid + 1;
+				continue;
+			}
+			right = mid;
+		}
+	}
 }

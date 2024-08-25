@@ -1,7 +1,7 @@
 import { ColorThemeKind, ThemeColor, window } from "vscode";
 import { Aux } from "./auxiliary";
 
-import VScodeColors from "../vscode-colors.json";
+import VScodeColors from "../json/vscode-colors.json";
 
 type RGB3 = [number, number, number];
 
@@ -73,7 +73,7 @@ function colorHash(hashString: string): RGB3 {
 	let sum = 0;
 	for (let i = 0; i < hashString.length; i++) sum += hashString.charCodeAt(i) * (i + 1);
 	const getVal = (param: number) =>
-		Math.floor(
+		Math.trunc(
 			Number(
 				"0." +
 					Math.sin(sum + param)

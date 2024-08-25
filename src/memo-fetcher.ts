@@ -7,7 +7,7 @@ import { FE } from "./utils/file-edit";
 import { IntervalMaid } from "./utils/interval-maid";
 import { Janitor } from "./utils/janitor";
 
-import LangCommentFormat from "./lang-comment-format.json";
+import LangCommentFormat from "./json/lang-comment-format.json";
 
 export type MemoEntry = {
 	readonly content: string;
@@ -148,6 +148,10 @@ export class MemoFetcher {
 		const memos = Array.from(this.docMemos.values()).flat();
 		commands.executeCommand("setContext", "better-memo.noMemos", memos.length === 0);
 		return memos;
+	}
+
+	getMemosInDoc(doc: TextDocument): MemoEntry[] {
+		return this.docMemos.get(doc);
 	}
 
 	removeMemos(...memos: MemoEntry[]): void {

@@ -3,7 +3,6 @@ import {
 	Position,
 	Range,
 	Selection,
-	TextDocument,
 	ThemeColor,
 	ThemeIcon,
 	TreeItem,
@@ -43,7 +42,7 @@ export namespace ETItems {
 
 		removeFromTree(viewProvider: ExplorerViewProvider): InnerItemType | undefined {
 			if (!this.parent) {
-				viewProvider.removeItems(<InnerItemType><unknown>this);
+				viewProvider.removeItems(<InnerItemType>(<unknown>this));
 				return;
 			}
 			this.parent.removeChildren(this);
@@ -71,7 +70,7 @@ export namespace ETItems {
 				this.children = this.children.filter((_, i) => i !== childIndex);
 			}
 		}
-	
+
 		removeAllItems(): void {
 			this.children = [];
 		}
