@@ -41,22 +41,18 @@ export namespace Aux {
 
 	/**
 	 * Returns index of the latest element in array <= candid. If sorted[0] > candid, returns -1
-	 * @param compare optional compare function that returns a number > 0 if a is larger than b, < 0 if a is smaller than b, 0 if a === b
+	 * @param transform optional function that returns a number for comparing if T is not number
 	 */
-	export function binaryMinSearch<T>(
-		sorted: T[],
-		candid: T,
-		compare: (a: T, b: T) => number = (a, b) => (a === b ? 0 : a > b ? 1 : -1),
-	) {
-		if (compare(sorted[0], candid) >= 0) return -1;
-		if (compare(sorted[0], candid) === 0) return 0;
-		if (compare(candid, sorted.at(-1)) >= 0) return sorted.length - 1;
+	export function binaryMinSearch<T>(sorted: T[], candid: T, transform: (a: T) => number = (a) => Number(a)) {
+		if (transform(sorted[0]) > transform(candid)) return -1;
+		if (transform(sorted[0]) === transform(candid)) return 0;
+		if (transform(candid) >= transform(sorted.at(-1))) return sorted.length - 1;
 		let left = 0;
 		let right = sorted.length - 1;
 		while (true) {
 			const mid = Math.trunc((left + right) / 2);
-			if (compare(candid, sorted[mid]) >= 0) {
-				if (compare(sorted[mid + 1], candid) > 0) return mid;
+			if (transform(candid) >= transform(sorted[mid])) {
+				if (transform(sorted[mid + 1]) > transform(candid)) return mid;
 				left = mid + 1;
 				continue;
 			}
