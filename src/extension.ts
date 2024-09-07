@@ -1,19 +1,25 @@
-import * as vscode from "vscode";
-
-import { ExplorerTreeView } from "./explorer-view-provider";
-import { MemoFetcher } from "./memo-fetcher";
+import { disposeConfigMaidInstances } from "./utils/config-maid";
+import { resolver as ETItemsResolve } from "./explorer-tree-items";
+import { resolver as ETViewResolve , ExplorerTreeView } from "./explorer-tree-view";
+import { resolver as MemoFetcherResolve, MemoFetcher } from "./memo-fetcher";
 
 let memoFetcher: MemoFetcher;
 let explorerTreeView: ExplorerTreeView;
 
-export function activate(): void {
+export async function activate(): Promise<void> {
+	await ETItemsResolve();
+	await ETViewResolve();
+	await MemoFetcherResolve();
+
 	memoFetcher = new MemoFetcher();
-	memoFetcher.init();
+	await memoFetcher.init();
+
 	explorerTreeView = new ExplorerTreeView();
-	explorerTreeView.init(memoFetcher);
+	await explorerTreeView.init(memoFetcher);
 }
 
-export function deactivate(): void {
-	memoFetcher?.dispose();
-	explorerTreeView?.dispose();
+export async function deactivate(): Promise<void> {
+	await explorerTreeView?.dispose();
+	await memoFetcher?.dispose();
+	await disposeConfigMaidInstances();
 }

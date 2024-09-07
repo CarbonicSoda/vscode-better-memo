@@ -1,6 +1,6 @@
 type DisposableLike = {
 	[any: string]: any;
-	dispose(...args: any): void;
+	dispose(...args: any): any;
 };
 
 export class Janitor {
@@ -9,43 +9,52 @@ export class Janitor {
 
 	/**
 	 * @param DisposableOrTimeout instances to manage
-	 * @returns unique id for Janitor.clear()
+	 * @returns unique id for managed instance
 	 */
-	add(...DisposableOrTimeout: (DisposableLike | NodeJS.Timeout)[]): number {
-		this.managed[this.id] = DisposableOrTimeout;
+	async add(
+		...DisposableOrTimeout: (DisposableLike | Promise<DisposableLike> | NodeJS.Timeout | Promise<NodeJS.Timeout>)[]
+	): Promise<number> {
+		this.managed[this.id] = await Promise.all(DisposableOrTimeout);
 		return this.id++;
 	}
 
 	/**
-	 * @param id unique id of managed instances for clearing
+	 * @param id unique id of managed instance
 	 */
-	clear(id: number): void {
+	async clear(id: number): Promise<void> {
+		if (this.managed[id].length === 0) return;
 		for (const instance of this.managed[id] ?? []) {
-			// @ts-ignore
-			instance.dispose?.();
+			(<{ dispose?: (...args: any) => any }>instance).dispose?.();
 			try {
-				//@ts-ignore
-				clearTimeout(instance);
+				clearTimeout(<NodeJS.Timeout>instance);
 			} finally {
 			}
 		}
+		this.managed[id] = [];
 	}
 
 	/**
-	 * clears all managed instances
+	 * Clears all managed instances
 	 */
-	clearAll(): void {
-		for (const id of Object.keys(this.managed)) this.clear(Number(id));
+	async clearAll(): Promise<void> {
+		for (let i = 0; i < this.id; i++) await this.clear(i);
 	}
 
 	/**
-	 * Clears the original managed instance and manages a new one
+	 * Clears the original managed instance and replaces with a new one
 	 * @param id unique id of managed instance to override
 	 * @param DisposableOrTimeout instances to manage instead
 	 */
-	override(id: number, ...DisposableOrTimeout: (DisposableLike | NodeJS.Timeout)[]): void {
-		if (!Object.hasOwn(this.managed, id)) throw new Error(`No managed instance to override with id ${id}`);
-		this.clear(id);
-		this.managed[id] = DisposableOrTimeout;
+	async override(
+		id: number,
+		...DisposableOrTimeout: (DisposableLike | Promise<DisposableLike> | NodeJS.Timeout | Promise<NodeJS.Timeout>)[]
+	): Promise<void> {
+		if (this.managed[id].length === 0) throw new Error(`No managed instance to override with id ${id}`);
+		await this.clear(id);
+		this.managed[id] = await Promise.all(DisposableOrTimeout);
+	}
+
+	async dispose() {
+		await this.clearAll();
 	}
 }

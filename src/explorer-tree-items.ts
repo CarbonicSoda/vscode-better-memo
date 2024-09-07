@@ -12,41 +12,52 @@ import {
 	window,
 	workspace,
 } from "vscode";
-import { ExplorerTreeView, ExplorerViewProvider } from "./explorer-view-provider";
+import { ExplorerTreeView, ExplorerViewProvider } from "./explorer-tree-view";
 import { MemoEntry, MemoFetcher } from "./memo-fetcher";
 import { Aux } from "./utils/auxiliary";
-import { getColorMaid } from "./utils/color-maid";
-import { getConfigMaid } from "./utils/config-maid";
-import { FE } from "./utils/file-edit";
+import { ColorMaid, getColorMaid } from "./utils/color-maid";
+import { ConfigMaid } from "./utils/config-maid";
+import { FEdit } from "./utils/file-edit";
+
+let colorMaid: ColorMaid;
+let configMaid: ConfigMaid;
+
+let resolved = false;
+export async function resolver(): Promise<void> {
+	if (resolved) return;
+	resolved = true;
+
+	colorMaid = await getColorMaid();
+	configMaid = new ConfigMaid();
+
+	await Promise.all([
+		configMaid.listen("actions.askForConfirmationOnCompletionOfMemo"),
+		configMaid.listen("actions.timeoutOfConfirmationOnCompletionOfMemo"),
+		configMaid.listen("actions.alwaysOpenChangedFileOnCompletionOfMemo"),
+		configMaid.listen("actions.askForConfirmationOnCompletionOfMemos"),
+		configMaid.listen("actions.removeLineIfMemoIsOnSingleLine"),
+	]);
+}
 
 export namespace ETItems {
-	const configMaid = getConfigMaid();
-	const colorMaid = getColorMaid();
-
-	configMaid.listen("actions.askForConfirmationOnCompletionOfMemo");
-	configMaid.listen("actions.timeoutOfConfirmationOnCompletionOfMemo");
-	configMaid.listen("actions.alwaysOpenChangedFileOnCompletionOfMemo");
-	configMaid.listen("actions.askForConfirmationOnCompletionOfMemos");
-	configMaid.listen("actions.removeLineIfMemoIsOnSingleLine");
-
 	export type InnerItemType = FileItem | TagItem;
 	export type ExplorerTreeItemType = ExplorerTreeItem | FileItem | TagItem | MemoItem;
 
 	class ExplorerTreeItem extends TreeItem {
 		constructor(label: string, expand: boolean | "none", public parent?: InnerItemType) {
-			let collapsibleState;
+			let collapsibleState: TreeItemCollapsibleState;
 			if (expand === "none") collapsibleState = TreeItemCollapsibleState.None;
 			else collapsibleState = expand ? TreeItemCollapsibleState.Expanded : TreeItemCollapsibleState.Collapsed;
 			super(label, collapsibleState);
 		}
 
-		removeFromTree(viewProvider: ExplorerViewProvider): InnerItemType | undefined {
+		async removeFromTree(viewProvider: ExplorerViewProvider): Promise<InnerItemType | undefined> {
 			if (!this.parent) {
-				viewProvider.removeItems(<InnerItemType>(<unknown>this));
+				await viewProvider.removeItems(<InnerItemType>(<unknown>this));
 				return;
 			}
-			this.parent.removeChildren(this);
-			if (this.parent.children.length === 0) return this.parent.removeFromTree(viewProvider);
+			await this.parent.removeChildren(this);
+			if (this.parent.children.length === 0) return await this.parent.removeFromTree(viewProvider);
 			return this.parent;
 		}
 	}
@@ -63,7 +74,7 @@ export namespace ETItems {
 			this.hierarchy = parent ? "secondary" : "primary";
 		}
 
-		removeChildren(...children: ExplorerTreeItem[]): void {
+		async removeChildren(...children: ExplorerTreeItem[]): Promise<void> {
 			for (const child of children) {
 				if (!this.children.includes(child)) continue;
 				const childIndex = this.children.indexOf(child);
@@ -71,29 +82,26 @@ export namespace ETItems {
 			}
 		}
 
-		removeAllItems(): void {
-			this.children = [];
-		}
-
 		async completeMemos(
 			explorerTreeView: ExplorerTreeView,
 			options?: { noConfirmation?: boolean; _noExtraTasks?: boolean },
 		): Promise<void> {
 			const { memoFetcher, viewProvider } = explorerTreeView;
-			memoFetcher.suppressForceScan();
-			const memoEntries = (
-				this.hierarchy === "primary"
+			await memoFetcher.suppressForceScan();
+			const memoEntries = await Promise.all(
+				(this.hierarchy === "primary"
 					? this.children.flatMap((child) => (<InnerItemType>child).children)
 					: this.children
-			).map((memoItem) => (<ETItems.MemoItem>memoItem).memoEntry);
+				).map(async (memoItem) => (<ETItems.MemoItem>memoItem).memoEntry),
+			);
 
-			if (!options?.noConfirmation && configMaid.get("actions.askForConfirmationOnCompletionOfMemos")) {
+			if (!options?.noConfirmation && (await configMaid.get("actions.askForConfirmationOnCompletionOfMemos"))) {
 				const iconPath = this.iconPath;
 				this.iconPath = InnerItem.waitingForCompletionConfirmationIcon;
-				viewProvider.refresh(this);
+				await viewProvider.refresh(this);
 
 				const completionDetails = `Are you sure you want to proceed?
-					This will mark all ${memoEntries.length} memo${Aux.plural(memoEntries)} ${
+					This will mark all ${memoEntries.length} memo${await Aux.plural(memoEntries)} ${
 					this.contextValue === "File" ? "in" : "under"
 				} the ${this.contextValue.toLowerCase()} ${this.label} as completed.`;
 				const option = await window.showInformationMessage(
@@ -102,29 +110,28 @@ export namespace ETItems {
 					"Yes",
 					"No",
 				);
+
 				this.iconPath = iconPath;
-				viewProvider.refresh(this);
+				await viewProvider.refresh(this);
 				if (!option || option === "No") {
-					memoFetcher.unsuppressForceScan();
+					await memoFetcher.unsuppressForceScan();
 					return;
 				}
 			}
 
-			const edit = new FE.FileEdit();
-			const docs = new Set();
+			const edit = new FEdit.FileEdit();
 			for (const memoEntry of memoEntries) {
 				await workspace.openTextDocument(memoEntry.path).then(async (doc) => {
-					docs.add(doc);
 					const doRemoveLine =
-						configMaid.get("actions.removeLineIfMemoIsOnSingleLine") &&
+						(await configMaid.get("actions.removeLineIfMemoIsOnSingleLine")) &&
 						memoEntry.line < doc.lineCount - 1 &&
 						doc
 							.lineAt(memoEntry.line)
 							.text.replace(
-								new RegExp(
-									`${Aux.reEscape(memoEntry.raw)}|${Aux.reEscape(
-										MemoFetcher.getFormattedMemo(memoEntry),
-									)}`,
+								RegExp(
+									`(?:${await Aux.reEscape(memoEntry.raw)})|(?:${await Aux.reEscape(
+										await MemoFetcher.getFormattedMemo(memoEntry),
+									)})`,
 								),
 								"",
 							)
@@ -134,15 +141,18 @@ export namespace ETItems {
 						? new Position(memoEntry.line + 1, 0)
 						: start.translate(0, memoEntry.rawLength);
 					const range = new Range(start, end);
-					edit.delete(doc.uri, range);
+					await edit.delete(doc.uri, range);
 				});
 			}
 			await edit.apply({ isRefactoring: true });
 			if (options?._noExtraTasks) return;
-			setTimeout(() => {
-				memoFetcher.removeMemos(...memoEntries);
-				viewProvider.reloadItems();
-			}, 100);
+			await memoFetcher.suppressForceScan();
+			await memoFetcher.removeMemos(...memoEntries);
+			viewProvider.reloadItems();
+			setTimeout(async () => {
+				memoFetcher.unsuppressForceScan();
+				// viewProvider.reloadItems();
+			}, 100); //maybe not needed since no blocking thread?
 		}
 	}
 
@@ -153,9 +163,9 @@ export namespace ETItems {
 			this.iconPath = ThemeIcon.File;
 		}
 
-		navigate(): void {
-			workspace.openTextDocument(this.path).then((doc) => {
-				window.showTextDocument(doc).then((editor) => {
+		async navigate(): Promise<void> {
+			await workspace.openTextDocument(this.path).then(async (doc) => {
+				await window.showTextDocument(doc).then(async (editor) => {
 					let pos = doc.lineAt(0).range.end;
 					editor.selection = new Selection(pos, pos);
 					editor.revealRange(new Range(pos, pos));
@@ -190,14 +200,13 @@ export namespace ETItems {
 		confirmInterval?: NodeJS.Timeout;
 		confirmTimeout?: NodeJS.Timeout;
 
-		constructor(public memoEntry: MemoEntry, parent: InnerItem, tagColor: ThemeColor, maxPriority: number) {
+		constructor(public memoEntry: MemoEntry, parent: InnerItem) {
 			const content = memoEntry.content === "" ? "Placeholder T^T" : memoEntry.content;
 			super(content, "none", parent);
 			this.description = `Ln ${memoEntry.line + 1}`;
 			this.tooltip = new MarkdownString(
 				`${memoEntry.tag} ~ *${memoEntry.relativePath}* - Ln ${memoEntry.line + 1}\n***\n${content}`,
 			);
-			this.tooltip.supportHtml = true;
 			this.contextValue = "Memo";
 			this.command = {
 				command: "better-memo.navigateToMemo",
@@ -205,66 +214,70 @@ export namespace ETItems {
 				tooltip: "Navigate to Memo",
 				arguments: [this],
 			};
+		}
+
+		async setIcon(tagColor: ThemeColor, maxPriority: number): Promise<void> {
 			this.iconPath =
-				memoEntry.priority === 0
+				this.memoEntry.priority === 0
 					? new ThemeIcon("circle-filled", tagColor)
 					: new ThemeIcon(
 							"circle-outline",
-							colorMaid.interpolate([255, (1 - memoEntry.priority / maxPriority) * 255, 0]),
+							await colorMaid.interpolate([255, (1 - this.memoEntry.priority / maxPriority) * 255, 0]),
 					  );
 		}
 
 		async navigate(): Promise<void> {
 			const memoEntry = this.memoEntry;
-			await workspace.openTextDocument(memoEntry.path).then(async (doc) => {
-				await window.showTextDocument(doc).then((editor) => {
-					let pos = doc.positionAt(memoEntry.offset + memoEntry.rawLength);
-					editor.selection = new Selection(pos, pos);
-					editor.revealRange(new Range(pos, pos));
-				});
-			});
+			await workspace.openTextDocument(memoEntry.path).then(
+				async (doc) =>
+					await window.showTextDocument(doc).then((editor) => {
+						let pos = doc.positionAt(memoEntry.offset + memoEntry.rawLength);
+						editor.selection = new Selection(pos, pos);
+						editor.revealRange(new Range(pos, pos));
+					}),
+			);
 		}
 
 		async complete(explorerTreeView: ExplorerTreeView, options?: { noConfirmation?: boolean }): Promise<void> {
 			const { memoFetcher, viewProvider } = explorerTreeView;
-			memoFetcher.unsuppressForceScan();
+			await memoFetcher.unsuppressForceScan();
 			if (
 				!options?.noConfirmation &&
-				configMaid.get("actions.askForConfirmationOnCompletionOfMemo") &&
-				!this.completionConfirmationHandle(explorerTreeView, { words: 3, maxLength: 12 })
+				(await configMaid.get("actions.askForConfirmationOnCompletionOfMemo")) &&
+				!(await this.completionConfirmationHandle(explorerTreeView, { words: 3, maxLength: 12 }))
 			)
 				return;
 			const memoEntry = this.memoEntry;
 			await workspace.openTextDocument(memoEntry.path).then(async (doc) => {
 				memoFetcher.scanDoc(doc);
 				if (!memoFetcher.includes(memoEntry)) {
-					viewProvider.reloadItems();
+					await viewProvider.reloadItems();
 					return;
 				}
 				const doRemoveLine =
-					configMaid.get("actions.removeLineIfMemoIsOnSingleLine") &&
+					(await configMaid.get("actions.removeLineIfMemoIsOnSingleLine")) &&
 					memoEntry.line < doc.lineCount - 1 &&
 					doc
 						.lineAt(memoEntry.line)
 						.text.replace(
-							new RegExp(
-								`${Aux.reEscape(memoEntry.raw)}|${Aux.reEscape(
-									MemoFetcher.getFormattedMemo(memoEntry),
+							RegExp(
+								`${await Aux.reEscape(memoEntry.raw)}|${await Aux.reEscape(
+									await MemoFetcher.getFormattedMemo(memoEntry),
 								)}`,
 							),
 							"",
 						)
 						.trim().length === 0;
-				const doOpenFile = configMaid.get("actions.alwaysOpenChangedFileOnCompletionOfMemo");
+				const doOpenFile = await configMaid.get("actions.alwaysOpenChangedFileOnCompletionOfMemo");
 				const start = doc.positionAt(memoEntry.offset);
 				const end = doRemoveLine
 					? new Position(memoEntry.line + 1, 0)
 					: start.translate(0, memoEntry.rawLength);
 				const range = new Range(start, end);
-				const edit = new FE.FileEdit();
-				edit.delete(doc.uri, range);
-				viewProvider.refresh(this.removeFromTree(viewProvider));
-				await edit.apply({ isRefactoring: true }, doOpenFile).then(() => {
+				const edit = new FEdit.FileEdit();
+				await edit.delete(doc.uri, range);
+				viewProvider.refresh(await this.removeFromTree(viewProvider));
+				await edit.apply({ isRefactoring: true }, doOpenFile).then(async () => {
 					const editor = window.activeTextEditor;
 					if (editor?.document === doc) {
 						editor.revealRange(new Range(start, start));
@@ -274,11 +287,11 @@ export namespace ETItems {
 			});
 		}
 
-		private completionConfirmationHandle(
+		private async completionConfirmationHandle(
 			explorerTreeView: ExplorerTreeView,
 			labelOptions: { words?: number; maxLength: number },
-		): boolean {
-			function setConfirmingItem(item: MemoItem) {
+		): Promise<boolean> {
+			const setConfirmingItem = async (item: MemoItem) => {
 				MemoItem.currentCompletionConfirmationTarget = currentTarget = item;
 				MemoItem.currentCompletionConfirmationBackup = {
 					label: item.label,
@@ -286,10 +299,9 @@ export namespace ETItems {
 					iconPath: item.iconPath,
 					contextValue: item.contextValue,
 				};
-			}
-
-			function reset(confirmingItem: MemoItem, noRefresh?: boolean) {
-				explorerTreeView.memoFetcher.unsuppressForceScan();
+			};
+			const reset = async (confirmingItem: MemoItem, options?: { noRefresh?: boolean }) => {
+				await explorerTreeView.memoFetcher.unsuppressForceScan();
 				clearInterval(confirmingItem.confirmInterval);
 				clearTimeout(confirmingItem.confirmTimeout);
 				confirmingItem.attemptedToComplete = false;
@@ -304,21 +316,21 @@ export namespace ETItems {
 					currentBackup.iconPath,
 					currentBackup.contextValue,
 				];
-				if (noRefresh) return;
-				explorerTreeView.viewProvider.refresh(confirmingItem);
-			}
+				if (options?.noRefresh) return;
+				await explorerTreeView.viewProvider.refresh(confirmingItem);
+			};
 
 			let currentTarget = MemoItem.currentCompletionConfirmationTarget;
 			const currentBackup = MemoItem.currentCompletionConfirmationBackup;
-			if (!currentTarget) setConfirmingItem(this);
+			if (!currentTarget) await setConfirmingItem(this);
 
 			if (this !== currentTarget) {
-				reset(currentTarget);
-				setConfirmingItem(this);
+				await reset(currentTarget);
+				await setConfirmingItem(this);
 			}
 
 			if (this.attemptedToComplete) {
-				reset(this, true);
+				await reset(this, { noRefresh: true });
 				return true;
 			}
 			this.attemptedToComplete = true;
@@ -332,20 +344,23 @@ export namespace ETItems {
 			this.label = abbrevLabel;
 			this.contextValue = "MemoWaitingForCompletionConfirmation";
 
-			explorerTreeView.memoFetcher.suppressForceScan();
-			const timeout = configMaid.get("actions.timeoutOfConfirmationOnCompletionOfMemo");
+			await explorerTreeView.memoFetcher.suppressForceScan();
+			const timeout = await configMaid.get("actions.timeoutOfConfirmationOnCompletionOfMemo");
 			let time = timeout;
-			const updateTime = (time: number) => {
+			const updateTime = async (time: number) => {
 				this.description = `Confirm in ${Math.round(time / 1000)}`;
 				const gbVal = (255 * time) / timeout;
-				this.iconPath = new ThemeIcon("loading~spin", colorMaid.interpolate([255, gbVal, gbVal]));
+				this.iconPath = new ThemeIcon("loading~spin", await colorMaid.interpolate([255, gbVal, gbVal]));
 				explorerTreeView.viewProvider.refresh(this);
 			};
-			updateTime(timeout);
-			this.confirmInterval = setInterval(() => updateTime((time -= 1000)), timeout / Math.round(time / 1000));
+			await updateTime(timeout);
+			this.confirmInterval = setInterval(
+				async () => await updateTime((time -= 1000)),
+				timeout / Math.round(time / 1000),
+			);
 
-			this.confirmTimeout = setTimeout(() => {
-				reset(this);
+			this.confirmTimeout = setTimeout(async () => {
+				await reset(this);
 				MemoItem.currentCompletionConfirmationTarget = null;
 				MemoItem.currentCompletionConfirmationBackup = null;
 			}, timeout);

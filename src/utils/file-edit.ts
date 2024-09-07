@@ -1,7 +1,7 @@
-import { readFileSync, writeFileSync } from "fs";
+import { writeFileSync } from "fs";
 import { commands, Position, Range, TextDocument, Uri, window, workspace, WorkspaceEdit } from "vscode";
 
-export namespace FE {
+export namespace FEdit {
 	type EditRange = [start: number | Position, end: number | Position];
 	type FileEdits = Map<EditRange, string>;
 	type FileEditMetaData = { isRefactoring?: boolean };
@@ -9,42 +9,42 @@ export namespace FE {
 	export class FileEdit {
 		private edits: Map<Uri, FileEdits> = new Map();
 
-		replace(uri: Uri, range: EditRange | Range, text: string): void {
+		async replace(uri: Uri, range: EditRange | Range, text: string): Promise<void> {
 			if (range instanceof Range) range = [range.start, range.end];
 			if (range.length !== 2) throw new Error(`Range must contain (only) start and end: ${range}`);
 			if (!this.edits.has(uri)) this.edits.set(uri, new Map());
-			this.edits.get(uri).set(<[number, number]>range, text);
+			this.edits.get(uri).set(<EditRange>range, text);
 		}
 
-		delete(uri: Uri, range: EditRange | Range): void {
-			this.replace(uri, range, "");
+		async delete(uri: Uri, range: EditRange | Range): Promise<void> {
+			await this.replace(uri, range, "");
 		}
 
-		insert(uri: Uri, offset: number, text: string): void {
-			this.replace(uri, [offset, offset], text);
+		async insert(uri: Uri, offset: number, text: string): Promise<void> {
+			await this.replace(uri, [offset, offset], text);
 		}
 
 		async apply(metaData?: FileEditMetaData, alwaysOpenFile?: boolean): Promise<void> {
 			for (const [uri, fileEdits] of this.edits.entries()) {
 				await this.editFile(fileEdits, uri, metaData, alwaysOpenFile).catch((err) => {
-					throw new Error(`Error when applying edits to files: ${err}`);
+					throw new Error(`Failed to apply edits to files: ${err}`);
 				});
-			};
+			}
 		}
 
-		reset(): void {
+		async reset(): Promise<void> {
 			this.edits.clear();
 		}
 
 		private async editFileWithFs(edits: FileEdits, doc: TextDocument): Promise<void> {
 			let text = doc.getText();
 			let delta = 0;
-			edits.forEach((edit, [start, end]) => {
+			for (let [[start, end], replacement] of edits.entries()) {
 				if (typeof start !== "number") start = doc.offsetAt(start);
 				if (typeof end !== "number") end = doc.offsetAt(end);
-				text = text.slice(0, start - delta) + edit + text.slice(end - delta);
-				delta += end - start - edit.length;
-			});
+				text = text.slice(0, start - delta) + replacement + text.slice(end - delta);
+				delta += end - start - replacement.length;
+			}
 			writeFileSync(doc.uri.fsPath, text);
 		}
 
@@ -61,17 +61,19 @@ export namespace FE {
 				}
 				await window
 					.showTextDocument(doc)
-					.then(() => commands.executeCommand("workbench.action.files.saveWithoutFormatting", doc));
+					.then(
+						async () => await commands.executeCommand("workbench.action.files.saveWithoutFormatting", doc),
+					);
 				const edit = new WorkspaceEdit();
-				edits.forEach((text, [start, end]) => {
+				for (let [[start, end], replacement] of edits.entries()) {
 					if (typeof start === "number") start = doc.positionAt(start);
 					if (typeof end === "number") end = doc.positionAt(end);
-					edit.replace(uri, new Range(start, end), text);
-				});
+					edit.replace(uri, new Range(start, end), replacement);
+				}
 				await workspace.applyEdit(edit, metaData).then(
-					() => commands.executeCommand("workbench.action.files.saveWithoutFormatting", doc),
-					(err) => {
-						throw new Error(`Error when modifying ${uri.path}: ${err}`);
+					async () => await commands.executeCommand("workbench.action.files.saveWithoutFormatting", doc),
+					async (err) => {
+						throw new Error(`Failed modifying ${uri.path}: ${err}`);
 					},
 				);
 			});

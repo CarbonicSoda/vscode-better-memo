@@ -1,76 +1,75 @@
-import { Disposable, workspace, WorkspaceConfiguration } from "vscode";
+import { workspace } from "vscode";
+import { Janitor } from "./janitor";
 
 type ListenList = {
 	[configName: string]: null | ((retrieved: any) => any);
 };
 
-export function getConfigMaid(): typeof ConfigMaid {
-	return ConfigMaid;
+const configMaidInstances: ConfigMaid[] = [];
+
+export async function disposeConfigMaidInstances(): Promise<void> {
+	for (const configMaid of configMaidInstances) {
+		await configMaid.dispose();
+	}
 }
 
-const ConfigMaid: {
-	/**
-	 * @param configName name of configuration to keep track of
-	 * @param callback an optional method to transform retrieved user config
-	 */
-	listen(configName: string, callback?: (retrieved: any) => any): void;
+export class ConfigMaid {
+	private config = workspace.getConfiguration("better-memo");
+	private configsMap = new Map();
+	private janitor = new Janitor();
+
+	constructor() {
+		this.janitor.add(
+			workspace.onDidChangeConfiguration((ev) => {
+				if (!ev.affectsConfiguration("better-memo")) return;
+				this.config = workspace.getConfiguration("better-memo");
+			}),
+		);
+		configMaidInstances.push(this);
+	}
 
 	/**
-	 * @param configList {[configName]: callback}
+	 * @param configNameOrList configuration's name
+	 * or an object with config name as keys and ${callback?} as values
+	 * @param callback an optional method to transform retrieved user config
 	 */
-	listen(configList: ListenList): void;
+	async listen(configNameOrList: string | ListenList, callback?: (retrieved: any) => any): Promise<void> {
+		callback = callback ?? (async (r: any) => await r);
+		if (typeof configNameOrList === "object") {
+			for (const [configName, callback] of Object.entries(configNameOrList))
+				await this.listen(configName, callback);
+			return;
+		}
+		this.configsMap.set(configNameOrList, callback);
+	}
 
 	/**
 	 * @param configName name of listened configuration to retrieve
 	 */
-	get(configName: string): any;
+	async get(configName: string): Promise<any> {
+		if (!this.configsMap.has(configName)) throw new Error(`${configName} is not listened`);
+		return await this.configsMap.get(configName)(this.config.get(configName));
+	}
 
 	/**
 	 * @param configs configurations to listen for change
-	 * @param callback function supplied with the new values packed into an object
+	 * @param callback function supplied with the new values in order of appearance in ${configs}
 	 */
-	onChange(configs: string | string[], callback: (...newValues: any[]) => void): Disposable;
-
-	dispose(): void;
-
-	config: WorkspaceConfiguration;
-	configsMap: Map<string, (retrieved: any) => any>;
-	retrieved: Map<string, any>;
-	onChangeConfig: Disposable;
-} = {
-	listen(configNameOrList: string | ListenList, callback: (retrieved: any) => any = (r: any) => r): void {
-		if (typeof configNameOrList === "object") {
-			for (const [configName, callback] of Object.entries(configNameOrList))
-				this.listen(configName, callback ?? ((r) => r));
-			return;
-		}
-		//@ts-ignore
-		this.configsMap.set(configNameOrList, callback);
-	},
-
-	get(configName: string): any {
-		if (!this.configsMap.has(configName)) throw new Error(`${configName} is not listened`);
-		return this.configsMap.get(configName)(this.config.get(configName));
-	},
-
-	onChange(configs: string | string[], callback: (...newValues: any[]) => void): Disposable {
+	async onChange(configs: string | string[], callback: (...newValues: any[]) => void): Promise<void> {
 		const _configs = [configs].flat();
-		return workspace.onDidChangeConfiguration((ev) => {
-			if (!ev.affectsConfiguration("better-memo")) return;
-			if (!_configs.some((config) => ev.affectsConfiguration(`better-memo.${config}`))) return;
-			callback(..._configs.map((config) => this.config.get(config)));
-		});
-	},
+		await this.janitor.add(
+			workspace.onDidChangeConfiguration(async (ev) => {
+				if (
+					!ev.affectsConfiguration("better-memo") ||
+					!_configs.some((config) => ev.affectsConfiguration(`better-memo.${config}`))
+				)
+					return;
+				callback(..._configs.map((config) => this.config.get(config)));
+			}),
+		);
+	}
 
-	dispose(): void {
-		this.onChangeConfig.dispose();
-	},
-
-	config: workspace.getConfiguration("better-memo"),
-	configsMap: new Map(),
-	retrieved: new Map(),
-	onChangeConfig: workspace.onDidChangeConfiguration((ev) => {
-		if (!ev.affectsConfiguration("better-memo")) return;
-		ConfigMaid.config = workspace.getConfiguration("better-memo");
-	}),
-};
+	async dispose(): Promise<void> {
+		await this.janitor.dispose();
+	}
+}

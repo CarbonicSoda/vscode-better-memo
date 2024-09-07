@@ -1,33 +1,35 @@
-import { getConfigMaid } from "./config-maid";
+import { ConfigMaid } from "./config-maid";
 import { Janitor } from "./janitor";
 
-const configMaid = getConfigMaid();
-
 export class IntervalMaid {
+	private configMaid = new ConfigMaid();
 	private intervalJanitor = new Janitor();
-	private configChangeJanitor = new Janitor();
 
-	add(callback: () => void, delayConfigName: string, configCallback?: (retrieved: any) => any): number {
-		configMaid.listen(delayConfigName, configCallback);
-		const intervalId = this.intervalJanitor.add(setInterval(callback, configMaid.get(delayConfigName)));
-		this.configChangeJanitor.add(
-			configMaid.onChange(delayConfigName, (delay) =>
-				this.intervalJanitor.override(intervalId, setInterval(callback, delay)),
-			),
+	async add(
+		callback: () => void | Promise<void>,
+		delayConfigName: string,
+		configCallback?: (retrieved: any) => any,
+	): Promise<number> {
+		await this.configMaid.listen(delayConfigName, configCallback);
+		const intervalId = await this.intervalJanitor.add(
+			setInterval(callback, await this.configMaid.get(delayConfigName)),
+		);
+		await this.configMaid.onChange(delayConfigName, async (newDelay) =>
+			this.intervalJanitor.override(intervalId, setInterval(callback, newDelay)),
 		);
 		return intervalId;
 	}
 
-	clear(intervalId: number): void {
-		this.intervalJanitor.clear(intervalId);
+	async clear(intervalId: number): Promise<void> {
+		await this.intervalJanitor.clear(intervalId);
 	}
 
-	clearAll(): void {
-		this.intervalJanitor.clearAll();
+	async clearAll(): Promise<void> {
+		await this.intervalJanitor.clearAll();
 	}
 
-	dispose(): void {
-		this.clearAll();
-		this.configChangeJanitor.clearAll();
+	async dispose(): Promise<void> {
+		await this.configMaid.dispose();
+		await this.intervalJanitor.dispose();
 	}
 }

@@ -40,6 +40,7 @@
 			{
 				"command": "better-memo.explorerCompleteAll",
 				"title": "Mark All Memos as Completed",
+				"enablement": "treeView.better-memo.memoExplorer.toggleCollapseAll",
 				"icon": "$(checklist)"
 			},
 			{
@@ -90,7 +91,23 @@
 				"title": "Mark Memo as Completed"
 			}
 		],
-		"keybindings": [],
+		"keybindings": [
+			{
+				"command": "better-memo.switchToFileView",
+				"when": "focusedView == 'better-memo.memoExplorer' && treeView.better-memo.memoExplorer.toggleCollapseAll && better-memo.explorerView == Tag",
+				"key": "Ctrl+Shift+V"
+			},
+			{
+				"command": "better-memo.switchToTagView",
+				"when": "focusedView == 'better-memo.memoExplorer' && treeView.better-memo.memoExplorer.toggleCollapseAll && better-memo.explorerView == File",
+				"key": "Ctrl+Shift+V"
+			},
+			{
+				"command": "better-memo.reloadExplorer",
+				"when": "focusedView == 'better-memo.memoExplorer' && better-memo.explorerInitFinished",
+				"key": "Ctrl+R"
+			}
+		],
 		"viewsContainers": {
 			"activitybar": [
 				{
