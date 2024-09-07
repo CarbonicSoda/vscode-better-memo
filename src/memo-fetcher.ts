@@ -65,8 +65,6 @@ export async function resolver(): Promise<void> {
 }
 
 export class MemoFetcher {
-	customTags: { [tag: string]: ThemeColor } = {};
-
 	private watchedDocs: Map<TextDocument, { version: number; lang: string }> = new Map();
 	private docMemos: Map<TextDocument, MemoEntry[]> = new Map();
 
@@ -205,13 +203,11 @@ export class MemoFetcher {
 	}
 
 	async getTags(): Promise<{ [tag: string]: ThemeColor }> {
-		await this.fetchCustomTags();
 		const tags = await Promise.all((await this.getMemos()).map(async (memo) => memo.tag));
+		const customTags = await this.fetchCustomTags();
 		const uMemoTags = {};
-		for (const tag of tags)
-			if (!this.customTags[tag]) uMemoTags[tag] = colorMaid.hashColor(tag)
-		await Promise.all(Object.values(uMemoTags));
-		return Object.assign(uMemoTags, this.customTags);
+		for (const tag of tags) if (!customTags[tag]) uMemoTags[tag] = colorMaid.hashColor(tag);
+		return Object.assign(await Aux.promiseProps(uMemoTags), customTags);
 	}
 
 	async suppressForceScan(): Promise<void> {
@@ -269,18 +265,17 @@ export class MemoFetcher {
 		);
 	}
 
-	private async fetchCustomTags(): Promise<void> {
+	private async fetchCustomTags(): Promise<{ [tag: string]: ThemeColor }> {
 		const userDefinedCustomTags = await configMaid.get("general.customTags");
 		const validTagRE = RegExp(`^[^\\r\\n\t ${commentCloseCharacters}]+$`);
 		const validHexRE = /(?:^#?[0-9a-f]{6}$)|(?:^#?[0-9a-f]{3}$)/i;
-		const validCustomTags: { [tag: string]: Promise<ThemeColor> } = {};
+		const uValidCustomTags: { [tag: string]: Promise<ThemeColor> } = {};
 		for (let [tag, hex] of Object.entries(userDefinedCustomTags)) {
 			[tag, hex] = [tag.trim().toUpperCase(), (<string>hex).trim()];
 			if (!validTagRE.test(tag) || !validHexRE.test(<string>hex)) continue;
-			validCustomTags[tag] = colorMaid.interpolate(<string>hex);
+			uValidCustomTags[tag] = colorMaid.interpolate(<string>hex);
 		}
-		await Promise.all(Object.values(validCustomTags));
-		this.customTags = validCustomTags;
+		return await Aux.promiseProps(uValidCustomTags);
 	}
 
 	private async scanDocInterval(): Promise<void> {
@@ -341,3 +336,4 @@ export class MemoFetcher {
 		return versionChanged || langChanged;
 	}
 }
+

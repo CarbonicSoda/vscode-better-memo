@@ -43,11 +43,13 @@ export namespace Aux {
 	 * Implementation of Promise.props()
 	 * @param object object with properties to resolve
 	 */
-	export async function promiseProps(object: Object): Promise<Object> {
+	export async function promiseProps<T>(object: {
+		[key: string | number | symbol]: T;
+	}): Promise<{ [key: string | number | symbol]: Awaited<T> }> {
 		const values = await Promise.all(Object.values(object));
 		const keys = Object.keys(object);
 		for (let i = 0; i < keys.length; i++) object[keys[i]] = values[i];
-		return object
+		return <{ [key: string | number | symbol]: Awaited<T> }>object;
 	}
 
 	/**
