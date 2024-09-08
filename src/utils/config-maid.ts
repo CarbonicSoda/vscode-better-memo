@@ -1,16 +1,15 @@
-import { workspace } from "vscode";
+import { ConfigurationChangeEvent, workspace } from "vscode";
+import { Aux } from "./auxiliary";
 import { Janitor } from "./janitor";
 
-type ListenList = {
+export type ListenList = {
 	[configName: string]: null | ((retrieved: any) => any);
 };
 
 const configMaidInstances: ConfigMaid[] = [];
 
 export async function disposeAllConfigMaids(): Promise<void> {
-	for (const configMaid of configMaidInstances) {
-		await configMaid.dispose();
-	}
+	await Aux.asyncFor(configMaidInstances, async (configMaid) => await configMaid.dispose());
 }
 
 export class ConfigMaid {
@@ -36,8 +35,10 @@ export class ConfigMaid {
 	async listen(configNameOrList: string | ListenList, callback?: (retrieved: any) => any): Promise<void> {
 		callback = callback ?? (async (r: any) => await r);
 		if (typeof configNameOrList === "object") {
-			for (const [configName, callback] of Object.entries(configNameOrList))
-				await this.listen(configName, callback);
+			await Aux.asyncFor(
+				Object.entries(configNameOrList),
+				async ([configName, callback]) => await this.listen(configName, callback),
+			);
 			return;
 		}
 		this.configsMap.set(configNameOrList, callback);
@@ -57,16 +58,20 @@ export class ConfigMaid {
 	 */
 	async onChange(configs: string | string[], callback: (...newValues: any[]) => void): Promise<void> {
 		const _configs = [configs].flat();
-		await this.janitor.add(
-			workspace.onDidChangeConfiguration(async (ev) => {
-				if (
-					!ev.affectsConfiguration("better-memo") ||
-					!_configs.some((config) => ev.affectsConfiguration(`better-memo.${config}`))
-				)
-					return;
-				callback(..._configs.map((config) => this.config.get(config)));
-			}),
-		);
+		const onChangeConfiguration = async (ev: ConfigurationChangeEvent) => {
+			if (
+				!ev.affectsConfiguration("better-memo") ||
+				!_configs.some((config) => ev.affectsConfiguration(`better-memo.${config}`))
+			)
+				return;
+			callback(
+				...(await Aux.asyncFor(
+					_configs,
+					async (configName) => await this.configsMap.get(configName)(this.config.get(configName)),
+				)),
+			);
+		};
+		await this.janitor.add(workspace.onDidChangeConfiguration(async (ev) => onChangeConfiguration(ev)));
 	}
 
 	async dispose(): Promise<void> {

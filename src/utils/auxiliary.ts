@@ -1,5 +1,45 @@
 export namespace Aux {
 	/**
+	 * Implementation of Python's range()
+	 */
+	export async function range(n: number): Promise<Iterable<number>> {
+		return Array(n).keys();
+	}
+
+	/**
+	 * Sugar for the async for loop Promise.all(iterable.map(async (ele) => {...}))
+	 */
+	export async function asyncFor<T, C>(
+		iterable: Iterable<T>,
+		callback: (value: T, index: number, array: T[]) => Promise<C>,
+	): Promise<Awaited<C>[]> {
+		return await Promise.all([...iterable].map(callback));
+	}
+
+	/**
+	 * Sugar for the async for loop Promise.all((await range(n)).map(async (i) => {...}))
+	 */
+	export async function asyncRange<T>(n: number, callback: (i: number) => Promise<T>): Promise<Awaited<T>[]> {
+		return await asyncFor(await range(n), callback);
+	}
+
+	/**
+	 * Array.includes() for objects
+	 */
+	export async function objectsInclude(objects: Object[], object: Object): Promise<boolean> {
+		return (await Aux.asyncFor(objects, async (obj) => JSON.stringify(obj)))
+			.join("\n")
+			.includes(JSON.stringify(object));
+	}
+
+	/**
+	 * Array.indexOf() for objects
+	 */
+	export async function objectsIndexOf(objects: Object[], object: Object): Promise<number> {
+		return (await Aux.asyncFor(objects, async (obj) => JSON.stringify(obj))).indexOf(JSON.stringify(object));
+	}
+
+	/**
 	 * Groups objects according to object[grouper] values
 	 * @param objects iterable of objects
 	 * @param grouper key of objects used to group them
@@ -10,11 +50,12 @@ export namespace Aux {
 		grouper: string,
 	): Promise<{ [group: string]: { [key: string]: any }[] }> {
 		const groups: { [group: string]: { [key: string]: any }[] } = {};
-		for (const object of objects) {
-			if (!groups[object[grouper]]) groups[object[grouper]] = [];
-
+		await asyncFor(objects, async (object) => {
+			groups[object[grouper]] = [];
+		});
+		await asyncFor(objects, async (object) => {
 			groups[object[grouper]].push(object);
-		}
+		});
 		return groups;
 	}
 
@@ -40,6 +81,15 @@ export namespace Aux {
 	export const randInt = async (min: number, max: number) => Math.round(Math.random() * (max - min) + min);
 
 	/**
+	 * math.clamp(), fits x into [min, max]
+	 */
+	export async function clamp(x: number, min: number, max: number): Promise<number> {
+		if (x < min) return min;
+		if (x > max) return max;
+		return x;
+	}
+
+	/**
 	 * Implementation of Promise.props()
 	 * @param object object with properties to resolve
 	 */
@@ -48,7 +98,9 @@ export namespace Aux {
 	}): Promise<{ [key: string | number | symbol]: Awaited<T> }> {
 		const values = await Promise.all(Object.values(object));
 		const keys = Object.keys(object);
-		for (let i = 0; i < keys.length; i++) object[keys[i]] = values[i];
+		await asyncRange(keys.length, async (i) => {
+			object[keys[i]] = values[i];
+		});
 		return <{ [key: string | number | symbol]: Awaited<T> }>object;
 	}
 

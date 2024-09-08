@@ -200,7 +200,7 @@
 		"viewsWelcome": [
 			{
 				"view": "better-memo.memoExplorer",
-				"contents": "Memos are loading.\nIf this is taking too long, consider inspecting fetcher configurations.",
+				"contents": "Memo Explorer is loading.\nIf this is taking too long, consider inspecting fetcher configurations.",
 				"when": "!better-memo.explorerInitFinished && !treeView.better-memo.memoExplorer.toggleCollapseAll"
 			},
 			{
@@ -267,7 +267,7 @@
 						"type": "integer",
 						"default": 1000,
 						"minimum": 100,
-						"maximum": 100000
+						"maximum": 1000000
 					},
 					"better-memo.fetcher.forceScanDelay": {
 						"order": 222,
@@ -275,7 +275,7 @@
 						"type": "integer",
 						"default": 5000,
 						"minimum": 500,
-						"maximum": 500000
+						"maximum": 5000000
 					},
 					"better-memo.fetcher.workspaceScanDelay": {
 						"order": 223,
@@ -283,7 +283,7 @@
 						"type": "integer",
 						"default": 10000,
 						"minimum": 1000,
-						"maximum": 1000000
+						"maximum": 10000000
 					}
 				}
 			},

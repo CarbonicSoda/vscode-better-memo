@@ -7,6 +7,7 @@ import {
 	TreeView as vsTreeView,
 	EventEmitter as vsEventEmitter,
 	window,
+	TreeViewVisibilityChangeEvent,
 } from "vscode";
 import { TreeItems } from "./tree-items";
 import { MemoEntry, MemoFetcher } from "./memo-fetcher";
@@ -69,7 +70,9 @@ const treeView: {
 
 			window.onDidChangeActiveColorTheme(async () => await this.viewProvider.reloadItems()),
 
-			this.view.onDidChangeVisibility(async (ev) => await this.handleChangeVisibility(ev.visible)),
+			this.view.onDidChangeVisibility(
+				async (ev: TreeViewVisibilityChangeEvent) => await this.handleChangeVisibility(ev.visible),
+			),
 
 			commands.registerCommand("better-memo.switchToFileView", async () => await this.updateViewType("File")),
 			commands.registerCommand("better-memo.switchToTagView", async () => await this.updateViewType("Tag")),
@@ -124,7 +127,10 @@ const treeView: {
 	},
 
 	async explorerExpandAll(): Promise<void> {
-		for (const item of this.viewProvider.items) this.view.reveal(item, { select: false, expand: 2 });
+		await Aux.asyncFor(
+			this.viewProvider.items,
+			async (item) => await this.view.reveal(item, { select: false, expand: 2 }),
+		);
 	},
 
 	async explorerCompleteAll(): Promise<void> {
@@ -132,6 +138,7 @@ const treeView: {
 		await memoFetcher.suppressForceScan();
 		const memoCount = viewProvider.memoCount;
 		const items = viewProvider.items;
+
 		const completionDetails = `Are you sure you want to proceed?
 			This will mark all ${memoCount} memo${await Aux.plural(memoCount)} ${
 			viewProvider.viewType === "File" ? "in" : "under"
@@ -146,6 +153,7 @@ const treeView: {
 			await memoFetcher.unsuppressForceScan();
 			return;
 		}
+
 		for (const item of items) await item.completeMemos(this, { noConfirmation: true, _noExtraTasks: true });
 		await memoFetcher.removeAllMemos();
 		await viewProvider.removeAllItems();
@@ -162,30 +170,36 @@ const treeView: {
 	async updateItemCollapsibleState(): Promise<void> {
 		const expandPrimaryItems = await configMaid.get("view.expandPrimaryItemsByDefault");
 		const expandSecondaryItems = await configMaid.get("view.expandSecondaryItemsByDefault");
-		const onViewReveal = async () =>
-			await commands.executeCommand("list.collapseAll").then(async () => {
-				if (expandSecondaryItems) {
-					const uRevealPromises = [];
-					for (const child of this.viewProvider.items.flatMap((item) => item.children))
-						uRevealPromises.push(this.view.reveal(child, { select: false, expand: true }));
-					await Promise.allSettled(uRevealPromises);
+
+		const onViewReveal = async () => {
+			await commands.executeCommand("list.collapseAll");
+			if (expandSecondaryItems) {
+				const uRevealPromises = [];
+				await Aux.asyncFor(
+					this.viewProvider.items.flatMap((item: TreeItems.InnerItemType) => item.children),
+					async (child) => uRevealPromises.push(this.view.reveal(child, { select: false, expand: true })),
+				);
+				await Promise.allSettled(uRevealPromises);
+			}
+			for (const item of this.viewProvider.items) {
+				if (expandPrimaryItems) {
+					this.view.reveal(item, { select: false, expand: true });
+					continue;
 				}
-				for (const item of this.viewProvider.items) {
-					if (expandPrimaryItems) {
-						this.view.reveal(item, { select: false, expand: true });
-						continue;
-					}
-					await this.view.reveal(item, { select: false, focus: true });
-					await commands.executeCommand("list.collapse");
-				}
-				await this.view.reveal(this.viewProvider.items[0], {
-					select: false,
-					focus: true,
-				});
+				await this.view.reveal(item, { select: false, focus: true });
+				await commands.executeCommand("list.collapse");
+			}
+			await this.view.reveal(this.viewProvider.items[0], {
+				select: false,
+				focus: true,
 			});
-		await this.view
-			.reveal(this.viewProvider.items[0], { select: false, focus: true })
-			.then(onViewReveal, async () => null);
+		};
+
+		try {
+			await this.view.reveal(this.viewProvider.items[0], { select: false, focus: true });
+			await onViewReveal();
+		} finally {
+		}
 	},
 
 	async handleChangeVisibility(visible: boolean): Promise<void> {
@@ -231,11 +245,11 @@ export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 	}
 
 	async removeItems(...items: TreeItems.InnerItemType[]): Promise<void> {
-		for (const item of items) {
-			if (!this.items.includes(item)) continue;
+		await Aux.asyncFor(items, async (item) => {
+			if (!this.items.includes(item)) return;
 			const itemIndex = this.items.indexOf(item);
 			this.items = this.items.filter((_, i) => i !== itemIndex);
-		}
+		});
 	}
 
 	async removeAllItems(): Promise<void> {
@@ -262,32 +276,33 @@ export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 
 		const inner = await Aux.groupObjects(memos, isFileView ? "path" : "tag");
 		const innerLabels = Object.keys(inner).sort();
-		const uInnerItems = innerLabels.map(
+		const innerItems: TreeItems.InnerItemType[] = await Aux.asyncFor(
+			innerLabels,
 			async (label) => new (isFileView ? TreeItems.FileItem : TreeItems.TagItem)(label, expandPrimaryGroup),
 		);
-		const innerItems: TreeItems.InnerItemType[] = await Promise.all(uInnerItems);
 
-		for (let i = 0; i < innerLabels.length; i++) {
+		await Aux.asyncRange(innerLabels.length, async (i: number) => {
 			const innerLabel = innerLabels[i];
 			const innerItem = innerItems[i];
 			if (!isFileView) innerItem.iconPath = new ThemeIcon("bookmark", tags[innerLabel]);
 
 			const halfLeaves = await Aux.groupObjects(inner[innerLabel], isFileView ? "tag" : "path");
 			const halfLeafLabels = Object.keys(halfLeaves).sort();
-			const uHalfLeafItems = isFileView
-				? halfLeafLabels.map(
+			const halfLeafItems: TreeItems.InnerItemType[] = isFileView
+				? await Aux.asyncFor(
+						halfLeafLabels,
 						async (label) =>
 							new TreeItems.TagItem(label, expandSecondaryGroup, <TreeItems.FileItem>innerItem),
 				  )
-				: halfLeafLabels.map(
+				: await Aux.asyncFor(
+						halfLeafLabels,
 						async (label) =>
 							new TreeItems.FileItem(label, expandSecondaryGroup, <TreeItems.TagItem>innerItem),
 				  );
-			const halfLeafItems: TreeItems.InnerItemType[] = await Promise.all(uHalfLeafItems);
 			innerItem.children = halfLeafItems;
 
 			let childMemoCount = 0;
-			for (let j = 0; j < innerItem.children.length; j++) {
+			await Aux.asyncRange(innerItem.children.length, async (j) => {
 				const halfLeafItem = innerItem.children[j];
 				const halfLeafLabel = halfLeafLabels[j];
 				if (isFileView) halfLeafItem.iconPath = new ThemeIcon("bookmark", tags[halfLeafLabel]);
@@ -295,23 +310,22 @@ export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 				let memos = (<MemoEntry[]>halfLeaves[halfLeafLabel]).sort((a, b) => a.offset - b.offset);
 				const priority = [];
 				const normal = [];
-				for (const memo of memos) {
+				await Aux.asyncFor(memos, async (memo) => {
 					if (memo.priority !== 0) {
 						priority.push(memo);
-						continue;
+						return;
 					}
 					normal.push(memo);
-				}
+				});
 				memos = priority.sort((a, b) => b.priority - a.priority).concat(normal);
 
 				const tagColor = (<ThemeIcon>(isFileView ? halfLeafItem : innerItem).iconPath).color;
 				const maxPriority = Math.max(...memos.map((memo) => memo.priority));
-				const uMemoItems = memos.map(async (memo) => {
+				const memoItems = await Aux.asyncFor(memos, async (memo) => {
 					const memoItem = new TreeItems.MemoItem(memo, <TreeItems.InnerItemType>halfLeafItem);
 					await memoItem.setIcon(tagColor, maxPriority);
 					return memoItem;
 				});
-				const memoItems = await Promise.all(uMemoItems);
 				(<TreeItems.InnerItemType>halfLeafItem).children = memoItems;
 				childMemoCount += memoItems.length;
 
@@ -322,7 +336,7 @@ export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 					} $(pencil)`,
 					true,
 				);
-			}
+			});
 
 			innerItem.description = `${halfLeafItems.length} ${isFileView ? "Tag" : "File"}${await Aux.plural(
 				halfLeafItems,
@@ -333,7 +347,7 @@ export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 				} ${isFileView ? "$(bookmark)" : "$(file)"} ${childMemoCount} $(pencil)`,
 				true,
 			);
-		}
+		});
 
 		return innerItems;
 	}

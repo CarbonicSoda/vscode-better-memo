@@ -1,4 +1,4 @@
-import { commands, TabGroup, TextDocument, ThemeColor, window, workspace } from "vscode";
+import { commands, TabGroup, TextDocument, ThemeColor, Uri, window, workspace } from "vscode";
 import { Aux } from "./utils/auxiliary";
 import { ColorMaid, getColorMaid } from "./utils/color-maid";
 import { ConfigMaid } from "./utils/config-maid";
@@ -37,6 +37,7 @@ const memoFetcher: {
 	init(): Promise<void>;
 	dispose(): Promise<void>;
 
+	watches(path: string): Promise<boolean>;
 	includes(memo: MemoEntry): Promise<boolean>;
 
 	getMemos(): Promise<MemoEntry[]>;
@@ -44,6 +45,7 @@ const memoFetcher: {
 	fetchCustomTags(): Promise<{ [tag: string]: ThemeColor }>;
 	getTags(): Promise<{ [tag: string]: ThemeColor }>;
 
+	removeMemo(memo: MemoEntry): Promise<void>;
 	removeMemos(...memos: MemoEntry[]): Promise<void>;
 	removeAllMemos(): Promise<void>;
 
@@ -62,14 +64,14 @@ const memoFetcher: {
 
 	scanDocInterval(): Promise<void>;
 	forceScanInterval(): Promise<void>;
-	handleTabChange(changed: readonly TabGroup[]): Promise<void>;
+	onTabChange(changed: readonly TabGroup[]): Promise<void>;
 
 	validateForScan(doc?: TextDocument): Promise<boolean>;
 
-	watchedDocs: Map<TextDocument, { version: number; lang: string }>;
-	docMemos: Map<TextDocument, MemoEntry[]>;
+	watchedDocsToInfoMap: Map<TextDocument, { version: number; lang: string }>;
+	documentToMemosMap: Map<TextDocument, MemoEntry[]>;
 
-	customTags: { [tag: string]: ThemeColor };
+	customTagsToColor: { [tag: string]: ThemeColor };
 	customTagsChanged: boolean;
 
 	forceScanSuppressed: boolean;
@@ -82,7 +84,7 @@ const memoFetcher: {
 	janitor: Janitor;
 	intervalMaid: IntervalMaid;
 
-	prevDoc?: TextDocument;
+	previousFocusedDocument?: TextDocument;
 } = {
 	async init(): Promise<void> {
 		if (!resolved) throw moduleUnresolvedError;
@@ -94,12 +96,13 @@ const memoFetcher: {
 			workspace.onDidDeleteFiles(async () => await this.fetchDocs()),
 
 			workspace.onDidSaveTextDocument(async (doc) => {
-				if (this.validateForScan(doc)) this.scanDoc(doc, { updateView: true }); //maybe use another priv func lol
+				if (this.validateForScan(doc)) this.scanDoc(doc, { updateView: true });
 			}),
-			window.tabGroups.onDidChangeTabGroups(async (ev) => await this.handleTabChange(ev.changed)),
+			window.tabGroups.onDidChangeTabGroups(async (ev) => await this.onTabChange(ev.changed)),
 
 			configMaid.onChange("general.customTags", async () => {
 				this.customTagsChanged = true;
+				eventEmitter.emit("updateView");
 			}),
 
 			commands.registerCommand(
@@ -109,9 +112,9 @@ const memoFetcher: {
 		);
 
 		await Promise.all([
-			this.intervalMaid.add(async () => await this.scanDocInterval(), "fetcher.scanDelay"),
-			this.intervalMaid.add(async () => await this.forceScanInterval(), "fetcher.forceScanDelay"),
-			this.intervalMaid.add(async () => await this.fetchDocs(), "fetcher.workspaceScanDelay"),
+			this.intervalMaid.add(async () => await this.scanDocInterval(), "fetcher.scanDelay", 100, 1000000),
+			this.intervalMaid.add(async () => await this.forceScanInterval(), "fetcher.forceScanDelay", 500, 5000000),
+			this.intervalMaid.add(async () => await this.fetchDocs(), "fetcher.workspaceScanDelay", 1000, 10000000),
 		]);
 
 		eventEmitter.emitWait("initExplorerView");
@@ -123,91 +126,107 @@ const memoFetcher: {
 		await this.intervalMaid.dispose();
 	},
 
+	async watches(docOrPath: TextDocument | string): Promise<boolean> {
+		const doc = typeof docOrPath === "string" ? await workspace.openTextDocument(docOrPath) : docOrPath;
+		return this.watchedDocsToInfoMap.has(doc);
+	},
+
 	async includes(memo: MemoEntry): Promise<boolean> {
-		return (await Promise.all(this.docMemos.values().map(async (memo) => JSON.stringify(memo))))
-			.join("\n")
-			.includes(JSON.stringify(memo));
+		return await Aux.objectsInclude(this.documentToMemosMap.values(), memo);
 	},
 
 	async getMemos(): Promise<MemoEntry[]> {
-		const memos = [...this.docMemos.values()].flat();
+		const memos = [...this.documentToMemosMap.values()].flat();
 		await commands.executeCommand("setContext", "better-memo.noMemos", memos.length === 0);
 		return memos;
 	},
 
 	async getMemosInDoc(doc: TextDocument): Promise<MemoEntry[]> {
-		return this.docMemos.get(doc);
+		return this.documentToMemosMap.get(doc);
 	},
 
 	async fetchCustomTags(): Promise<{ [tag: string]: ThemeColor }> {
-		const userDefinedCustomTags = await configMaid.get("general.customTags");
+		const customTags = await configMaid.get("general.customTags");
 		const validTagRE = RegExp(`^[^\\r\\n\t ${commentCloseCharacters}]+$`);
 		const validHexRE = /(?:^#?[0-9a-f]{6}$)|(?:^#?[0-9a-f]{3}$)/i;
 		const uValidCustomTags: { [tag: string]: Promise<ThemeColor> } = {};
-		for (let [tag, hex] of Object.entries(userDefinedCustomTags)) {
+		await Aux.asyncFor(Object.entries(customTags), async ([tag, hex]) => {
 			[tag, hex] = [tag.trim().toUpperCase(), (<string>hex).trim()];
-			if (!validTagRE.test(tag) || !validHexRE.test(<string>hex)) continue;
+			if (!validTagRE.test(tag) || !validHexRE.test(<string>hex)) return;
 			uValidCustomTags[tag] = colorMaid.interpolate(<string>hex);
-		}
+		});
 		return await Aux.promiseProps(uValidCustomTags);
 	},
 
 	async getTags(): Promise<{ [tag: string]: ThemeColor }> {
-		const tags = await Promise.all((await this.getMemos()).map(async (memo) => memo.tag));
+		const tags = await Aux.asyncFor(await this.getMemos(), async (memo: MemoEntry) => memo.tag);
 		if (this.customTagsChanged) {
 			this.customTagsChanged = false;
-			this.customTags = await this.fetchCustomTags();
+			this.customTagsToColor = await this.fetchCustomTags();
 		}
 		const uMemoTags = {};
-		for (const tag of tags) if (!this.customTags[tag]) uMemoTags[tag] = colorMaid.hashColor(tag);
-		return Object.assign(await Aux.promiseProps(uMemoTags), this.customTags);
+		await Aux.asyncFor(tags, async (tag) => {
+			if (!this.customTagsToColor[tag]) uMemoTags[tag] = colorMaid.hashColor(tag);
+		});
+		return Object.assign(await Aux.promiseProps(uMemoTags), this.customTagsToColor);
+	},
+
+	async removeMemo(memo: MemoEntry): Promise<void> {
+		await Aux.asyncFor(
+			(<Map<TextDocument, MemoEntry[]>>this.documentToMemosMap).entries(),
+			async ([doc, memos]) => {
+				if (!(await Aux.objectsInclude(memos, memo))) return;
+				const memoIndex = await Aux.objectsIndexOf(memos, memo);
+				const removed = (<MemoEntry[]>memos).filter((_, i) => i !== memoIndex);
+				this.documentToMemosMap.set(doc, removed);
+			},
+		);
 	},
 
 	async removeMemos(...memos: MemoEntry[]): Promise<void> {
-		for (const memo of memos) {
-			for (const [doc, _memos] of this.docMemos.entries()) {
-				if (!_memos.includes(memo)) continue;
-				const memoIndex = _memos.indexOf(memo);
-				const removed = _memos.filter((_, i) => i !== memoIndex);
-				this.docMemos.set(doc, removed);
-			}
-		}
+		await Aux.asyncFor(memos, async (memo) => await this.removeMemo(memo));
 	},
 
 	async removeAllMemos(): Promise<void> {
-		this.docMemos.clear();
+		this.documentToMemosMap.clear();
 	},
 
 	async fetchDocs(): Promise<void> {
 		const watch = await configMaid.get("fetcher.watch");
 		const ignore = await configMaid.get("fetcher.ignore");
-		const uUnfiltered = await workspace.findFiles(watch, ignore).then((files) =>
-			files.map((file) =>
-				workspace.openTextDocument(file).then(
-					(doc) => <TextDocument>doc,
-					() => <null>null,
-				),
+
+		const getDoc = async (uri: Uri) => {
+			try {
+				return await workspace.openTextDocument(uri);
+			} finally {
+			}
+		};
+		const unfilteredUris = await workspace.findFiles(watch, ignore);
+		const unfilteredDocs = await Aux.asyncFor(unfilteredUris, async (uri) => await getDoc(uri));
+		const docs: TextDocument[] = unfilteredDocs.filter((doc) => Object.hasOwn(LangCommentFormat, doc?.languageId));
+
+		this.watchedDocsToInfoMap.clear();
+		await commands.executeCommand("setContext", "better-memo.noFiles", docs.length === 0);
+
+		await Promise.all([
+			Aux.asyncFor(
+				docs,
+				async (doc) => await this.watchedDocsToInfoMap.set(doc, { version: doc.version, lang: doc.languageId }),
 			),
-		);
-		const documents: TextDocument[] = (await Promise.all(uUnfiltered)).filter((doc) =>
-			Object.hasOwn(LangCommentFormat, doc?.languageId),
-		);
-		commands.executeCommand("setContext", "better-memo.noFiles", documents.length === 0);
-		this.watchedDocs.clear();
-		for (const doc of documents) this.watchedDocs.set(doc, { version: doc.version, lang: doc.languageId });
-		for (const doc of this.docMemos.keys()) if (!this.watchedDocs.has(doc)) this.docMemos.delete(doc);
-		await Promise.all(
-			[...this.watchedDocs.keys()].map(async (doc) => {
-				if (!this.docMemos.has(doc)) return await this.scanDoc(doc);
+			Aux.asyncFor(this.documentToMemosMap.keys(), async (doc) => {
+				if (!this.watchedDocsToInfoMap.has(doc)) this.documentToMemosMap.delete(doc);
 			}),
-		);
+			Aux.asyncFor(this.watchedDocsToInfoMap.keys(), async (doc) => {
+				if (!this.documentToMemosMap.has(doc)) this.scanDoc(doc);
+			}),
+		]);
 	},
 
 	async scanDoc(doc: TextDocument, options?: { updateView?: boolean }): Promise<void> {
 		if (this.backgroundMode) {
 			if (this.backgroundScanBuffer < this.backgroundScanBufferMax) {
-				this.backgroundScanQueue.add(doc);
 				this.backgroundScanBuffer += doc.lineCount;
+				this.backgroundScanQueue.add(doc);
 				return;
 			} else {
 				this.backgroundScanBuffer -= doc.lineCount;
@@ -217,18 +236,18 @@ const memoFetcher: {
 		const docContent = doc.getText();
 		const langId = <keyof typeof LangCommentFormat>doc.languageId;
 		const commentFormats: { open: string; close?: string }[] = [LangCommentFormat[langId]].flat();
-		const uCommentFormatREs = commentFormats.map(async (data, i) => {
+		const commentFormatREs = await Aux.asyncFor(commentFormats, async (data, i) => {
 			const open = await Aux.reEscape(data.open);
 			const close = await Aux.reEscape(data.close ?? "");
 			return `(?<![${open}])${open}[\\t ]*mo[\\t ]+(?<tag${i}>[^\\r\\n\\t ${commentCloseCharacters}]+)[\\t ]*(?<priority${i}>!*)(?<content${i}>.*${
 				close ? "?" : ""
 			})${close}`;
 		});
-		const matchPatternRaw = `(?:${(await Promise.all(uCommentFormatREs)).join(")|(?:")})`;
+		const matchPatternRaw = `(?:${commentFormatREs.join(")|(?:")})`;
 		const matchPattern = RegExp(matchPatternRaw, "gim");
 
 		let memos = [];
-		for (const match of docContent.matchAll(matchPattern)) {
+		await Aux.asyncFor(docContent.matchAll(matchPattern), async (match) => {
 			let tag: string;
 			let priority: number;
 			let content: string;
@@ -252,24 +271,23 @@ const memoFetcher: {
 				content: content,
 				tag: tag,
 				priority: priority,
-				path: doc.fileName,
-				relativePath: workspace.asRelativePath(doc.fileName),
 				line: doc.positionAt(match.index).line,
 				offset: match.index,
-				rawLength: match[0].length,
-				raw: match[0],
+				path: doc.fileName,
+				relativePath: workspace.asRelativePath(doc.fileName),
 				langId: langId,
+				raw: match[0],
+				rawLength: match[0].length,
 			});
-		}
-		this.docMemos.set(doc, memos);
-		if (options?.updateView) eventEmitter.emit("updateView");
+		});
+		this.documentToMemosMap.set(doc, memos);
+		if (options?.updateView) await eventEmitter.emit("updateView");
 	},
 
 	async fetchMemos(options?: { updateView?: boolean }): Promise<void> {
-		await this.fetchDocs().then(async () => {
-			await Promise.all([...this.watchedDocs.keys()].map(async (doc) => await this.scanDoc(doc)));
-			if (options?.updateView) eventEmitter.emit("updateView");
-		});
+		await this.fetchDocs();
+		await Aux.asyncFor(this.watchedDocsToInfoMap.keys(), async (doc) => await this.scanDoc(doc));
+		if (options?.updateView) await eventEmitter.emit("updateView");
 	},
 
 	async getFormattedMemo(memo: MemoEntry): Promise<string> {
@@ -281,11 +299,14 @@ const memoFetcher: {
 	},
 
 	async formatMemos(doc: TextDocument): Promise<void> {
-		const memos = this.docMemos.get(doc);
+		const memos = this.documentToMemosMap.get(doc);
 		if (!memos) return;
-		const edit = new FEdit.FileEdit();
-		for (const memo of memos)
+
+		const formatMemo = async (memo: MemoEntry) =>
 			await edit.replace(doc.uri, [memo.offset, memo.offset + memo.rawLength], await this.getFormattedMemo(memo));
+
+		const edit = new FEdit.FileEdit();
+		await Aux.asyncFor(memos, async (memo: MemoEntry) => await formatMemo(memo));
 		await edit.apply({ isRefactoring: true });
 	},
 
@@ -303,61 +324,65 @@ const memoFetcher: {
 
 	async disableBackgroundMode(): Promise<void> {
 		this.backgroundMode = false;
-		await Promise.all([...this.backgroundScanQueue].map(async (doc) => this.scanDoc(doc)));
+		await Aux.asyncFor(this.backgroundScanQueue, async (doc) => await this.scanDoc(doc));
 		this.backgroundScanQueue.clear();
 		this.backgroundScanBuffer = 0;
-		eventEmitter.emit("updateView");
+		await eventEmitter.emit("updateView");
 	},
 
 	async scanDocInterval(): Promise<void> {
 		const doc = window.activeTextEditor?.document;
 		if (!doc) return;
-		this.prevDoc = doc;
+		this.previousFocusedDocument = doc;
 		if (await this.validateForScan(doc)) this.scanDoc(doc, { updateView: true });
 	},
 
 	async forceScanInterval(): Promise<void> {
 		if (this.forceScanSuppressed) return;
 		const doc = window.activeTextEditor?.document;
-		if (!doc || !this.watchedDocs.has(doc)) return;
+		if (!doc || !this.watchedDocsToInfoMap.has(doc)) return;
 		this.scanDoc(doc, { updateView: true });
 	},
 
-	async handleTabChange(changed: readonly TabGroup[]): Promise<void> {
-		if (!this.prevDoc || !this.watchedDocs.has(this.prevDoc) || changed.length !== 1) return;
+	async onTabChange(changed: readonly TabGroup[]): Promise<void> {
+		if (
+			!this.previousFocusedDocument ||
+			!this.watchedDocsToInfoMap.has(this.previousFocusedDocument) ||
+			changed.length !== 1
+		)
+			return;
 		const tabGroup = changed[0];
 		const activeTab = tabGroup.activeTab;
-		const input = activeTab?.input;
+		const input: { uri?: Uri } = activeTab?.input;
 		if (
 			!tabGroup.isActive ||
 			(activeTab && !activeTab?.isActive) ||
-			(input && Object.getPrototypeOf(input).constructor.name !== "Kn")
+			(input && !(await this.watches(input.uri?.path)))
 		)
 			return;
-		if (this.prevDoc.isDirty) return;
-		if (await this.validateForScan(this.prevDoc)) await this.scanDoc(this.prevDoc, { updateView: true });
-		this.formatMemos(this.prevDoc);
+		if (this.previousFocusedDocument.isDirty) return;
+		if (await this.validateForScan(this.previousFocusedDocument))
+			await this.scanDoc(this.previousFocusedDocument, { updateView: true });
+		this.formatMemos(this.previousFocusedDocument);
 		if (!input) return;
-		//@ts-ignore
-		workspace.openTextDocument(input.uri).then(async (doc) => {
-			this.prevDoc = doc;
-		});
+		const doc = await workspace.openTextDocument(input.uri);
+		this.previousFocusedDocument = doc;
 	},
 
 	async validateForScan(doc?: TextDocument): Promise<boolean> {
-		const watched = this.watchedDocs.get(doc);
-		if (!watched) return false;
-		const versionChanged = doc.version !== watched.version;
-		const langChanged = doc.languageId !== watched.lang;
-		if (versionChanged) watched.version = doc.version;
-		if (langChanged) watched.lang = doc.languageId;
+		const docInfo = this.watchedDocsToInfoMap.get(doc);
+		if (!docInfo) return false;
+		const versionChanged = doc.version !== docInfo.version;
+		const langChanged = doc.languageId !== docInfo.lang;
+		if (versionChanged) docInfo.version = doc.version;
+		if (langChanged) docInfo.lang = doc.languageId;
 		return versionChanged || langChanged;
 	},
 
-	watchedDocs: new Map(),
-	docMemos: new Map(),
+	watchedDocsToInfoMap: new Map(),
+	documentToMemosMap: new Map(),
 
-	customTags: {},
+	customTagsToColor: {},
 	customTagsChanged: true,
 
 	forceScanSuppressed: false,
@@ -377,21 +402,15 @@ export async function resolver(): Promise<void> {
 	if (resolved) return;
 	resolved = true;
 
-	commentCloseCharacters = await Aux.reEscape(
-		[
-			...new Set(
-				(
-					await Promise.all(
-						Object.values(LangCommentFormat)
-							.flat()
-							.map(async (data) => (<{ open: string; close?: string }>data).close),
-					)
-				)
-					.join("")
-					.split(""),
-			),
-		].join(""),
-	);
+	const tmp = (
+		await Aux.asyncFor(
+			Object.values(LangCommentFormat).flat(),
+			async (format) => (<{ open: string; close?: string }>format).close,
+		)
+	)
+		.join("")
+		.split("");
+	commentCloseCharacters = await Aux.reEscape([...new Set(tmp)].join(""));
 
 	colorMaid = await getColorMaid();
 	configMaid = new ConfigMaid();
@@ -405,6 +424,4 @@ export async function resolver(): Promise<void> {
 			"fetcher.ignore": async (ignore) => `{${ignore.join(",")}}`,
 		}),
 	]);
-
-	await configMaid.onChange("general.customTags", async () => await eventEmitter.emit("updateView"));
 }

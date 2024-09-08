@@ -1,3 +1,5 @@
+import { Aux } from "./auxiliary";
+
 export namespace EvEmitter {
 	export type EventEmitter = typeof EventEmitter;
 
@@ -62,7 +64,10 @@ export namespace EvEmitter {
 		},
 
 		async emit(event: string, ...args: any): Promise<void> {
-			for (const callback of this.events.get(event) ?? []) callback?.(...args);
+			await Aux.asyncFor(
+				this.events.get(event) ?? [],
+				async (callback?: (...args: any) => void | Promise<void>) => await callback?.(...args),
+			);
 		},
 
 		async emitWait(
@@ -74,7 +79,7 @@ export namespace EvEmitter {
 			return await new Promise(async (resolve) => {
 				const newListenerWatcher = await this.subscribe(
 					`__waitListenerAdded${event}`,
-					async (onDispatch: (...args: any) => void) => onDispatch(...args),
+					async (onDispatch: (...args: any) => Promise<void>) => await onDispatch(...args),
 				);
 				const stop = async () => {
 					newListenerWatcher.dispose();

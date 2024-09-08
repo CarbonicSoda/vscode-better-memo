@@ -1,5 +1,6 @@
 import { writeFileSync } from "fs";
 import { commands, Position, Range, TextDocument, Uri, window, workspace, WorkspaceEdit } from "vscode";
+import { Aux } from "./auxiliary";
 
 export namespace FEdit {
 	type EditRange = [start: number | Position, end: number | Position];
@@ -26,9 +27,11 @@ export namespace FEdit {
 
 		async apply(metaData?: FileEditMetaData, alwaysOpenFile?: boolean): Promise<void> {
 			for (const [uri, fileEdits] of this.edits.entries()) {
-				await this.editFile(fileEdits, uri, metaData, alwaysOpenFile).catch((err) => {
+				try {
+					await this.editFile(fileEdits, uri, metaData, alwaysOpenFile);
+				} catch (err) {
 					throw new Error(`Failed to apply edits to files: ${err}`);
-				});
+				}
 			}
 		}
 
@@ -54,29 +57,25 @@ export namespace FEdit {
 			metaData?: FileEditMetaData,
 			alwaysOpenFile?: boolean,
 		): Promise<void> {
-			await workspace.openTextDocument(uri).then(async (doc) => {
-				if (!alwaysOpenFile && !doc.isDirty) {
-					this.editFileWithFs(edits, doc);
-					return;
-				}
-				await window
-					.showTextDocument(doc)
-					.then(
-						async () => await commands.executeCommand("workbench.action.files.saveWithoutFormatting", doc),
-					);
-				const edit = new WorkspaceEdit();
-				for (let [[start, end], replacement] of edits.entries()) {
-					if (typeof start === "number") start = doc.positionAt(start);
-					if (typeof end === "number") end = doc.positionAt(end);
-					edit.replace(uri, new Range(start, end), replacement);
-				}
-				await workspace.applyEdit(edit, metaData).then(
-					async () => await commands.executeCommand("workbench.action.files.saveWithoutFormatting", doc),
-					async (err) => {
-						throw new Error(`Failed modifying ${uri.path}: ${err}`);
-					},
-				);
+			const doc = await workspace.openTextDocument(uri);
+			if (!alwaysOpenFile && !doc.isDirty) {
+				await this.editFileWithFs(edits, doc);
+				return;
+			}
+			await window.showTextDocument(doc);
+			await commands.executeCommand("workbench.action.files.saveWithoutFormatting", doc);
+			const edit = new WorkspaceEdit();
+			await Aux.asyncFor(edits.entries(), async ([[start, end], replacement]) => {
+				if (typeof start === "number") start = doc.positionAt(start);
+				if (typeof end === "number") end = doc.positionAt(end);
+				edit.replace(uri, new Range(start, end), replacement);
 			});
+			try {
+				await workspace.applyEdit(edit, metaData);
+				await commands.executeCommand("workbench.action.files.saveWithoutFormatting", doc);
+			} catch (err) {
+				throw new Error(`Failed modifying ${uri.path}: ${err}`);
+			}
 		}
 	}
 }

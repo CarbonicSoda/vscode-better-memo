@@ -1,7 +1,7 @@
 import { ColorThemeKind, ThemeColor, window } from "vscode";
 import { Aux } from "./auxiliary";
 
-import VScodeColors from "../json/vscode-colors.json";
+import VSCodeColors from "../json/vscode-colors.json";
 
 type RGB3 = [r: number, g: number, b: number];
 
@@ -53,9 +53,11 @@ const ColorMaid: {
 		const colorThemeKind = ColorThemeKind[window.activeColorTheme.kind];
 		let bestDist = 999999;
 		let best = "";
-		for (const [colorName, colorRgb] of Object.entries(VScodeColors[<keyof typeof VScodeColors>colorThemeKind])) {
+		for (const [colorName, colorRgb] of Object.entries(VSCodeColors[<keyof typeof VSCodeColors>colorThemeKind])) {
 			let dist = 0;
-			for (let i = 0; i < 3; i++) dist += (rgb[i] - colorRgb[i]) ** 2;
+			await Aux.asyncRange(3, async (i) => {
+				dist += (rgb[i] - colorRgb[i]) ** 2;
+			});
 			if (dist < bestDist) {
 				bestDist = dist;
 				best = colorName;
@@ -82,15 +84,10 @@ const ColorMaid: {
 
 	async sRGBHash(hashString: string): Promise<RGB3> {
 		let sum = 0;
-		for (let i = 0; i < hashString.length; i++) sum += hashString.charCodeAt(i) * (i + 1);
-		const getVal = async (param: number) =>
-			Math.trunc(
-				Number(
-					`0.${Math.sin(sum + param)
-						.toString()
-						.slice(6)}`,
-				) * 256,
-			);
+		await Aux.asyncRange(hashString.length, async (i) => {
+			sum += hashString.charCodeAt(i) * (i + 1);
+		});
+		const getVal = async (param: number) => Math.trunc(Number(`0.${String(Math.sin(sum + param)).slice(6)}`) * 256);
 		return await Promise.all([getVal(1), getVal(2), getVal(3)]);
 	},
 };

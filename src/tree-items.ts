@@ -33,6 +33,7 @@ export namespace TreeItems {
 			let collapsibleState: TreeItemCollapsibleState;
 			if (expand === "none") collapsibleState = TreeItemCollapsibleState.None;
 			else collapsibleState = expand ? TreeItemCollapsibleState.Expanded : TreeItemCollapsibleState.Collapsed;
+
 			super(label, collapsibleState);
 		}
 
@@ -62,11 +63,11 @@ export namespace TreeItems {
 		}
 
 		async removeChildren(...children: ExplorerTreeItem[]): Promise<void> {
-			for (const child of children) {
-				if (!this.children.includes(child)) continue;
+			await Aux.asyncFor(children, async (child) => {
+				if (!this.children.includes(child)) return;
 				const childIndex = this.children.indexOf(child);
 				this.children = this.children.filter((_, i) => i !== childIndex);
-			}
+			});
 		}
 
 		async completeMemos(
@@ -75,11 +76,11 @@ export namespace TreeItems {
 		): Promise<void> {
 			const { memoFetcher, viewProvider } = treeView;
 			await memoFetcher.suppressForceScan();
-			const memoEntries = await Promise.all(
-				(this.hierarchy === "primary"
-					? this.children.flatMap((child) => (<InnerItemType>child).children)
-					: this.children
-				).map(async (memoItem) => (<TreeItems.MemoItem>memoItem).memoEntry),
+			const memoEntries = await Aux.asyncFor(
+				this.hierarchy === "primary"
+					? this.children.flatMap((child: InnerItemType) => child.children)
+					: this.children,
+				async (memoItem: MemoItem) => memoItem.memoEntry,
 			);
 
 			if (!options?.noConfirmation && (await configMaid.get("actions.askForConfirmationOnCompletionOfMemos"))) {
@@ -106,33 +107,39 @@ export namespace TreeItems {
 				}
 			}
 
+			await Aux.asyncFor(
+				new Set(await Aux.asyncFor(memoEntries, async (memoEntry) => memoEntry.path)),
+				async (path) => {
+					const doc = await workspace.openTextDocument(path);
+					await memoFetcher.scanDoc(doc);
+				},
+			);
+			await viewProvider.reloadItems();
+
 			const edit = new FEdit.FileEdit();
-			for (const memoEntry of memoEntries) {
-				//add memoFetcher.includes check!!
-				await workspace.openTextDocument(memoEntry.path).then(async (doc) => {
-					const doRemoveLine =
-						(await configMaid.get("actions.removeLineIfMemoIsOnSingleLine")) &&
-						memoEntry.line < doc.lineCount - 1 &&
-						doc
-							.lineAt(memoEntry.line)
-							.text.replace(
-								RegExp(
-									`(?:${await Aux.reEscape(memoEntry.raw)})|(?:${await Aux.reEscape(
-										await memoFetcher.getFormattedMemo(memoEntry),
-									)})`,
-								),
-								"",
-							)
-							.trim().length === 0;
-					const start = doc.positionAt(memoEntry.offset);
-					const end = doRemoveLine
-						? new Position(memoEntry.line + 1, 0)
-						: start.translate(0, memoEntry.rawLength);
-					const range = new Range(start, end);
-					await edit.delete(doc.uri, range);
-				});
-			}
+			await Aux.asyncFor(memoEntries, async (memoEntry) => {
+				if (!(await memoFetcher.includes(memoEntry))) return;
+
+				const doc = await workspace.openTextDocument(memoEntry.path);
+				const memoRE = RegExp(
+					`(?:${await Aux.reEscape(memoEntry.raw)})|(?:${await Aux.reEscape(
+						await memoFetcher.getFormattedMemo(memoEntry),
+					)})`,
+				);
+				const doRemoveLine =
+					(await configMaid.get("actions.removeLineIfMemoIsOnSingleLine")) &&
+					memoEntry.line < doc.lineCount - 1 &&
+					doc.lineAt(memoEntry.line).text.replace(memoRE, "").trim().length === 0;
+
+				const start = doc.positionAt(memoEntry.offset);
+				const end = doRemoveLine
+					? new Position(memoEntry.line + 1, 0)
+					: start.translate(0, memoEntry.rawLength);
+				const range = new Range(start, end);
+				await edit.delete(doc.uri, range);
+			});
 			await edit.apply({ isRefactoring: true });
+
 			if (options?._noExtraTasks) return;
 			await memoFetcher.suppressForceScan();
 			await memoFetcher.removeMemos(...memoEntries);
@@ -151,13 +158,11 @@ export namespace TreeItems {
 		}
 
 		async navigate(): Promise<void> {
-			await workspace.openTextDocument(this.path).then(async (doc) => {
-				await window.showTextDocument(doc).then(async (editor) => {
-					let pos = doc.lineAt(0).range.end;
-					editor.selection = new Selection(pos, pos);
-					editor.revealRange(new Range(pos, pos));
-				});
-			});
+			const doc = await workspace.openTextDocument(this.path);
+			const editor = await window.showTextDocument(doc);
+			const pos = doc.lineAt(0).range.end;
+			editor.selection = new Selection(pos, pos);
+			editor.revealRange(new Range(pos, pos));
 		}
 	}
 
@@ -174,14 +179,7 @@ export namespace TreeItems {
 		static currentCompletionConfirmationBackup?: {
 			label: string | TreeItemLabel;
 			description: string | boolean;
-			iconPath:
-				| string
-				| Uri
-				| {
-						light: string | Uri;
-						dark: string | Uri;
-				  }
-				| ThemeIcon;
+			iconPath: ThemeIcon;
 			contextValue: string;
 		};
 
@@ -208,29 +206,28 @@ export namespace TreeItems {
 		}
 
 		async setIcon(tagColor: ThemeColor, maxPriority: number): Promise<void> {
-			this.iconPath =
-				this.memoEntry.priority === 0
-					? new ThemeIcon("circle-filled", tagColor)
-					: new ThemeIcon(
-							"circle-outline",
-							await colorMaid.interpolate([255, (1 - this.memoEntry.priority / maxPriority) * 255, 0]),
-					  );
+			if (this.memoEntry.priority === 0) {
+				this.iconPath = new ThemeIcon("circle-filled", tagColor);
+				return;
+			}
+			this.iconPath = new ThemeIcon(
+				"circle-outline",
+				await colorMaid.interpolate([255, (1 - this.memoEntry.priority / maxPriority) * 255, 0]),
+			);
 		}
 
 		async navigate(): Promise<void> {
 			const memoEntry = this.memoEntry;
-			await workspace.openTextDocument(memoEntry.path).then(
-				async (doc) =>
-					await window.showTextDocument(doc).then((editor) => {
-						let pos = doc.positionAt(memoEntry.offset + memoEntry.rawLength);
-						editor.selection = new Selection(pos, pos);
-						editor.revealRange(new Range(pos, pos));
-					}),
-			);
+			const doc = await workspace.openTextDocument(memoEntry.path);
+			const editor = await window.showTextDocument(doc);
+			const pos = doc.positionAt(memoEntry.offset + memoEntry.rawLength);
+			editor.selection = new Selection(pos, pos);
+			editor.revealRange(new Range(pos, pos));
 		}
 
 		async complete(treeView: TreeView, options?: { noConfirmation?: boolean }): Promise<void> {
 			const { memoFetcher, viewProvider } = treeView;
+
 			await memoFetcher.unsuppressForceScan();
 			if (
 				!options?.noConfirmation &&
@@ -238,44 +235,41 @@ export namespace TreeItems {
 				!(await this.completionConfirmationHandle(treeView, { words: 3, maxLength: 12 }))
 			)
 				return;
+
 			const memoEntry = this.memoEntry;
-			await workspace.openTextDocument(memoEntry.path).then(async (doc) => {
-				await memoFetcher.scanDoc(doc);
-				if (!await memoFetcher.includes(memoEntry)) {
-					await viewProvider.reloadItems();
-					return;
-				}
-				const doRemoveLine =
-					(await configMaid.get("actions.removeLineIfMemoIsOnSingleLine")) &&
-					memoEntry.line < doc.lineCount - 1 &&
-					doc
-						.lineAt(memoEntry.line)
-						.text.replace(
-							RegExp(
-								`${await Aux.reEscape(memoEntry.raw)}|${await Aux.reEscape(
-									await memoFetcher.getFormattedMemo(memoEntry),
-								)}`,
-							),
-							"",
-						)
-						.trim().length === 0;
-				const doOpenFile = await configMaid.get("actions.alwaysOpenChangedFileOnCompletionOfMemo");
-				const start = doc.positionAt(memoEntry.offset);
-				const end = doRemoveLine
-					? new Position(memoEntry.line + 1, 0)
-					: start.translate(0, memoEntry.rawLength);
-				const range = new Range(start, end);
-				const edit = new FEdit.FileEdit();
-				await edit.delete(doc.uri, range);
-				viewProvider.refresh(await this.removeFromTree(viewProvider));
-				await edit.apply({ isRefactoring: true }, doOpenFile).then(async () => {
-					const editor = window.activeTextEditor;
-					if (editor?.document === doc) {
-						editor.revealRange(new Range(start, start));
-						editor.selection = new Selection(start, start);
-					}
-				});
-			});
+			const doc = await workspace.openTextDocument(memoEntry.path);
+			await memoFetcher.scanDoc(doc);
+			if (!(await memoFetcher.includes(memoEntry))) {
+				await viewProvider.reloadItems();
+				return;
+			}
+
+			const memoRE = RegExp(
+				`${await Aux.reEscape(memoEntry.raw)}|${await Aux.reEscape(
+					await memoFetcher.getFormattedMemo(memoEntry),
+				)}`,
+			);
+			const doRemoveLine =
+				(await configMaid.get("actions.removeLineIfMemoIsOnSingleLine")) &&
+				memoEntry.line < doc.lineCount - 1 &&
+				doc.lineAt(memoEntry.line).text.replace(memoRE, "").trim().length === 0;
+
+			const doOpenFile = await configMaid.get("actions.alwaysOpenChangedFileOnCompletionOfMemo");
+
+			const start = doc.positionAt(memoEntry.offset);
+			const end = doRemoveLine ? new Position(memoEntry.line + 1, 0) : start.translate(0, memoEntry.rawLength);
+			const range = new Range(start, end);
+			const edit = new FEdit.FileEdit();
+			await edit.delete(doc.uri, range);
+			await memoFetcher.removeMemo(memoEntry);
+			viewProvider.refresh(await this.removeFromTree(viewProvider));
+
+			await edit.apply({ isRefactoring: true }, doOpenFile);
+			const editor = window.activeTextEditor;
+			if (editor?.document === doc) {
+				editor.revealRange(new Range(start, start));
+				editor.selection = new Selection(start, start);
+			}
 		}
 
 		private async completionConfirmationHandle(
@@ -287,7 +281,7 @@ export namespace TreeItems {
 				MemoItem.currentCompletionConfirmationBackup = {
 					label: item.label,
 					description: item.description,
-					iconPath: item.iconPath,
+					iconPath: <ThemeIcon>item.iconPath,
 					contextValue: item.contextValue,
 				};
 			};
@@ -342,19 +336,19 @@ export namespace TreeItems {
 				this.description = `Confirm in ${Math.round(time / 1000)}`;
 				const gbVal = (255 * time) / timeout;
 				this.iconPath = new ThemeIcon("loading~spin", await colorMaid.interpolate([255, gbVal, gbVal]));
-				treeView.viewProvider.refresh(this);
+				await treeView.viewProvider.refresh(this);
 			};
 			await updateTime(timeout);
 			this.confirmInterval = setInterval(
 				async () => await updateTime((time -= 1000)),
 				timeout / Math.round(time / 1000),
 			);
-
 			this.confirmTimeout = setTimeout(async () => {
 				await reset(this);
 				MemoItem.currentCompletionConfirmationTarget = null;
 				MemoItem.currentCompletionConfirmationBackup = null;
 			}, timeout);
+
 			return false;
 		}
 	}
