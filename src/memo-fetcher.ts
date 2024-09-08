@@ -41,6 +41,7 @@ const memoFetcher: {
 
 	getMemos(): Promise<MemoEntry[]>;
 	getMemosInDoc(doc: TextDocument): Promise<MemoEntry[]>;
+	fetchCustomTags(): Promise<{ [tag: string]: ThemeColor }>;
 	getTags(): Promise<{ [tag: string]: ThemeColor }>;
 
 	removeMemos(...memos: MemoEntry[]): Promise<void>;
@@ -49,7 +50,6 @@ const memoFetcher: {
 	fetchDocs(): Promise<void>;
 	scanDoc(doc: TextDocument, options?: { updateView?: boolean }): Promise<void>;
 	fetchMemos(options?: { updateView?: boolean }): Promise<void>;
-	fetchCustomTags(): Promise<{ [tag: string]: ThemeColor }>;
 
 	getFormattedMemo(memo: MemoEntry): Promise<string>;
 	formatMemos(doc: TextDocument): Promise<void>;
@@ -68,6 +68,9 @@ const memoFetcher: {
 
 	watchedDocs: Map<TextDocument, { version: number; lang: string }>;
 	docMemos: Map<TextDocument, MemoEntry[]>;
+
+	customTags: { [tag: string]: ThemeColor };
+	customTagsChanged: boolean;
 
 	forceScanSuppressed: boolean;
 
@@ -94,6 +97,10 @@ const memoFetcher: {
 				if (this.validateForScan(doc)) this.scanDoc(doc, { updateView: true }); //maybe use another priv func lol
 			}),
 			window.tabGroups.onDidChangeTabGroups(async (ev) => await this.handleTabChange(ev.changed)),
+
+			configMaid.onChange("general.customTags", async () => {
+				this.customTagsChanged = true;
+			}),
 
 			commands.registerCommand(
 				"better-memo.reloadExplorer",
@@ -131,12 +138,28 @@ const memoFetcher: {
 		return this.docMemos.get(doc);
 	},
 
+	async fetchCustomTags(): Promise<{ [tag: string]: ThemeColor }> {
+		const userDefinedCustomTags = await configMaid.get("general.customTags");
+		const validTagRE = RegExp(`^[^\\r\\n\t ${commentCloseCharacters}]+$`);
+		const validHexRE = /(?:^#?[0-9a-f]{6}$)|(?:^#?[0-9a-f]{3}$)/i;
+		const uValidCustomTags: { [tag: string]: Promise<ThemeColor> } = {};
+		for (let [tag, hex] of Object.entries(userDefinedCustomTags)) {
+			[tag, hex] = [tag.trim().toUpperCase(), (<string>hex).trim()];
+			if (!validTagRE.test(tag) || !validHexRE.test(<string>hex)) continue;
+			uValidCustomTags[tag] = colorMaid.interpolate(<string>hex);
+		}
+		return await Aux.promiseProps(uValidCustomTags);
+	},
+
 	async getTags(): Promise<{ [tag: string]: ThemeColor }> {
 		const tags = await Promise.all((await this.getMemos()).map(async (memo) => memo.tag));
-		const customTags = await this.fetchCustomTags();
+		if (this.customTagsChanged) {
+			this.customTagsChanged = false;
+			this.customTags = await this.fetchCustomTags();
+		}
 		const uMemoTags = {};
-		for (const tag of tags) if (!customTags[tag]) uMemoTags[tag] = colorMaid.hashColor(tag);
-		return Object.assign(await Aux.promiseProps(uMemoTags), customTags);
+		for (const tag of tags) if (!this.customTags[tag]) uMemoTags[tag] = colorMaid.hashColor(tag);
+		return Object.assign(await Aux.promiseProps(uMemoTags), this.customTags);
 	},
 
 	async removeMemos(...memos: MemoEntry[]): Promise<void> {
@@ -248,19 +271,6 @@ const memoFetcher: {
 		});
 	},
 
-	async fetchCustomTags(): Promise<{ [tag: string]: ThemeColor }> {
-		const userDefinedCustomTags = await configMaid.get("general.customTags");
-		const validTagRE = RegExp(`^[^\\r\\n\t ${commentCloseCharacters}]+$`);
-		const validHexRE = /(?:^#?[0-9a-f]{6}$)|(?:^#?[0-9a-f]{3}$)/i;
-		const uValidCustomTags: { [tag: string]: Promise<ThemeColor> } = {};
-		for (let [tag, hex] of Object.entries(userDefinedCustomTags)) {
-			[tag, hex] = [tag.trim().toUpperCase(), (<string>hex).trim()];
-			if (!validTagRE.test(tag) || !validHexRE.test(<string>hex)) continue;
-			uValidCustomTags[tag] = colorMaid.interpolate(<string>hex);
-		}
-		return await Aux.promiseProps(uValidCustomTags);
-	},
-
 	async getFormattedMemo(memo: MemoEntry): Promise<string> {
 		const commentFormat: { open: string; close?: string } = [LangCommentFormat[memo.langId]].flat()[0];
 		const padding = commentFormat.close ? " " : "";
@@ -345,6 +355,9 @@ const memoFetcher: {
 
 	watchedDocs: new Map(),
 	docMemos: new Map(),
+
+	customTags: {},
+	customTagsChanged: true,
 
 	forceScanSuppressed: false,
 
