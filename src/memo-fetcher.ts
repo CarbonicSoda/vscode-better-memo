@@ -124,8 +124,9 @@ const memoFetcher: {
 	},
 
 	async includes(memo: MemoEntry): Promise<boolean> {
-		for (const _memo of this.docMemos.values()) if (JSON.stringify(memo) === JSON.stringify(_memo)) return true;
-		return false;
+		return (await Promise.all(this.docMemos.values().map(async (memo) => JSON.stringify(memo))))
+			.join(",")
+			.includes(JSON.stringify(memo));
 	},
 
 	async getMemos(): Promise<MemoEntry[]> {
@@ -165,7 +166,7 @@ const memoFetcher: {
 	async removeMemos(...memos: MemoEntry[]): Promise<void> {
 		for (const memo of memos) {
 			for (const [doc, _memos] of this.docMemos.entries()) {
-				if (!_memos.includes(memo)) return;
+				if (!_memos.includes(memo)) continue;
 				const memoIndex = _memos.indexOf(memo);
 				const removed = _memos.filter((_, i) => i !== memoIndex);
 				this.docMemos.set(doc, removed);
