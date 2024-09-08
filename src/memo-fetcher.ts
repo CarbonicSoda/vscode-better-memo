@@ -125,7 +125,7 @@ const memoFetcher: {
 
 	async includes(memo: MemoEntry): Promise<boolean> {
 		return (await Promise.all(this.docMemos.values().map(async (memo) => JSON.stringify(memo))))
-			.join(",")
+			.join("\n")
 			.includes(JSON.stringify(memo));
 	},
 

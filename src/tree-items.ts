@@ -108,6 +108,7 @@ export namespace TreeItems {
 
 			const edit = new FEdit.FileEdit();
 			for (const memoEntry of memoEntries) {
+				//add memoFetcher.includes check!!
 				await workspace.openTextDocument(memoEntry.path).then(async (doc) => {
 					const doRemoveLine =
 						(await configMaid.get("actions.removeLineIfMemoIsOnSingleLine")) &&
@@ -136,7 +137,7 @@ export namespace TreeItems {
 			await memoFetcher.suppressForceScan();
 			await memoFetcher.removeMemos(...memoEntries);
 			await viewProvider.reloadItems();
-			memoFetcher.unsuppressForceScan();
+			await memoFetcher.unsuppressForceScan();
 		}
 	}
 
@@ -239,8 +240,8 @@ export namespace TreeItems {
 				return;
 			const memoEntry = this.memoEntry;
 			await workspace.openTextDocument(memoEntry.path).then(async (doc) => {
-				memoFetcher.scanDoc(doc);
-				if (!memoFetcher.includes(memoEntry)) {
+				await memoFetcher.scanDoc(doc);
+				if (!await memoFetcher.includes(memoEntry)) {
 					await viewProvider.reloadItems();
 					return;
 				}
