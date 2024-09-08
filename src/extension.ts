@@ -1,7 +1,7 @@
-import { disposeConfigMaidInstances } from "./utils/config-maid";
+import { disposeAllConfigMaids } from "./utils/config-maid";
 import { resolver as ETItemsResolve } from "./explorer-tree-items";
-import { resolver as ETViewResolve , ExplorerTreeView } from "./explorer-tree-view";
-import { resolver as MemoFetcherResolve, MemoFetcher } from "./memo-fetcher";
+import { resolver as ETViewResolve, ExplorerTreeView, getExplorerTreeView } from "./explorer-tree-view";
+import { resolver as MemoFetcherResolve, MemoFetcher, getMemoFetcher } from "./memo-fetcher";
 
 let memoFetcher: MemoFetcher;
 let explorerTreeView: ExplorerTreeView;
@@ -11,15 +11,15 @@ export async function activate(): Promise<void> {
 	await ETViewResolve();
 	await MemoFetcherResolve();
 
-	memoFetcher = new MemoFetcher();
+	memoFetcher = await getMemoFetcher();
 	await memoFetcher.init();
 
-	explorerTreeView = new ExplorerTreeView();
+	explorerTreeView = await getExplorerTreeView();
 	await explorerTreeView.init(memoFetcher);
 }
 
 export async function deactivate(): Promise<void> {
-	await explorerTreeView?.dispose();
-	await memoFetcher?.dispose();
-	await disposeConfigMaidInstances();
+	explorerTreeView?.dispose();
+	memoFetcher?.dispose();
+	disposeAllConfigMaids();
 }

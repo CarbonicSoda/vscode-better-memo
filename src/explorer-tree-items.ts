@@ -13,7 +13,7 @@ import {
 	workspace,
 } from "vscode";
 import { ExplorerTreeView, ExplorerViewProvider } from "./explorer-tree-view";
-import { MemoEntry, MemoFetcher } from "./memo-fetcher";
+import { MemoEntry } from "./memo-fetcher";
 import { Aux } from "./utils/auxiliary";
 import { ColorMaid, getColorMaid } from "./utils/color-maid";
 import { ConfigMaid } from "./utils/config-maid";
@@ -22,29 +22,14 @@ import { FEdit } from "./utils/file-edit";
 let colorMaid: ColorMaid;
 let configMaid: ConfigMaid;
 
-let resolved = false;
-export async function resolver(): Promise<void> {
-	if (resolved) return;
-	resolved = true;
-
-	colorMaid = await getColorMaid();
-	configMaid = new ConfigMaid();
-
-	await Promise.all([
-		configMaid.listen("actions.askForConfirmationOnCompletionOfMemo"),
-		configMaid.listen("actions.timeoutOfConfirmationOnCompletionOfMemo"),
-		configMaid.listen("actions.alwaysOpenChangedFileOnCompletionOfMemo"),
-		configMaid.listen("actions.askForConfirmationOnCompletionOfMemos"),
-		configMaid.listen("actions.removeLineIfMemoIsOnSingleLine"),
-	]);
-}
-
 export namespace ETItems {
 	export type InnerItemType = FileItem | TagItem;
 	export type ExplorerTreeItemType = ExplorerTreeItem | FileItem | TagItem | MemoItem;
 
 	class ExplorerTreeItem extends TreeItem {
 		constructor(label: string, expand: boolean | "none", public parent?: InnerItemType) {
+			if (!resolved) throw moduleUnresolvedError;
+
 			let collapsibleState: TreeItemCollapsibleState;
 			if (expand === "none") collapsibleState = TreeItemCollapsibleState.None;
 			else collapsibleState = expand ? TreeItemCollapsibleState.Expanded : TreeItemCollapsibleState.Collapsed;
@@ -69,6 +54,8 @@ export namespace ETItems {
 		hierarchy: "primary" | "secondary";
 
 		constructor(label: string, expand: boolean, context: string, parent?: InnerItemType) {
+			if (!resolved) throw moduleUnresolvedError;
+
 			super(label, expand, parent);
 			this.contextValue = context;
 			this.hierarchy = parent ? "secondary" : "primary";
@@ -130,7 +117,7 @@ export namespace ETItems {
 							.text.replace(
 								RegExp(
 									`(?:${await Aux.reEscape(memoEntry.raw)})|(?:${await Aux.reEscape(
-										await MemoFetcher.getFormattedMemo(memoEntry),
+										await memoFetcher.getFormattedMemo(memoEntry),
 									)})`,
 								),
 								"",
@@ -158,6 +145,8 @@ export namespace ETItems {
 
 	export class FileItem extends InnerItem {
 		constructor(readonly path: string, expand: boolean, parent?: TagItem) {
+			if (!resolved) throw moduleUnresolvedError;
+
 			super(workspace.asRelativePath(path), expand, "File", parent);
 			this.resourceUri = Uri.file(path);
 			this.iconPath = ThemeIcon.File;
@@ -176,6 +165,7 @@ export namespace ETItems {
 
 	export class TagItem extends InnerItem {
 		constructor(tag: string, expand: boolean, parent?: FileItem) {
+			if (!resolved) throw moduleUnresolvedError;
 			super(tag, expand, "Tag", parent);
 		}
 	}
@@ -201,6 +191,8 @@ export namespace ETItems {
 		confirmTimeout?: NodeJS.Timeout;
 
 		constructor(public memoEntry: MemoEntry, parent: InnerItem) {
+			if (!resolved) throw moduleUnresolvedError;
+
 			const content = memoEntry.content === "" ? "Placeholder T^T" : memoEntry.content;
 			super(content, "none", parent);
 			this.description = `Ln ${memoEntry.line + 1}`;
@@ -262,7 +254,7 @@ export namespace ETItems {
 						.text.replace(
 							RegExp(
 								`${await Aux.reEscape(memoEntry.raw)}|${await Aux.reEscape(
-									await MemoFetcher.getFormattedMemo(memoEntry),
+									await memoFetcher.getFormattedMemo(memoEntry),
 								)}`,
 							),
 							"",
@@ -367,4 +359,22 @@ export namespace ETItems {
 			return false;
 		}
 	}
+}
+
+let resolved = false;
+const moduleUnresolvedError = new Error("explorer-tree-items is not resolved");
+export async function resolver(): Promise<void> {
+	if (resolved) return;
+	resolved = true;
+
+	colorMaid = await getColorMaid();
+	configMaid = new ConfigMaid();
+
+	await Promise.all([
+		configMaid.listen("actions.askForConfirmationOnCompletionOfMemo"),
+		configMaid.listen("actions.timeoutOfConfirmationOnCompletionOfMemo"),
+		configMaid.listen("actions.alwaysOpenChangedFileOnCompletionOfMemo"),
+		configMaid.listen("actions.askForConfirmationOnCompletionOfMemos"),
+		configMaid.listen("actions.removeLineIfMemoIsOnSingleLine"),
+	]);
 }

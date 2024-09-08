@@ -7,7 +7,7 @@ type ListenList = {
 
 const configMaidInstances: ConfigMaid[] = [];
 
-export async function disposeConfigMaidInstances(): Promise<void> {
+export async function disposeAllConfigMaids(): Promise<void> {
 	for (const configMaid of configMaidInstances) {
 		await configMaid.dispose();
 	}

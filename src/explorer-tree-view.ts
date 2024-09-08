@@ -18,29 +18,32 @@ import { Janitor } from "./utils/janitor";
 let configMaid: ConfigMaid;
 let eventEmitter: EvEmitter.EventEmitter;
 
-let resolved = false;
-export async function resolver(): Promise<void> {
-	if (resolved) return;
-	resolved = true;
+export type ExplorerTreeView = typeof explorerTreeView;
 
-	configMaid = new ConfigMaid();
-	eventEmitter = await EvEmitter.getEventEmitter();
-
-	await Promise.all([
-		configMaid.listen("view.defaultView"),
-		configMaid.listen("view.expandPrimaryItemsByDefault"),
-		configMaid.listen("view.expandSecondaryItemsByDefault"),
-	]);
+export async function getExplorerTreeView(): Promise<typeof explorerTreeView> {
+	return explorerTreeView;
 }
 
-export class ExplorerTreeView {
-	memoFetcher: MemoFetcher;
-	viewProvider: ExplorerViewProvider;
+const explorerTreeView: {
+	memoFetcher?: MemoFetcher;
+	viewProvider?: ExplorerViewProvider;
 
-	private view: TreeView<ETItems.ExplorerTreeItemType>;
-	private janitor = new Janitor();
+	init(memoFetcher: MemoFetcher): Promise<void>;
+	dispose(): Promise<void>;
 
+	explorerExpandAll(): Promise<void>;
+	explorerCompleteAll(): Promise<void>;
+
+	updateViewType(view?: "File" | "Tag", options?: { noReload?: boolean }): Promise<void>;
+	updateItemCollapsibleState(): Promise<void>;
+	handleChangeVisibility(visible: boolean): Promise<void>;
+
+	view?: TreeView<ETItems.ExplorerTreeItemType>;
+	janitor: Janitor;
+} = {
 	async init(memoFetcher: MemoFetcher): Promise<void> {
+		if (!resolved) throw moduleUnresolvedError;
+
 		this.memoFetcher = memoFetcher;
 		this.viewProvider = new ExplorerViewProvider(memoFetcher);
 		await this.updateViewType(null, { noReload: true });
@@ -114,20 +117,49 @@ export class ExplorerTreeView {
 		);
 
 		await commands.executeCommand("setContext", "better-memo.explorerInitFinished", true);
-	}
+	},
 
 	async dispose(): Promise<void> {
 		await this.janitor.dispose();
-	}
+	},
 
-	private async updateViewType(view?: "File" | "Tag", options?: { noReload?: boolean }): Promise<void> {
+	async explorerExpandAll(): Promise<void> {
+		for (const item of this.viewProvider.items) this.view.reveal(item, { select: false, expand: 2 });
+	},
+
+	async explorerCompleteAll(): Promise<void> {
+		const { memoFetcher, viewProvider } = this;
+		await memoFetcher.suppressForceScan();
+		const memoCount = viewProvider.memoCount;
+		const items = viewProvider.items;
+		const completionDetails = `Are you sure you want to proceed?
+			This will mark all ${memoCount} memo${await Aux.plural(memoCount)} ${
+			viewProvider.viewType === "File" ? "in" : "under"
+		} ${items.length} ${viewProvider.viewType.toLowerCase()}${await Aux.plural(items)} as completed.`;
+		const option = await window.showInformationMessage(
+			"Confirm Completion of Memos",
+			{ modal: true, detail: completionDetails },
+			"Yes",
+			"No",
+		);
+		if (!option || option === "No") {
+			await memoFetcher.unsuppressForceScan();
+			return;
+		}
+		for (const item of items) await item.completeMemos(this, { noConfirmation: true, _noExtraTasks: true });
+		await memoFetcher.removeAllMemos();
+		await viewProvider.removeAllItems();
+		await viewProvider.refresh();
+	},
+
+	async updateViewType(view?: "File" | "Tag", options?: { noReload?: boolean }): Promise<void> {
 		this.viewProvider.viewType = view = view ?? (await configMaid.get("view.defaultView"));
 		await commands.executeCommand("setContext", "better-memo.explorerView", view);
 		if (options?.noReload) return;
 		await this.viewProvider.reloadItems();
-	}
+	},
 
-	private async updateItemCollapsibleState(): Promise<void> {
+	async updateItemCollapsibleState(): Promise<void> {
 		const expandPrimaryItems = await configMaid.get("view.expandPrimaryItemsByDefault");
 		const expandSecondaryItems = await configMaid.get("view.expandSecondaryItemsByDefault");
 		const onViewReveal = async () =>
@@ -154,45 +186,18 @@ export class ExplorerTreeView {
 		await this.view
 			.reveal(this.viewProvider.items[0], { select: false, focus: true })
 			.then(onViewReveal, async () => null);
-	}
+	},
 
-	private async handleChangeVisibility(visible: boolean): Promise<void> {
+	async handleChangeVisibility(visible: boolean): Promise<void> {
 		if (visible) {
 			await this.memoFetcher.disableBackgroundMode();
 			return;
 		}
 		await this.memoFetcher.enableBackgroundMode();
-	}
+	},
 
-	private async explorerCompleteAll(): Promise<void> {
-		const { memoFetcher, viewProvider } = this;
-		await memoFetcher.suppressForceScan();
-		const memoCount = viewProvider.memoCount;
-		const items = viewProvider.items;
-		const completionDetails = `Are you sure you want to proceed?
-			This will mark all ${memoCount} memo${await Aux.plural(memoCount)} ${
-			viewProvider.viewType === "File" ? "in" : "under"
-		} ${items.length} ${viewProvider.viewType.toLowerCase()}${await Aux.plural(items)} as completed.`;
-		const option = await window.showInformationMessage(
-			"Confirm Completion of Memos",
-			{ modal: true, detail: completionDetails },
-			"Yes",
-			"No",
-		);
-		if (!option || option === "No") {
-			await memoFetcher.unsuppressForceScan();
-			return;
-		}
-		for (const item of items) await item.completeMemos(this, { noConfirmation: true, _noExtraTasks: true });
-		await memoFetcher.removeAllMemos();
-		await viewProvider.removeAllItems();
-		await viewProvider.refresh();
-	}
-
-	private async explorerExpandAll(): Promise<void> {
-		for (const item of this.viewProvider.items) this.view.reveal(item, { select: false, expand: 2 });
-	}
-}
+	janitor: new Janitor(),
+};
 
 export class ExplorerViewProvider implements TreeDataProvider<ETItems.ExplorerTreeItemType> {
 	items: ETItems.InnerItemType[] = [];
@@ -205,7 +210,9 @@ export class ExplorerViewProvider implements TreeDataProvider<ETItems.ExplorerTr
 	readonly onDidChangeTreeData: Event<void | undefined | ETItems.ExplorerTreeItemType> =
 		this._onDidChangeTreeData.event;
 
-	constructor(private memoFetcher: MemoFetcher) {}
+	constructor(private memoFetcher: MemoFetcher) {
+		if (!resolved) throw moduleUnresolvedError;
+	}
 
 	async init(): Promise<void> {
 		await eventEmitter.wait("initExplorerView", async () => await this.reloadItems());
@@ -329,4 +336,20 @@ export class ExplorerViewProvider implements TreeDataProvider<ETItems.ExplorerTr
 
 		return innerItems;
 	}
+}
+
+let resolved = false;
+const moduleUnresolvedError = new Error("explorer-tree-view is not resolved");
+export async function resolver(): Promise<void> {
+	if (resolved) return;
+	resolved = true;
+
+	configMaid = new ConfigMaid();
+	eventEmitter = await EvEmitter.getEventEmitter();
+
+	await Promise.all([
+		configMaid.listen("view.defaultView"),
+		configMaid.listen("view.expandPrimaryItemsByDefault"),
+		configMaid.listen("view.expandSecondaryItemsByDefault"),
+	]);
 }
