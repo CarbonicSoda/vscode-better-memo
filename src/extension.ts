@@ -1,10 +1,10 @@
 import { disposeAllConfigMaids } from "./utils/config-maid";
 import { resolver as ETItemsResolve } from "./tree-items";
-import { resolver as ETViewResolve, vsTreeView, getTreeView } from "./tree-view";
+import { resolver as ETViewResolve, TreeView, getTreeView } from "./tree-view";
 import { resolver as MemoFetcherResolve, MemoFetcher, getMemoFetcher } from "./memo-fetcher";
 
 let memoFetcher: MemoFetcher;
-let explorerTreeView: vsTreeView;
+let explorerTreeView: TreeView;
 
 export async function activate(): Promise<void> {
 	await ETItemsResolve();
