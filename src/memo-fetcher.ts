@@ -73,6 +73,8 @@ const memoFetcher: {
 
 	backgroundMode: boolean;
 	backgroundScanQueue: Set<TextDocument>;
+	backgroundScanBuffer: number;
+	backgroundScanBufferMax: number;
 
 	janitor: Janitor;
 	intervalMaid: IntervalMaid;
@@ -80,6 +82,8 @@ const memoFetcher: {
 	prevDoc?: TextDocument;
 } = {
 	async init(): Promise<void> {
+		if (!resolved) throw moduleUnresolvedError;
+
 		await this.fetchMemos();
 
 		await this.janitor.add(
@@ -144,8 +148,6 @@ const memoFetcher: {
 				this.docMemos.set(doc, removed);
 			}
 		}
-		// for (const path of Object.keys(Aux.groupObjects(memos, "path")))
-		// 	workspace.openTextDocument(path).then(async (doc) => await this.scanDoc(doc));
 	},
 
 	async removeAllMemos(): Promise<void> {
@@ -179,9 +181,15 @@ const memoFetcher: {
 
 	async scanDoc(doc: TextDocument, options?: { updateView?: boolean }): Promise<void> {
 		if (this.backgroundMode) {
-			this.backgroundScanQueue.add(doc);
-			return;
+			if (this.backgroundScanBuffer < this.backgroundScanBufferMax) {
+				this.backgroundScanQueue.add(doc);
+				this.backgroundScanBuffer += doc.lineCount;
+				return;
+			} else {
+				this.backgroundScanBuffer -= doc.lineCount;
+			}
 		}
+
 		const docContent = doc.getText();
 		const langId = <keyof typeof LangCommentFormat>doc.languageId;
 		const commentFormats: { open: string; close?: string }[] = [LangCommentFormat[langId]].flat();
@@ -284,8 +292,10 @@ const memoFetcher: {
 
 	async disableBackgroundMode(): Promise<void> {
 		this.backgroundMode = false;
-		await Promise.all([...this.backgroundScanQueue].map(async (doc) => await this.scanDoc(doc)));
+		await Promise.all([...this.backgroundScanQueue].map(async (doc) => this.scanDoc(doc)));
 		this.backgroundScanQueue.clear();
+		this.backgroundScanBuffer = 0;
+		eventEmitter.emit("updateView");
 	},
 
 	async scanDocInterval(): Promise<void> {
@@ -340,6 +350,8 @@ const memoFetcher: {
 
 	backgroundMode: false,
 	backgroundScanQueue: new Set(),
+	backgroundScanBuffer: 0,
+	backgroundScanBufferMax: 1000,
 
 	janitor: new Janitor(),
 	intervalMaid: new IntervalMaid(),
