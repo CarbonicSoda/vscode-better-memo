@@ -4,11 +4,11 @@ import {
 	MarkdownString,
 	ThemeIcon,
 	TreeDataProvider,
-	TreeView,
-	EventEmitter as VSEventEmitter,
+	TreeView as vsTreeView,
+	EventEmitter as vsEventEmitter,
 	window,
 } from "vscode";
-import { ETItems } from "./explorer-tree-items";
+import { TreeItems } from "./tree-items";
 import { MemoEntry, MemoFetcher } from "./memo-fetcher";
 import { Aux } from "./utils/auxiliary";
 import { ConfigMaid } from "./utils/config-maid";
@@ -18,15 +18,15 @@ import { Janitor } from "./utils/janitor";
 let configMaid: ConfigMaid;
 let eventEmitter: EvEmitter.EventEmitter;
 
-export type ExplorerTreeView = typeof explorerTreeView;
+export type TreeView = typeof treeView;
 
-export async function getExplorerTreeView(): Promise<typeof explorerTreeView> {
-	return explorerTreeView;
+export async function getTreeView(): Promise<typeof treeView> {
+	return treeView;
 }
 
-const explorerTreeView: {
+const treeView: {
 	memoFetcher?: MemoFetcher;
-	viewProvider?: ExplorerViewProvider;
+	viewProvider?: ViewProvider;
 
 	init(memoFetcher: MemoFetcher): Promise<void>;
 	dispose(): Promise<void>;
@@ -38,14 +38,14 @@ const explorerTreeView: {
 	updateItemCollapsibleState(): Promise<void>;
 	handleChangeVisibility(visible: boolean): Promise<void>;
 
-	view?: TreeView<ETItems.ExplorerTreeItemType>;
+	view?: vsTreeView<TreeItems.TreeItemType>;
 	janitor: Janitor;
 } = {
 	async init(memoFetcher: MemoFetcher): Promise<void> {
 		if (!resolved) throw moduleUnresolvedError;
 
 		this.memoFetcher = memoFetcher;
-		this.viewProvider = new ExplorerViewProvider(memoFetcher);
+		this.viewProvider = new ViewProvider(memoFetcher);
 		await this.updateViewType(null, { noReload: true });
 		await this.viewProvider.init();
 		this.view = window.createTreeView("better-memo.memoExplorer", {
@@ -78,41 +78,41 @@ const explorerTreeView: {
 
 			commands.registerCommand(
 				"better-memo.navigateToFile",
-				async (fileItem: ETItems.FileItem) => await fileItem.navigate(),
+				async (fileItem: TreeItems.FileItem) => await fileItem.navigate(),
 			),
 			commands.registerCommand(
 				"better-memo.completeFile",
-				async (fileItem: ETItems.FileItem) => await fileItem.completeMemos(this),
+				async (fileItem: TreeItems.FileItem) => await fileItem.completeMemos(this),
 			),
 			commands.registerCommand(
 				"better-memo.completeFileNoConfirm",
-				async (fileItem: ETItems.FileItem) => await fileItem.completeMemos(this, { noConfirmation: true }),
+				async (fileItem: TreeItems.FileItem) => await fileItem.completeMemos(this, { noConfirmation: true }),
 			),
 
 			commands.registerCommand(
 				"better-memo.completeTag",
-				async (tagItem: ETItems.TagItem) => await tagItem.completeMemos(this),
+				async (tagItem: TreeItems.TagItem) => await tagItem.completeMemos(this),
 			),
 			commands.registerCommand(
 				"better-memo.completeTagNoConfirm",
-				async (tagItem: ETItems.TagItem) => await tagItem.completeMemos(this, { noConfirmation: true }),
+				async (tagItem: TreeItems.TagItem) => await tagItem.completeMemos(this, { noConfirmation: true }),
 			),
 
 			commands.registerCommand(
 				"better-memo.navigateToMemo",
-				async (memoItem: ETItems.MemoItem) => await memoItem.navigate(),
+				async (memoItem: TreeItems.MemoItem) => await memoItem.navigate(),
 			),
 			commands.registerCommand(
 				"better-memo.completeMemo",
-				async (memoItem: ETItems.MemoItem) => await memoItem.complete(this),
+				async (memoItem: TreeItems.MemoItem) => await memoItem.complete(this),
 			),
 			commands.registerCommand(
 				"better-memo.confirmCompleteMemo",
-				async (memoItem: ETItems.MemoItem) => await memoItem.complete(this),
+				async (memoItem: TreeItems.MemoItem) => await memoItem.complete(this),
 			),
 			commands.registerCommand(
 				"better-memo.completeMemoNoConfirm",
-				async (memoItem: ETItems.MemoItem) => await memoItem.complete(this, { noConfirmation: true }),
+				async (memoItem: TreeItems.MemoItem) => await memoItem.complete(this, { noConfirmation: true }),
 			),
 		);
 
@@ -199,16 +199,15 @@ const explorerTreeView: {
 	janitor: new Janitor(),
 };
 
-export class ExplorerViewProvider implements TreeDataProvider<ETItems.ExplorerTreeItemType> {
-	items: ETItems.InnerItemType[] = [];
-	memoCount = 0;
+export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 	viewType: "File" | "Tag";
+	items: TreeItems.InnerItemType[] = [];
+	memoCount = 0;
 
-	private _onDidChangeTreeData: VSEventEmitter<void | undefined | ETItems.ExplorerTreeItemType> = new VSEventEmitter<
-		void | undefined | ETItems.ExplorerTreeItemType
+	private _onDidChangeTreeData: vsEventEmitter<void | undefined | TreeItems.TreeItemType> = new vsEventEmitter<
+		void | undefined | TreeItems.TreeItemType
 	>();
-	readonly onDidChangeTreeData: Event<void | undefined | ETItems.ExplorerTreeItemType> =
-		this._onDidChangeTreeData.event;
+	readonly onDidChangeTreeData: Event<void | undefined | TreeItems.TreeItemType> = this._onDidChangeTreeData.event;
 
 	constructor(private memoFetcher: MemoFetcher) {
 		if (!resolved) throw moduleUnresolvedError;
@@ -218,20 +217,20 @@ export class ExplorerViewProvider implements TreeDataProvider<ETItems.ExplorerTr
 		await eventEmitter.wait("initExplorerView", async () => await this.reloadItems());
 	}
 
-	async getTreeItem(element: ETItems.ExplorerTreeItemType): Promise<ETItems.ExplorerTreeItemType> {
+	async getTreeItem(element: TreeItems.TreeItemType): Promise<TreeItems.TreeItemType> {
 		return element;
 	}
 
-	async getParent(element: ETItems.ExplorerTreeItemType): Promise<ETItems.InnerItemType> {
+	async getParent(element: TreeItems.TreeItemType): Promise<TreeItems.InnerItemType> {
 		return element.parent;
 	}
 
-	async getChildren(element: ETItems.InnerItemType | undefined): Promise<ETItems.ExplorerTreeItemType[]> {
+	async getChildren(element: TreeItems.InnerItemType | undefined): Promise<TreeItems.TreeItemType[]> {
 		if (element) return element.children;
 		return this.items;
 	}
 
-	async removeItems(...items: ETItems.InnerItemType[]): Promise<void> {
+	async removeItems(...items: TreeItems.InnerItemType[]): Promise<void> {
 		for (const item of items) {
 			if (!this.items.includes(item)) continue;
 			const itemIndex = this.items.indexOf(item);
@@ -248,11 +247,11 @@ export class ExplorerViewProvider implements TreeDataProvider<ETItems.ExplorerTr
 		this._onDidChangeTreeData.fire();
 	}
 
-	async refresh(item?: ETItems.ExplorerTreeItemType): Promise<void> {
+	async refresh(item?: TreeItems.TreeItemType): Promise<void> {
 		this._onDidChangeTreeData.fire(item);
 	}
 
-	private async getItems(): Promise<ETItems.InnerItemType[]> {
+	private async getItems(): Promise<TreeItems.InnerItemType[]> {
 		const isFileView = this.viewType === "File";
 		const expandPrimaryGroup = await configMaid.get("view.expandPrimaryItemsByDefault");
 		const expandSecondaryGroup = await configMaid.get("view.expandSecondaryItemsByDefault");
@@ -264,9 +263,9 @@ export class ExplorerViewProvider implements TreeDataProvider<ETItems.ExplorerTr
 		const inner = await Aux.groupObjects(memos, isFileView ? "path" : "tag");
 		const innerLabels = Object.keys(inner).sort();
 		const uInnerItems = innerLabels.map(
-			async (label) => new (isFileView ? ETItems.FileItem : ETItems.TagItem)(label, expandPrimaryGroup),
+			async (label) => new (isFileView ? TreeItems.FileItem : TreeItems.TagItem)(label, expandPrimaryGroup),
 		);
-		const innerItems: ETItems.InnerItemType[] = await Promise.all(uInnerItems);
+		const innerItems: TreeItems.InnerItemType[] = await Promise.all(uInnerItems);
 
 		for (let i = 0; i < innerLabels.length; i++) {
 			const innerLabel = innerLabels[i];
@@ -277,12 +276,14 @@ export class ExplorerViewProvider implements TreeDataProvider<ETItems.ExplorerTr
 			const halfLeafLabels = Object.keys(halfLeaves).sort();
 			const uHalfLeafItems = isFileView
 				? halfLeafLabels.map(
-						async (label) => new ETItems.TagItem(label, expandSecondaryGroup, <ETItems.FileItem>innerItem),
+						async (label) =>
+							new TreeItems.TagItem(label, expandSecondaryGroup, <TreeItems.FileItem>innerItem),
 				  )
 				: halfLeafLabels.map(
-						async (label) => new ETItems.FileItem(label, expandSecondaryGroup, <ETItems.TagItem>innerItem),
+						async (label) =>
+							new TreeItems.FileItem(label, expandSecondaryGroup, <TreeItems.TagItem>innerItem),
 				  );
-			const halfLeafItems: ETItems.InnerItemType[] = await Promise.all(uHalfLeafItems);
+			const halfLeafItems: TreeItems.InnerItemType[] = await Promise.all(uHalfLeafItems);
 			innerItem.children = halfLeafItems;
 
 			let childMemoCount = 0;
@@ -306,12 +307,12 @@ export class ExplorerViewProvider implements TreeDataProvider<ETItems.ExplorerTr
 				const tagColor = (<ThemeIcon>(isFileView ? halfLeafItem : innerItem).iconPath).color;
 				const maxPriority = Math.max(...memos.map((memo) => memo.priority));
 				const uMemoItems = memos.map(async (memo) => {
-					const memoItem = new ETItems.MemoItem(memo, <ETItems.InnerItemType>halfLeafItem);
+					const memoItem = new TreeItems.MemoItem(memo, <TreeItems.InnerItemType>halfLeafItem);
 					await memoItem.setIcon(tagColor, maxPriority);
 					return memoItem;
 				});
 				const memoItems = await Promise.all(uMemoItems);
-				(<ETItems.InnerItemType>halfLeafItem).children = memoItems;
+				(<TreeItems.InnerItemType>halfLeafItem).children = memoItems;
 				childMemoCount += memoItems.length;
 
 				halfLeafItem.description = `${memoItems.length} Memo${await Aux.plural(memoItems)}`;
@@ -339,7 +340,7 @@ export class ExplorerViewProvider implements TreeDataProvider<ETItems.ExplorerTr
 }
 
 let resolved = false;
-const moduleUnresolvedError = new Error("explorer-tree-view is not resolved");
+const moduleUnresolvedError = new Error("module tree-view is not resolved");
 export async function resolver(): Promise<void> {
 	if (resolved) return;
 	resolved = true;

@@ -12,7 +12,7 @@ import {
 	window,
 	workspace,
 } from "vscode";
-import { ExplorerTreeView, ExplorerViewProvider } from "./explorer-tree-view";
+import { TreeView, ViewProvider } from "./tree-view";
 import { MemoEntry } from "./memo-fetcher";
 import { Aux } from "./utils/auxiliary";
 import { ColorMaid, getColorMaid } from "./utils/color-maid";
@@ -22,9 +22,9 @@ import { FEdit } from "./utils/file-edit";
 let colorMaid: ColorMaid;
 let configMaid: ConfigMaid;
 
-export namespace ETItems {
+export namespace TreeItems {
 	export type InnerItemType = FileItem | TagItem;
-	export type ExplorerTreeItemType = ExplorerTreeItem | FileItem | TagItem | MemoItem;
+	export type TreeItemType = ExplorerTreeItem | FileItem | TagItem | MemoItem;
 
 	class ExplorerTreeItem extends TreeItem {
 		constructor(label: string, expand: boolean | "none", public parent?: InnerItemType) {
@@ -36,7 +36,7 @@ export namespace ETItems {
 			super(label, collapsibleState);
 		}
 
-		async removeFromTree(viewProvider: ExplorerViewProvider): Promise<InnerItemType | undefined> {
+		async removeFromTree(viewProvider: ViewProvider): Promise<InnerItemType | undefined> {
 			if (!this.parent) {
 				await viewProvider.removeItems(<InnerItemType>(<unknown>this));
 				return;
@@ -70,16 +70,16 @@ export namespace ETItems {
 		}
 
 		async completeMemos(
-			explorerTreeView: ExplorerTreeView,
+			treeView: TreeView,
 			options?: { noConfirmation?: boolean; _noExtraTasks?: boolean },
 		): Promise<void> {
-			const { memoFetcher, viewProvider } = explorerTreeView;
+			const { memoFetcher, viewProvider } = treeView;
 			await memoFetcher.suppressForceScan();
 			const memoEntries = await Promise.all(
 				(this.hierarchy === "primary"
 					? this.children.flatMap((child) => (<InnerItemType>child).children)
 					: this.children
-				).map(async (memoItem) => (<ETItems.MemoItem>memoItem).memoEntry),
+				).map(async (memoItem) => (<TreeItems.MemoItem>memoItem).memoEntry),
 			);
 
 			if (!options?.noConfirmation && (await configMaid.get("actions.askForConfirmationOnCompletionOfMemos"))) {
@@ -135,11 +135,8 @@ export namespace ETItems {
 			if (options?._noExtraTasks) return;
 			await memoFetcher.suppressForceScan();
 			await memoFetcher.removeMemos(...memoEntries);
-			viewProvider.reloadItems();
-			setTimeout(async () => {
-				memoFetcher.unsuppressForceScan();
-				// viewProvider.reloadItems();
-			}, 100); //maybe not needed since no blocking thread?
+			await viewProvider.reloadItems();
+			memoFetcher.unsuppressForceScan();
 		}
 	}
 
@@ -166,6 +163,7 @@ export namespace ETItems {
 	export class TagItem extends InnerItem {
 		constructor(tag: string, expand: boolean, parent?: FileItem) {
 			if (!resolved) throw moduleUnresolvedError;
+
 			super(tag, expand, "Tag", parent);
 		}
 	}
@@ -230,13 +228,13 @@ export namespace ETItems {
 			);
 		}
 
-		async complete(explorerTreeView: ExplorerTreeView, options?: { noConfirmation?: boolean }): Promise<void> {
-			const { memoFetcher, viewProvider } = explorerTreeView;
+		async complete(treeView: TreeView, options?: { noConfirmation?: boolean }): Promise<void> {
+			const { memoFetcher, viewProvider } = treeView;
 			await memoFetcher.unsuppressForceScan();
 			if (
 				!options?.noConfirmation &&
 				(await configMaid.get("actions.askForConfirmationOnCompletionOfMemo")) &&
-				!(await this.completionConfirmationHandle(explorerTreeView, { words: 3, maxLength: 12 }))
+				!(await this.completionConfirmationHandle(treeView, { words: 3, maxLength: 12 }))
 			)
 				return;
 			const memoEntry = this.memoEntry;
@@ -280,7 +278,7 @@ export namespace ETItems {
 		}
 
 		private async completionConfirmationHandle(
-			explorerTreeView: ExplorerTreeView,
+			treeView: TreeView,
 			labelOptions: { words?: number; maxLength: number },
 		): Promise<boolean> {
 			const setConfirmingItem = async (item: MemoItem) => {
@@ -293,7 +291,7 @@ export namespace ETItems {
 				};
 			};
 			const reset = async (confirmingItem: MemoItem, options?: { noRefresh?: boolean }) => {
-				await explorerTreeView.memoFetcher.unsuppressForceScan();
+				await treeView.memoFetcher.unsuppressForceScan();
 				clearInterval(confirmingItem.confirmInterval);
 				clearTimeout(confirmingItem.confirmTimeout);
 				confirmingItem.attemptedToComplete = false;
@@ -309,7 +307,7 @@ export namespace ETItems {
 					currentBackup.contextValue,
 				];
 				if (options?.noRefresh) return;
-				await explorerTreeView.viewProvider.refresh(confirmingItem);
+				await treeView.viewProvider.refresh(confirmingItem);
 			};
 
 			let currentTarget = MemoItem.currentCompletionConfirmationTarget;
@@ -336,14 +334,14 @@ export namespace ETItems {
 			this.label = abbrevLabel;
 			this.contextValue = "MemoWaitingForCompletionConfirmation";
 
-			await explorerTreeView.memoFetcher.suppressForceScan();
+			await treeView.memoFetcher.suppressForceScan();
 			const timeout = await configMaid.get("actions.timeoutOfConfirmationOnCompletionOfMemo");
 			let time = timeout;
 			const updateTime = async (time: number) => {
 				this.description = `Confirm in ${Math.round(time / 1000)}`;
 				const gbVal = (255 * time) / timeout;
 				this.iconPath = new ThemeIcon("loading~spin", await colorMaid.interpolate([255, gbVal, gbVal]));
-				explorerTreeView.viewProvider.refresh(this);
+				treeView.viewProvider.refresh(this);
 			};
 			await updateTime(timeout);
 			this.confirmInterval = setInterval(
@@ -362,7 +360,7 @@ export namespace ETItems {
 }
 
 let resolved = false;
-const moduleUnresolvedError = new Error("explorer-tree-items is not resolved");
+const moduleUnresolvedError = new Error("module tree-items is not resolved");
 export async function resolver(): Promise<void> {
 	if (resolved) return;
 	resolved = true;
