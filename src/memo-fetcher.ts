@@ -1,11 +1,11 @@
 import { commands, TabGroup, TextDocument, ThemeColor, Uri, window, workspace } from "vscode";
 import { Aux } from "./utils/auxiliary";
-import { ColorMaid, getColorMaid } from "./utils/color-maid";
-import { ConfigMaid } from "./utils/config-maid";
-import { EvEmitter } from "./utils/event-emitter";
-import { FEdit } from "./utils/file-edit";
-import { IntervalMaid } from "./utils/interval-maid";
-import { Janitor } from "./utils/janitor";
+import { Colors } from "./utils/colors";
+import { Janitor, getJanitor } from "./utils/janitor";
+import { ConfigMaid, getConfigMaid } from "./utils/config-maid";
+import { IntervalMaid, getIntervalMaid } from "./utils/interval-maid";
+import { EventEmitter, getEventEmitter } from "./utils/event-emitter";
+import { FileEdit } from "./utils/file-edit";
 
 import LangCommentFormat from "./json/lang-comment-format.json";
 
@@ -22,20 +22,14 @@ export type MemoEntry = {
 	readonly rawLength: number;
 };
 
-let commentCloseCharacters: string;
-let colorMaid: ColorMaid;
-let configMaid: ConfigMaid;
-let eventEmitter: EvEmitter.EventEmitter;
-
 export type MemoFetcher = typeof memoFetcher;
 
-export async function getMemoFetcher(): Promise<typeof memoFetcher> {
+export async function getMemoFetcher(): Promise<MemoFetcher> {
 	return memoFetcher;
 }
 
 const memoFetcher: {
 	init(): Promise<void>;
-	dispose(): Promise<void>;
 
 	watches(path: string): Promise<boolean>;
 	includes(memo: MemoEntry): Promise<boolean>;
@@ -81,15 +75,52 @@ const memoFetcher: {
 	backgroundScanBuffer: number;
 	backgroundScanBufferMax: number;
 
-	janitor: Janitor;
-	intervalMaid: IntervalMaid;
-
 	previousFocusedDocument?: TextDocument;
+
+	commentCloseCharacters?: string;
+	janitor?: Janitor;
+	configMaid?: ConfigMaid;
+	intervalMaid?: IntervalMaid;
+	eventEmitter?: EventEmitter;
 } = {
 	async init(): Promise<void> {
-		if (!resolved) throw moduleUnresolvedError;
+		const tmp = (
+			await Aux.asyncFor(
+				Object.values(LangCommentFormat).flat(),
+				async (format) => (<{ open: string; close?: string }>format).close,
+			)
+		)
+			.join("")
+			.split("");
+		this.commentCloseCharacters = await Aux.reEscape([...new Set(tmp)].join(""));
 
-		await this.fetchMemos();
+		this.janitor = await getJanitor();
+		this.configMaid = await getConfigMaid();
+		this.intervalMaid = await getIntervalMaid();
+		this.eventEmitter = await getEventEmitter();
+
+		await Promise.all([
+			this.configMaid.listen("general.customTags"),
+			this.configMaid.listen({
+				"fetcher.watch": async (watch: string[]) => `{${watch.join(",")}}`,
+				"fetcher.ignore": async (ignore: string[]) => `{${ignore.join(",")}}`,
+			}),
+		]);
+
+		await Promise.all([
+			this.intervalMaid.add(async () => await this.scanDocInterval(), "fetcher.scanDelay", {
+				min: 100,
+				max: 1000000,
+			}),
+			this.intervalMaid.add(async () => await this.forceScanInterval(), "fetcher.forceScanDelay", {
+				min: 500,
+				max: 5000000,
+			}),
+			this.intervalMaid.add(async () => await this.fetchDocs(), "fetcher.workspaceScanDelay", {
+				min: 1000,
+				max: 10000000,
+			}),
+		]);
 
 		await this.janitor.add(
 			workspace.onDidCreateFiles(async () => await this.fetchDocs()),
@@ -100,9 +131,9 @@ const memoFetcher: {
 			}),
 			window.tabGroups.onDidChangeTabGroups(async (ev) => await this.onTabChange(ev.changed)),
 
-			configMaid.onChange("general.customTags", async () => {
+			this.configMaid.onChange("general.customTags", async () => {
 				this.customTagsChanged = true;
-				eventEmitter.emit("updateView");
+				this.eventEmitter.emit("updateView");
 			}),
 
 			commands.registerCommand(
@@ -111,19 +142,10 @@ const memoFetcher: {
 			),
 		);
 
-		await Promise.all([
-			this.intervalMaid.add(async () => await this.scanDocInterval(), "fetcher.scanDelay", 100, 1000000),
-			this.intervalMaid.add(async () => await this.forceScanInterval(), "fetcher.forceScanDelay", 500, 5000000),
-			this.intervalMaid.add(async () => await this.fetchDocs(), "fetcher.workspaceScanDelay", 1000, 10000000),
-		]);
+		await this.fetchMemos();
 
-		eventEmitter.emitWait("initExplorerView");
-		eventEmitter.emitWait("initTextEditorCommands");
-	},
-
-	async dispose(): Promise<void> {
-		await this.janitor.dispose();
-		await this.intervalMaid.dispose();
+		this.eventEmitter.emitWait("initExplorerView");
+		this.eventEmitter.emitWait("initTextEditorCommands");
 	},
 
 	async watches(docOrPath: TextDocument | string): Promise<boolean> {
@@ -146,14 +168,14 @@ const memoFetcher: {
 	},
 
 	async fetchCustomTags(): Promise<{ [tag: string]: ThemeColor }> {
-		const customTags = await configMaid.get("general.customTags");
-		const validTagRE = RegExp(`^[^\\r\\n\t ${commentCloseCharacters}]+$`);
+		const customTags = await this.configMaid.get("general.customTags");
+		const validTagRE = RegExp(`^[^\\r\\n\t ${this.commentCloseCharacters}]+$`);
 		const validHexRE = /(?:^#?[0-9a-f]{6}$)|(?:^#?[0-9a-f]{3}$)/i;
 		const uValidCustomTags: { [tag: string]: Promise<ThemeColor> } = {};
 		await Aux.asyncFor(Object.entries(customTags), async ([tag, hex]) => {
 			[tag, hex] = [tag.trim().toUpperCase(), (<string>hex).trim()];
 			if (!validTagRE.test(tag) || !validHexRE.test(<string>hex)) return;
-			uValidCustomTags[tag] = colorMaid.interpolate(<string>hex);
+			uValidCustomTags[tag] = Colors.interpolate(<string>hex);
 		});
 		return await Aux.promiseProps(uValidCustomTags);
 	},
@@ -166,7 +188,7 @@ const memoFetcher: {
 		}
 		const uMemoTags = {};
 		await Aux.asyncFor(tags, async (tag) => {
-			if (!this.customTagsToColor[tag]) uMemoTags[tag] = colorMaid.hashColor(tag);
+			if (!this.customTagsToColor[tag]) uMemoTags[tag] = Colors.hashColor(tag);
 		});
 		return Object.assign(await Aux.promiseProps(uMemoTags), this.customTagsToColor);
 	},
@@ -192,8 +214,8 @@ const memoFetcher: {
 	},
 
 	async fetchDocs(): Promise<void> {
-		const watch = await configMaid.get("fetcher.watch");
-		const ignore = await configMaid.get("fetcher.ignore");
+		const watch = await this.configMaid.get("fetcher.watch");
+		const ignore = await this.configMaid.get("fetcher.ignore");
 
 		const getDoc = async (uri: Uri) => {
 			try {
@@ -239,9 +261,9 @@ const memoFetcher: {
 		const commentFormatREs = await Aux.asyncFor(commentFormats, async (data, i) => {
 			const open = await Aux.reEscape(data.open);
 			const close = await Aux.reEscape(data.close ?? "");
-			return `(?<![${open}])${open}[\\t ]*mo[\\t ]+(?<tag${i}>[^\\r\\n\\t ${commentCloseCharacters}]+)[\\t ]*(?<priority${i}>!*)(?<content${i}>.*${
-				close ? "?" : ""
-			})${close}`;
+			return `(?<![${open}])${open}[\\t ]*mo[\\t ]+(?<tag${i}>[^\\r\\n\\t ${
+				this.commentCloseCharacters
+			}]+)[\\t ]*(?<priority${i}>!*)(?<content${i}>.*${close ? "?" : ""})${close}`;
 		});
 		const matchPatternRaw = `(?:${commentFormatREs.join(")|(?:")})`;
 		const matchPattern = RegExp(matchPatternRaw, "gim");
@@ -281,13 +303,13 @@ const memoFetcher: {
 			});
 		});
 		this.documentToMemosMap.set(doc, memos);
-		if (options?.updateView) await eventEmitter.emit("updateView");
+		if (options?.updateView) await this.eventEmitter.emit("updateView");
 	},
 
 	async fetchMemos(options?: { updateView?: boolean }): Promise<void> {
 		await this.fetchDocs();
 		await Aux.asyncFor(this.watchedDocsToInfoMap.keys(), async (doc) => await this.scanDoc(doc));
-		if (options?.updateView) await eventEmitter.emit("updateView");
+		if (options?.updateView) await this.eventEmitter.emit("updateView");
 	},
 
 	async getFormattedMemo(memo: MemoEntry): Promise<string> {
@@ -305,7 +327,7 @@ const memoFetcher: {
 		const formatMemo = async (memo: MemoEntry) =>
 			await edit.replace(doc.uri, [memo.offset, memo.offset + memo.rawLength], await this.getFormattedMemo(memo));
 
-		const edit = new FEdit.FileEdit();
+		const edit = new FileEdit();
 		await Aux.asyncFor(memos, async (memo: MemoEntry) => await formatMemo(memo));
 		await edit.apply({ isRefactoring: true });
 	},
@@ -327,7 +349,7 @@ const memoFetcher: {
 		await Aux.asyncFor(this.backgroundScanQueue, async (doc) => await this.scanDoc(doc));
 		this.backgroundScanQueue.clear();
 		this.backgroundScanBuffer = 0;
-		await eventEmitter.emit("updateView");
+		await this.eventEmitter.emit("updateView");
 	},
 
 	async scanDocInterval(): Promise<void> {
@@ -391,37 +413,4 @@ const memoFetcher: {
 	backgroundScanQueue: new Set(),
 	backgroundScanBuffer: 0,
 	backgroundScanBufferMax: 1000,
-
-	janitor: new Janitor(),
-	intervalMaid: new IntervalMaid(),
 };
-
-let resolved = false;
-const moduleUnresolvedError = new Error("memo-fetcher is not resolved");
-export async function resolver(): Promise<void> {
-	if (resolved) return;
-	resolved = true;
-
-	const tmp = (
-		await Aux.asyncFor(
-			Object.values(LangCommentFormat).flat(),
-			async (format) => (<{ open: string; close?: string }>format).close,
-		)
-	)
-		.join("")
-		.split("");
-	commentCloseCharacters = await Aux.reEscape([...new Set(tmp)].join(""));
-
-	colorMaid = await getColorMaid();
-	configMaid = new ConfigMaid();
-	eventEmitter = await EvEmitter.getEventEmitter();
-
-	await Promise.all([
-		configMaid.listen("general.customTags"),
-
-		configMaid.listen({
-			"fetcher.watch": async (watch) => `{${watch.join(",")}}`,
-			"fetcher.ignore": async (ignore) => `{${ignore.join(",")}}`,
-		}),
-	]);
-}

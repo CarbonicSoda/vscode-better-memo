@@ -12,14 +12,13 @@ import {
 	window,
 	workspace,
 } from "vscode";
+import { Aux } from "./utils/auxiliary";
+import { Colors } from "./utils/colors";
+import { ConfigMaid, getConfigMaid } from "./utils/config-maid";
+import { FileEdit } from "./utils/file-edit";
 import { TreeView, ViewProvider } from "./tree-view";
 import { MemoEntry } from "./memo-fetcher";
-import { Aux } from "./utils/auxiliary";
-import { ColorMaid, getColorMaid } from "./utils/color-maid";
-import { ConfigMaid } from "./utils/config-maid";
-import { FEdit } from "./utils/file-edit";
 
-let colorMaid: ColorMaid;
 let configMaid: ConfigMaid;
 
 export namespace TreeItems {
@@ -116,7 +115,7 @@ export namespace TreeItems {
 			);
 			await viewProvider.reloadItems();
 
-			const edit = new FEdit.FileEdit();
+			const edit = new FileEdit();
 			await Aux.asyncFor(memoEntries, async (memoEntry) => {
 				if (!(await memoFetcher.includes(memoEntry))) return;
 
@@ -212,7 +211,7 @@ export namespace TreeItems {
 			}
 			this.iconPath = new ThemeIcon(
 				"circle-outline",
-				await colorMaid.interpolate([255, (1 - this.memoEntry.priority / maxPriority) * 255, 0]),
+				await Colors.interpolate([255, (1 - this.memoEntry.priority / maxPriority) * 255, 0]),
 			);
 		}
 
@@ -259,7 +258,7 @@ export namespace TreeItems {
 			const start = doc.positionAt(memoEntry.offset);
 			const end = doRemoveLine ? new Position(memoEntry.line + 1, 0) : start.translate(0, memoEntry.rawLength);
 			const range = new Range(start, end);
-			const edit = new FEdit.FileEdit();
+			const edit = new FileEdit();
 			await edit.delete(doc.uri, range);
 			await memoFetcher.removeMemo(memoEntry);
 			viewProvider.refresh(await this.removeFromTree(viewProvider));
@@ -335,7 +334,7 @@ export namespace TreeItems {
 			const updateTime = async (time: number) => {
 				this.description = `Confirm in ${Math.round(time / 1000)}`;
 				const gbVal = (255 * time) / timeout;
-				this.iconPath = new ThemeIcon("loading~spin", await colorMaid.interpolate([255, gbVal, gbVal]));
+				this.iconPath = new ThemeIcon("loading~spin", await Colors.interpolate([255, gbVal, gbVal]));
 				await treeView.viewProvider.refresh(this);
 			};
 			await updateTime(timeout);
@@ -360,9 +359,7 @@ export async function resolver(): Promise<void> {
 	if (resolved) return;
 	resolved = true;
 
-	colorMaid = await getColorMaid();
-	configMaid = new ConfigMaid();
-
+	configMaid = await getConfigMaid();
 	await Promise.all([
 		configMaid.listen("actions.askForConfirmationOnCompletionOfMemo"),
 		configMaid.listen("actions.timeoutOfConfirmationOnCompletionOfMemo"),

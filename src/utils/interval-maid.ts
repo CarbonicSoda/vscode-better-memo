@@ -1,11 +1,29 @@
 import { Aux } from "./auxiliary";
-import { ConfigMaid } from "./config-maid";
-import { Janitor } from "./janitor";
+import { Janitor, getJanitor } from "./janitor";
+import { ConfigMaid, getConfigMaid } from "./config-maid";
 
-export class IntervalMaid {
-	private configMaid = new ConfigMaid();
-	private intervalJanitor = new Janitor();
+export type IntervalMaid = typeof intervalMaid;
 
+export async function getIntervalMaid(): Promise<IntervalMaid> {
+	if (!resolved) throw moduleUnresolvedError;
+
+	return intervalMaid;
+}
+
+const intervalMaid: {
+	add(
+		callback: () => void | Promise<void>,
+		delayConfigName: string,
+		delayClamp?: { min: number; max: number },
+		configCallback?: (retrieved: any) => any,
+	): Promise<number>;
+
+	clear(intervalId: number): Promise<void>;
+	clearAll(): Promise<void>;
+
+	configMaid?: ConfigMaid;
+	janitor?: Janitor;
+} = {
 	async add(
 		callback: () => void | Promise<void>,
 		delayConfigName: string,
@@ -13,26 +31,29 @@ export class IntervalMaid {
 		configCallback?: (retrieved: any) => any,
 	): Promise<number> {
 		await this.configMaid.listen(delayConfigName, configCallback);
-		const intervalId = await this.intervalJanitor.add(
-			setInterval(callback, await this.configMaid.get(delayConfigName)),
-		);
-		await this.configMaid.onChange(delayConfigName, async (newDelay) => {
-			if (delayClamp) newDelay = Aux.clamp(newDelay, delayClamp.min, delayClamp.max);
-			await this.intervalJanitor.override(intervalId, setInterval(callback, newDelay));
+		const intervalId = await this.janitor.add(setInterval(callback, await this.configMaid.get(delayConfigName)));
+		await this.configMaid.onChange(delayConfigName, async (newDelay: number) => {
+			if (delayClamp) newDelay = await Aux.clamp(newDelay, delayClamp.min, delayClamp.max);
+			await this.janitor.override(intervalId, setInterval(callback, newDelay));
 		});
 		return intervalId;
-	}
+	},
 
 	async clear(intervalId: number): Promise<void> {
-		await this.intervalJanitor.clear(intervalId);
-	}
+		await this.janitor.clear(intervalId);
+	},
 
 	async clearAll(): Promise<void> {
-		await this.intervalJanitor.clearAll();
-	}
+		await this.janitor.clearAll();
+	},
+};
 
-	async dispose(): Promise<void> {
-		await this.configMaid.dispose();
-		await this.intervalJanitor.dispose();
-	}
+let resolved = false;
+const moduleUnresolvedError = new Error("interval-maid is not resolved");
+export async function resolver(): Promise<void> {
+	if (resolved) return;
+	resolved = true;
+
+	intervalMaid.configMaid = await getConfigMaid();
+	intervalMaid.janitor = await getJanitor();
 }

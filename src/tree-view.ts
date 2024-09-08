@@ -9,28 +9,25 @@ import {
 	window,
 	TreeViewVisibilityChangeEvent,
 } from "vscode";
+import { Aux } from "./utils/auxiliary";
 import { TreeItems } from "./tree-items";
 import { MemoEntry, MemoFetcher } from "./memo-fetcher";
-import { Aux } from "./utils/auxiliary";
-import { ConfigMaid } from "./utils/config-maid";
-import { EvEmitter } from "./utils/event-emitter";
-import { Janitor } from "./utils/janitor";
-
-let configMaid: ConfigMaid;
-let eventEmitter: EvEmitter.EventEmitter;
+import { Janitor, getJanitor } from "./utils/janitor";
+import { ConfigMaid, getConfigMaid } from "./utils/config-maid";
+import { EventEmitter, getEventEmitter } from "./utils/event-emitter";
 
 export type TreeView = typeof treeView;
 
-export async function getTreeView(): Promise<typeof treeView> {
+export async function getTreeView(): Promise<TreeView> {
 	return treeView;
 }
 
 const treeView: {
 	memoFetcher?: MemoFetcher;
 	viewProvider?: ViewProvider;
+	view?: vsTreeView<TreeItems.TreeItemType>;
 
 	init(memoFetcher: MemoFetcher): Promise<void>;
-	dispose(): Promise<void>;
 
 	explorerExpandAll(): Promise<void>;
 	explorerCompleteAll(): Promise<void>;
@@ -39,11 +36,20 @@ const treeView: {
 	updateItemCollapsibleState(): Promise<void>;
 	handleChangeVisibility(visible: boolean): Promise<void>;
 
-	view?: vsTreeView<TreeItems.TreeItemType>;
-	janitor: Janitor;
+	janitor?: Janitor;
+	configMaid?: ConfigMaid;
+	eventEmitter?: EventEmitter;
 } = {
 	async init(memoFetcher: MemoFetcher): Promise<void> {
-		if (!resolved) throw moduleUnresolvedError;
+		this.janitor = await getJanitor();
+		this.configMaid = await getConfigMaid();
+		this.eventEmitter = await getEventEmitter();
+
+		await Promise.all([
+			this.configMaid.listen("view.defaultView"),
+			this.configMaid.listen("view.expandPrimaryItemsByDefault"),
+			this.configMaid.listen("view.expandSecondaryItemsByDefault"),
+		]);
 
 		this.memoFetcher = memoFetcher;
 		this.viewProvider = new ViewProvider(memoFetcher);
@@ -56,8 +62,11 @@ const treeView: {
 		});
 
 		await Promise.all([
-			configMaid.onChange("view.defaultView", async (view: "File" | "Tag") => await this.updateViewType(view)),
-			configMaid.onChange(
+			this.configMaid.onChange(
+				"view.defaultView",
+				async (view: "File" | "Tag") => await this.updateViewType(view),
+			),
+			this.configMaid.onChange(
 				["view.expandPrimaryItemsByDefault", "view.expandSecondaryItemsByDefault"],
 				async () => await this.updateItemCollapsibleState(),
 			),
@@ -66,7 +75,7 @@ const treeView: {
 		await this.janitor.add(
 			this.view,
 
-			eventEmitter.subscribe("updateView", async () => await this.viewProvider.reloadItems()),
+			this.eventEmitter.subscribe("updateView", async () => await this.viewProvider.reloadItems()),
 
 			window.onDidChangeActiveColorTheme(async () => await this.viewProvider.reloadItems()),
 
@@ -122,10 +131,6 @@ const treeView: {
 		await commands.executeCommand("setContext", "better-memo.explorerInitFinished", true);
 	},
 
-	async dispose(): Promise<void> {
-		await this.janitor.dispose();
-	},
-
 	async explorerExpandAll(): Promise<void> {
 		await Aux.asyncFor(
 			this.viewProvider.items,
@@ -161,15 +166,15 @@ const treeView: {
 	},
 
 	async updateViewType(view?: "File" | "Tag", options?: { noReload?: boolean }): Promise<void> {
-		this.viewProvider.viewType = view = view ?? (await configMaid.get("view.defaultView"));
+		this.viewProvider.viewType = view = view ?? (await this.configMaid.get("view.defaultView"));
 		await commands.executeCommand("setContext", "better-memo.explorerView", view);
 		if (options?.noReload) return;
 		await this.viewProvider.reloadItems();
 	},
 
 	async updateItemCollapsibleState(): Promise<void> {
-		const expandPrimaryItems = await configMaid.get("view.expandPrimaryItemsByDefault");
-		const expandSecondaryItems = await configMaid.get("view.expandSecondaryItemsByDefault");
+		const expandPrimaryItems = await this.configMaid.get("view.expandPrimaryItemsByDefault");
+		const expandSecondaryItems = await this.configMaid.get("view.expandSecondaryItemsByDefault");
 
 		const onViewReveal = async () => {
 			await commands.executeCommand("list.collapseAll");
@@ -209,8 +214,6 @@ const treeView: {
 		}
 		await this.memoFetcher.enableBackgroundMode();
 	},
-
-	janitor: new Janitor(),
 };
 
 export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
@@ -223,12 +226,10 @@ export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 	>();
 	readonly onDidChangeTreeData: Event<void | undefined | TreeItems.TreeItemType> = this._onDidChangeTreeData.event;
 
-	constructor(private memoFetcher: MemoFetcher) {
-		if (!resolved) throw moduleUnresolvedError;
-	}
+	constructor(private memoFetcher: MemoFetcher) {}
 
 	async init(): Promise<void> {
-		await eventEmitter.wait("initExplorerView", async () => await this.reloadItems());
+		await treeView.eventEmitter.wait("initExplorerView", async () => await this.reloadItems());
 	}
 
 	async getTreeItem(element: TreeItems.TreeItemType): Promise<TreeItems.TreeItemType> {
@@ -267,8 +268,8 @@ export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 
 	private async getItems(): Promise<TreeItems.InnerItemType[]> {
 		const isFileView = this.viewType === "File";
-		const expandPrimaryGroup = await configMaid.get("view.expandPrimaryItemsByDefault");
-		const expandSecondaryGroup = await configMaid.get("view.expandSecondaryItemsByDefault");
+		const expandPrimaryGroup = await treeView.configMaid.get("view.expandPrimaryItemsByDefault");
+		const expandSecondaryGroup = await treeView.configMaid.get("view.expandSecondaryItemsByDefault");
 
 		const memos = await this.memoFetcher.getMemos();
 		const tags = await this.memoFetcher.getTags();
@@ -351,20 +352,4 @@ export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 
 		return innerItems;
 	}
-}
-
-let resolved = false;
-const moduleUnresolvedError = new Error("module tree-view is not resolved");
-export async function resolver(): Promise<void> {
-	if (resolved) return;
-	resolved = true;
-
-	configMaid = new ConfigMaid();
-	eventEmitter = await EvEmitter.getEventEmitter();
-
-	await Promise.all([
-		configMaid.listen("view.defaultView"),
-		configMaid.listen("view.expandPrimaryItemsByDefault"),
-		configMaid.listen("view.expandSecondaryItemsByDefault"),
-	]);
 }
