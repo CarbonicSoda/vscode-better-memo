@@ -56,7 +56,7 @@ const janitor: {
 
 	async clear(id: number): Promise<void> {
 		if (this.managed[id]?.length === 0) return;
-		await Aux.asyncFor(this.managed[id], async (instance) => {
+		await Aux.async.aFor(this.managed[id], async (instance) => {
 			(<{ dispose?: (...args: any) => any }>instance).dispose?.();
 			try {
 				clearTimeout(<NodeJS.Timeout>instance);
@@ -67,7 +67,7 @@ const janitor: {
 	},
 
 	async clearAll(): Promise<void> {
-		await Aux.asyncRange(this.autoIncrementInstanceID, async (i) => await this.clear(i));
+		await Aux.async.aRange(this.autoIncrementInstanceID, async (i) => await this.clear(i));
 	},
 
 	async override(

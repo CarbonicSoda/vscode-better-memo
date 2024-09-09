@@ -62,7 +62,7 @@ export namespace TreeItems {
 		}
 
 		async removeChildren(...children: ExplorerTreeItem[]): Promise<void> {
-			await Aux.asyncFor(children, async (child) => {
+			await Aux.async.aFor(children, async (child) => {
 				if (!this.children.includes(child)) return;
 				const childIndex = this.children.indexOf(child);
 				this.children = this.children.filter((_, i) => i !== childIndex);
@@ -75,7 +75,7 @@ export namespace TreeItems {
 		): Promise<void> {
 			const { memoFetcher, viewProvider } = treeView;
 			await memoFetcher.suppressForceScan();
-			const memoEntries = await Aux.asyncFor(
+			const memoEntries = await Aux.async.aFor(
 				this.hierarchy === "primary"
 					? this.children.flatMap((child: InnerItemType) => child.children)
 					: this.children,
@@ -88,7 +88,7 @@ export namespace TreeItems {
 				await viewProvider.refresh(this);
 
 				const completionDetails = `Are you sure you want to proceed?
-					This will mark all ${memoEntries.length} memo${await Aux.plural(memoEntries)} ${
+					This will mark all ${memoEntries.length} memo${await Aux.string.plural(memoEntries)} ${
 					this.contextValue === "File" ? "in" : "under"
 				} the ${this.contextValue.toLowerCase()} ${this.label} as completed.`;
 				const option = await window.showInformationMessage(
@@ -106,8 +106,8 @@ export namespace TreeItems {
 				}
 			}
 
-			await Aux.asyncFor(
-				new Set(await Aux.asyncFor(memoEntries, async (memoEntry) => memoEntry.path)),
+			await Aux.async.aFor(
+				new Set(await Aux.async.aFor(memoEntries, async (memoEntry) => memoEntry.path)),
 				async (path) => {
 					const doc = await workspace.openTextDocument(path);
 					await memoFetcher.scanDoc(doc);
@@ -116,14 +116,13 @@ export namespace TreeItems {
 			await viewProvider.reloadItems();
 
 			const edit = new FileEdit();
-			await Aux.asyncFor(memoEntries, async (memoEntry) => {
+			await Aux.async.aFor(memoEntries, async (memoEntry) => {
 				if (!(await memoFetcher.includes(memoEntry))) return;
 
 				const doc = await workspace.openTextDocument(memoEntry.path);
-				const memoRE = RegExp(
-					`(?:${await Aux.reEscape(memoEntry.raw)})|(?:${await Aux.reEscape(
-						await memoFetcher.getFormattedMemo(memoEntry),
-					)})`,
+				const memoRE = await Aux.re.concat(
+					await Aux.re.escape(memoEntry.raw),
+					await Aux.re.escape(await memoFetcher.getFormattedMemo(memoEntry)),
 				);
 				const doRemoveLine =
 					(await configMaid.get("actions.removeLineIfMemoIsOnSingleLine")) &&
@@ -236,14 +235,14 @@ export namespace TreeItems {
 				return;
 
 			const memoEntry = this.memoEntry;
-			const memoRE = RegExp(
-				`${await Aux.reEscape(memoEntry.raw)}|${await Aux.reEscape(
-					await memoFetcher.getFormattedMemo(memoEntry),
-				)}`,
+			const memoRE = await Aux.re.concat(
+				await Aux.re.escape(memoEntry.raw),
+				await Aux.re.escape(await memoFetcher.getFormattedMemo(memoEntry)),
 			);
 			const doc = await workspace.openTextDocument(memoEntry.path);
-			
+
 			if (!memoRE.test(doc.lineAt(memoEntry.line).text)) {
+				//FIX
 				await memoFetcher.scanDoc(doc);
 				await viewProvider.reloadItems();
 				return;

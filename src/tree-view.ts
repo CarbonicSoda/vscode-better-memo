@@ -132,7 +132,7 @@ const treeView: {
 	},
 
 	async explorerExpandAll(): Promise<void> {
-		await Aux.asyncFor(
+		await Aux.async.aFor(
 			this.viewProvider.items,
 			async (item) => await this.view.reveal(item, { select: false, expand: 2 }),
 		);
@@ -145,9 +145,9 @@ const treeView: {
 		const items = viewProvider.items;
 
 		const completionDetails = `Are you sure you want to proceed?
-			This will mark all ${memoCount} memo${await Aux.plural(memoCount)} ${
+			This will mark all ${memoCount} memo${await Aux.string.plural(memoCount)} ${
 			viewProvider.viewType === "File" ? "in" : "under"
-		} ${items.length} ${viewProvider.viewType.toLowerCase()}${await Aux.plural(items)} as completed.`;
+		} ${items.length} ${viewProvider.viewType.toLowerCase()}${await Aux.string.plural(items)} as completed.`;
 		const option = await window.showInformationMessage(
 			"Confirm Completion of Memos",
 			{ modal: true, detail: completionDetails },
@@ -180,7 +180,7 @@ const treeView: {
 			await commands.executeCommand("list.collapseAll");
 			if (expandSecondaryItems) {
 				const uRevealPromises = [];
-				await Aux.asyncFor(
+				await Aux.async.aFor(
 					this.viewProvider.items.flatMap((item: TreeItems.InnerItemType) => item.children),
 					async (child) => uRevealPromises.push(this.view.reveal(child, { select: false, expand: true })),
 				);
@@ -246,7 +246,7 @@ export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 	}
 
 	async removeItems(...items: TreeItems.InnerItemType[]): Promise<void> {
-		await Aux.asyncFor(items, async (item) => {
+		await Aux.async.aFor(items, async (item) => {
 			if (!this.items.includes(item)) return;
 			const itemIndex = this.items.indexOf(item);
 			this.items = this.items.filter((_, i) => i !== itemIndex);
@@ -275,27 +275,27 @@ export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 		const tags = await this.memoFetcher.getTags();
 		this.memoCount = memos.length;
 
-		const inner = await Aux.groupObjects(memos, isFileView ? "path" : "tag");
+		const inner = await Aux.object.group(memos, isFileView ? "path" : "tag");
 		const innerLabels = Object.keys(inner).sort();
-		const innerItems: TreeItems.InnerItemType[] = await Aux.asyncFor(
+		const innerItems: TreeItems.InnerItemType[] = await Aux.async.aFor(
 			innerLabels,
 			async (label) => new (isFileView ? TreeItems.FileItem : TreeItems.TagItem)(label, expandPrimaryGroup),
 		);
 
-		await Aux.asyncRange(innerLabels.length, async (i: number) => {
+		await Aux.async.aRange(innerLabels.length, async (i: number) => {
 			const innerLabel = innerLabels[i];
 			const innerItem = innerItems[i];
 			if (!isFileView) innerItem.iconPath = new ThemeIcon("bookmark", tags[innerLabel]);
 
-			const halfLeaves = await Aux.groupObjects(inner[innerLabel], isFileView ? "tag" : "path");
+			const halfLeaves = await Aux.object.group(inner[innerLabel], isFileView ? "tag" : "path");
 			const halfLeafLabels = Object.keys(halfLeaves).sort();
 			const halfLeafItems: TreeItems.InnerItemType[] = isFileView
-				? await Aux.asyncFor(
+				? await Aux.async.aFor(
 						halfLeafLabels,
 						async (label) =>
 							new TreeItems.TagItem(label, expandSecondaryGroup, <TreeItems.FileItem>innerItem),
 				  )
-				: await Aux.asyncFor(
+				: await Aux.async.aFor(
 						halfLeafLabels,
 						async (label) =>
 							new TreeItems.FileItem(label, expandSecondaryGroup, <TreeItems.TagItem>innerItem),
@@ -303,7 +303,7 @@ export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 			innerItem.children = halfLeafItems;
 
 			let childMemoCount = 0;
-			await Aux.asyncRange(innerItem.children.length, async (j) => {
+			await Aux.async.aRange(innerItem.children.length, async (j) => {
 				const halfLeafItem = innerItem.children[j];
 				const halfLeafLabel = halfLeafLabels[j];
 				if (isFileView) halfLeafItem.iconPath = new ThemeIcon("bookmark", tags[halfLeafLabel]);
@@ -311,7 +311,7 @@ export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 				let memos = (<MemoEntry[]>halfLeaves[halfLeafLabel]).sort((a, b) => a.offset - b.offset);
 				const priority = [];
 				const normal = [];
-				await Aux.asyncFor(memos, async (memo) => {
+				await Aux.async.aFor(memos, async (memo) => {
 					if (memo.priority !== 0) {
 						priority.push(memo);
 						return;
@@ -322,7 +322,7 @@ export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 
 				const tagColor = (<ThemeIcon>(isFileView ? halfLeafItem : innerItem).iconPath).color;
 				const maxPriority = Math.max(...memos.map((memo) => memo.priority));
-				const memoItems = await Aux.asyncFor(memos, async (memo) => {
+				const memoItems = await Aux.async.aFor(memos, async (memo) => {
 					const memoItem = new TreeItems.MemoItem(memo, <TreeItems.InnerItemType>halfLeafItem);
 					await memoItem.setIcon(tagColor, maxPriority);
 					return memoItem;
@@ -330,7 +330,7 @@ export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 				(<TreeItems.InnerItemType>halfLeafItem).children = memoItems;
 				childMemoCount += memoItems.length;
 
-				halfLeafItem.description = `${memoItems.length} Memo${await Aux.plural(memoItems)}`;
+				halfLeafItem.description = `${memoItems.length} Memo${await Aux.string.plural(memoItems)}`;
 				halfLeafItem.tooltip = new MarkdownString(
 					`${isFileView ? "Tag: " : "File: *"}${halfLeafItem.label}${isFileView ? "" : "*"} - ${
 						memoItems.length
@@ -339,9 +339,9 @@ export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 				);
 			});
 
-			innerItem.description = `${halfLeafItems.length} ${isFileView ? "Tag" : "File"}${await Aux.plural(
+			innerItem.description = `${halfLeafItems.length} ${isFileView ? "Tag" : "File"}${await Aux.string.plural(
 				halfLeafItems,
-			)} > ${childMemoCount} Memo${await Aux.plural(childMemoCount)}`;
+			)} > ${childMemoCount} Memo${await Aux.string.plural(childMemoCount)}`;
 			innerItem.tooltip = new MarkdownString(
 				`${isFileView ? "File: *" : "Tag: "}${innerItem.label}${isFileView ? "*" : ""} - ${
 					halfLeafItems.length

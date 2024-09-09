@@ -22,7 +22,7 @@ export namespace Colors {
 		let best = "";
 		for (const [colorName, colorRgb] of Object.entries(VSCodeColors[<keyof typeof VSCodeColors>colorThemeKind])) {
 			let dist = 0;
-			await Aux.asyncRange(3, async (i) => {
+			await Aux.async.aRange(3, async (i) => {
 				dist += (rgb[i] - colorRgb[i]) ** 2;
 			});
 			if (dist < bestDist) {
@@ -37,7 +37,7 @@ export namespace Colors {
 	 * Gets random RGB and then interpolates to get ThemeColor
 	 */
 	export async function randomColor(): Promise<ThemeColor> {
-		const rgb = await Promise.all([Aux.randInt(0, 255), Aux.randInt(0, 255), Aux.randInt(0, 255)]);
+		const rgb = await Promise.all([Aux.math.randInt(0, 255), Aux.math.randInt(0, 255), Aux.math.randInt(0, 255)]);
 		return await this.interpolate(<RGB3>rgb);
 	}
 
@@ -68,7 +68,7 @@ export namespace Colors {
 	 */
 	export async function sRGBHash(hashString: string): Promise<RGB3> {
 		let sum = 0;
-		await Aux.asyncRange(hashString.length, async (i) => {
+		await Aux.async.aRange(hashString.length, async (i) => {
 			sum += hashString.charCodeAt(i) * (i + 1);
 		});
 		const getVal = async (param: number) => Math.trunc(Number(`0.${String(Math.sin(sum + param)).slice(6)}`) * 256);

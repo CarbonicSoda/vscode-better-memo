@@ -33,7 +33,7 @@ const intervalMaid: {
 		await this.configMaid.listen(delayConfigName, configCallback);
 		const intervalId = await this.janitor.add(setInterval(callback, await this.configMaid.get(delayConfigName)));
 		await this.configMaid.onChange(delayConfigName, async (newDelay: number) => {
-			if (delayClamp) newDelay = await Aux.clamp(newDelay, delayClamp.min, delayClamp.max);
+			if (delayClamp) newDelay = await Aux.math.clamp(newDelay, delayClamp.min, delayClamp.max);
 			await this.janitor.override(intervalId, setInterval(callback, newDelay));
 		});
 		return intervalId;
