@@ -62,7 +62,7 @@ export namespace TreeItems {
 		}
 
 		async removeChildren(...children: ExplorerTreeItem[]): Promise<void> {
-			await Aux.async.aFor(children, async (child) => {
+			await Aux.async.map(children, async (child) => {
 				if (!this.children.includes(child)) return;
 				const childIndex = this.children.indexOf(child);
 				this.children = this.children.filter((_, i) => i !== childIndex);
@@ -75,7 +75,7 @@ export namespace TreeItems {
 		): Promise<void> {
 			const { memoFetcher, viewProvider } = treeView;
 			await memoFetcher.suppressForceScan();
-			const memoEntries = await Aux.async.aFor(
+			const memoEntries = await Aux.async.map(
 				this.hierarchy === "primary"
 					? this.children.flatMap((child: InnerItemType) => child.children)
 					: this.children,
@@ -106,8 +106,8 @@ export namespace TreeItems {
 				}
 			}
 
-			await Aux.async.aFor(
-				new Set(await Aux.async.aFor(memoEntries, async (memoEntry) => memoEntry.path)),
+			await Aux.async.map(
+				new Set(await Aux.async.map(memoEntries, async (memoEntry) => memoEntry.path)),
 				async (path) => {
 					const doc = await workspace.openTextDocument(path);
 					await memoFetcher.scanDoc(doc);
@@ -116,7 +116,7 @@ export namespace TreeItems {
 			await viewProvider.reloadItems();
 
 			const edit = new FileEdit();
-			await Aux.async.aFor(memoEntries, async (memoEntry) => {
+			await Aux.async.map(memoEntries, async (memoEntry) => {
 				if (!(await memoFetcher.includes(memoEntry))) return;
 
 				const doc = await workspace.openTextDocument(memoEntry.path);

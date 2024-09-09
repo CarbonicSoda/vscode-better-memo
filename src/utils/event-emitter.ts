@@ -58,7 +58,7 @@ const eventEmitter: {
 	},
 
 	async emit(event: string, ...args: any): Promise<void> {
-		await Aux.async.aFor(
+		await Aux.async.map(
 			this.events.get(event) ?? [],
 			async (callback?: (...args: any) => void | Promise<void>) => await callback?.(...args),
 		);

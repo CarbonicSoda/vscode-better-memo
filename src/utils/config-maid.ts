@@ -40,7 +40,7 @@ const configMaid: {
 	async listen(configNameOrList: string | ListenList, callback?: (retrieved: any) => any): Promise<void> {
 		callback = callback ?? (async (r: any) => await r);
 		if (typeof configNameOrList === "object") {
-			await Aux.async.aFor(
+			await Aux.async.map(
 				Object.entries(configNameOrList),
 				async ([configName, callback]) => await this.listen(configName, callback),
 			);
@@ -63,7 +63,7 @@ const configMaid: {
 			)
 				return;
 			this.configs = workspace.getConfiguration("better-memo");
-			callback(...(await Aux.async.aFor(_configs, async (configName) => await this.get(configName))));
+			callback(...(await Aux.async.map(_configs, async (configName) => await this.get(configName))));
 		};
 		await this.janitor.add(workspace.onDidChangeConfiguration(async (ev) => onChangeConfiguration(ev)));
 	},

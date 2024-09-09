@@ -64,7 +64,7 @@ export class FileEdit {
 		await window.showTextDocument(doc);
 		await commands.executeCommand("workbench.action.files.saveWithoutFormatting", doc);
 		const edit = new WorkspaceEdit();
-		await Aux.async.aFor(edits.entries(), async ([[start, end], replacement]) => {
+		await Aux.async.map(edits.entries(), async ([[start, end], replacement]) => {
 			if (typeof start === "number") start = doc.positionAt(start);
 			if (typeof end === "number") end = doc.positionAt(end);
 			edit.replace(uri, new Range(start, end), replacement);

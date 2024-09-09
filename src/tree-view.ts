@@ -132,7 +132,7 @@ const treeView: {
 	},
 
 	async explorerExpandAll(): Promise<void> {
-		await Aux.async.aFor(
+		await Aux.async.map(
 			this.viewProvider.items,
 			async (item) => await this.view.reveal(item, { select: false, expand: 2 }),
 		);
@@ -180,7 +180,7 @@ const treeView: {
 			await commands.executeCommand("list.collapseAll");
 			if (expandSecondaryItems) {
 				const uRevealPromises = [];
-				await Aux.async.aFor(
+				await Aux.async.map(
 					this.viewProvider.items.flatMap((item: TreeItems.InnerItemType) => item.children),
 					async (child) => uRevealPromises.push(this.view.reveal(child, { select: false, expand: true })),
 				);
@@ -246,7 +246,7 @@ export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 	}
 
 	async removeItems(...items: TreeItems.InnerItemType[]): Promise<void> {
-		await Aux.async.aFor(items, async (item) => {
+		await Aux.async.map(items, async (item) => {
 			if (!this.items.includes(item)) return;
 			const itemIndex = this.items.indexOf(item);
 			this.items = this.items.filter((_, i) => i !== itemIndex);
@@ -277,12 +277,12 @@ export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 
 		const inner = await Aux.object.group(memos, isFileView ? "path" : "tag");
 		const innerLabels = Object.keys(inner).sort();
-		const innerItems: TreeItems.InnerItemType[] = await Aux.async.aFor(
+		const innerItems: TreeItems.InnerItemType[] = await Aux.async.map(
 			innerLabels,
 			async (label) => new (isFileView ? TreeItems.FileItem : TreeItems.TagItem)(label, expandPrimaryGroup),
 		);
 
-		await Aux.async.aRange(innerLabels.length, async (i: number) => {
+		await Aux.async.range(innerLabels.length, async (i: number) => {
 			const innerLabel = innerLabels[i];
 			const innerItem = innerItems[i];
 			if (!isFileView) innerItem.iconPath = new ThemeIcon("bookmark", tags[innerLabel]);
@@ -290,12 +290,12 @@ export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 			const halfLeaves = await Aux.object.group(inner[innerLabel], isFileView ? "tag" : "path");
 			const halfLeafLabels = Object.keys(halfLeaves).sort();
 			const halfLeafItems: TreeItems.InnerItemType[] = isFileView
-				? await Aux.async.aFor(
+				? await Aux.async.map(
 						halfLeafLabels,
 						async (label) =>
 							new TreeItems.TagItem(label, expandSecondaryGroup, <TreeItems.FileItem>innerItem),
 				  )
-				: await Aux.async.aFor(
+				: await Aux.async.map(
 						halfLeafLabels,
 						async (label) =>
 							new TreeItems.FileItem(label, expandSecondaryGroup, <TreeItems.TagItem>innerItem),
@@ -303,7 +303,7 @@ export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 			innerItem.children = halfLeafItems;
 
 			let childMemoCount = 0;
-			await Aux.async.aRange(innerItem.children.length, async (j) => {
+			await Aux.async.range(innerItem.children.length, async (j) => {
 				const halfLeafItem = innerItem.children[j];
 				const halfLeafLabel = halfLeafLabels[j];
 				if (isFileView) halfLeafItem.iconPath = new ThemeIcon("bookmark", tags[halfLeafLabel]);
@@ -311,7 +311,7 @@ export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 				let memos = (<MemoEntry[]>halfLeaves[halfLeafLabel]).sort((a, b) => a.offset - b.offset);
 				const priority = [];
 				const normal = [];
-				await Aux.async.aFor(memos, async (memo) => {
+				await Aux.async.map(memos, async (memo) => {
 					if (memo.priority !== 0) {
 						priority.push(memo);
 						return;
@@ -322,7 +322,7 @@ export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 
 				const tagColor = (<ThemeIcon>(isFileView ? halfLeafItem : innerItem).iconPath).color;
 				const maxPriority = Math.max(...memos.map((memo) => memo.priority));
-				const memoItems = await Aux.async.aFor(memos, async (memo) => {
+				const memoItems = await Aux.async.map(memos, async (memo) => {
 					const memoItem = new TreeItems.MemoItem(memo, <TreeItems.InnerItemType>halfLeafItem);
 					await memoItem.setIcon(tagColor, maxPriority);
 					return memoItem;

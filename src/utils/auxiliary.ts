@@ -20,7 +20,7 @@ export namespace Aux.object {
 	 * Array.includes() for objects
 	 */
 	export async function includes(objects: Object[], object: Object): Promise<boolean> {
-		return (await async.aFor(objects, async (obj) => JSON.stringify(obj)))
+		return (await async.map(objects, async (obj) => JSON.stringify(obj)))
 			.join("\n")
 			.includes(JSON.stringify(object));
 	}
@@ -29,7 +29,7 @@ export namespace Aux.object {
 	 * Array.indexOf() for objects
 	 */
 	export async function indexOf(objects: Object[], object: Object): Promise<number> {
-		return (await async.aFor(objects, async (obj) => JSON.stringify(obj))).indexOf(JSON.stringify(object));
+		return (await async.map(objects, async (obj) => JSON.stringify(obj))).indexOf(JSON.stringify(object));
 	}
 
 	/**
@@ -43,10 +43,10 @@ export namespace Aux.object {
 		grouper: string,
 	): Promise<{ [group: string]: { [key: string]: any }[] }> {
 		const groups: { [group: string]: { [key: string]: any }[] } = {};
-		await async.aFor(objects, async (object) => {
+		await async.map(objects, async (object) => {
 			groups[object[grouper]] = [];
 		});
-		await async.aFor(objects, async (object) => {
+		await async.map(objects, async (object) => {
 			groups[object[grouper]].push(object);
 		});
 		return groups;
@@ -61,7 +61,7 @@ export namespace Aux.object {
 	}): Promise<{ [key: string | number | symbol]: Awaited<T> }> {
 		const values = await Promise.all(Object.values(object));
 		const keys = Object.keys(object);
-		await async.aRange(keys.length, async (i) => {
+		await async.range(keys.length, async (i) => {
 			object[keys[i]] = values[i];
 		});
 		return <{ [key: string | number | symbol]: Awaited<T> }>object;
@@ -72,7 +72,7 @@ export namespace Aux.async {
 	/**
 	 * Sugar for the async for loop Promise.all(iterable.map(async (ele) => {...}))
 	 */
-	export async function aFor<T, C>(
+	export async function map<T, C>(
 		iterable: Iterable<T>,
 		callback: (value: T, index: number, array: T[]) => Promise<C>,
 	): Promise<Awaited<C>[]> {
@@ -82,8 +82,8 @@ export namespace Aux.async {
 	/**
 	 * Sugar for the async for loop Promise.all((await range(n)).map(async (i) => {...}))
 	 */
-	export async function aRange<T>(n: number, callback: (i: number) => Promise<T>): Promise<Awaited<T>[]> {
-		return await aFor(await misc.range(n), callback);
+	export async function range<T>(n: number, callback: (i: number) => Promise<T>): Promise<Awaited<T>[]> {
+		return await map(await misc.range(n), callback);
 	}
 }
 
