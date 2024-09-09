@@ -1,4 +1,4 @@
-import { ConfigurationChangeEvent, workspace, WorkspaceConfiguration, window } from "vscode";
+import { ConfigurationChangeEvent, workspace, WorkspaceConfiguration } from "vscode";
 import { Aux } from "./auxiliary";
 import { Janitor, getJanitor } from "./janitor";
 

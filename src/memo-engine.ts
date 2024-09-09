@@ -1,11 +1,11 @@
 import { commands, TabGroup, TextDocument, ThemeColor, Uri, window, workspace } from "vscode";
 import { Aux } from "./utils/auxiliary";
 import { Colors } from "./utils/colors";
+import { FileEdit } from "./utils/file-edit";
 import { Janitor, getJanitor } from "./utils/janitor";
 import { ConfigMaid, getConfigMaid } from "./utils/config-maid";
 import { IntervalMaid, getIntervalMaid } from "./utils/interval-maid";
 import { EventEmitter, getEventEmitter } from "./utils/event-emitter";
-import { FileEdit } from "./utils/file-edit";
 
 import LangCommentFormat from "./json/lang-comment-format.json";
 
@@ -22,13 +22,13 @@ export type MemoEntry = {
 	readonly rawLength: number;
 };
 
-export type MemoFetcher = typeof memoFetcher;
+export type MemoEngine = typeof memoEngine;
 
-export async function getMemoFetcher(): Promise<MemoFetcher> {
-	return memoFetcher;
+export async function getMemoEngine(): Promise<MemoEngine> {
+	return memoEngine;
 }
 
-const memoFetcher: {
+const memoEngine: {
 	init(): Promise<void>;
 
 	watches(path: string): Promise<boolean>;

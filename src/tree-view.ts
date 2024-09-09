@@ -10,11 +10,11 @@ import {
 	TreeViewVisibilityChangeEvent,
 } from "vscode";
 import { Aux } from "./utils/auxiliary";
-import { TreeItems } from "./tree-items";
-import { MemoEntry, MemoFetcher } from "./memo-fetcher";
 import { Janitor, getJanitor } from "./utils/janitor";
 import { ConfigMaid, getConfigMaid } from "./utils/config-maid";
 import { EventEmitter, getEventEmitter } from "./utils/event-emitter";
+import { MemoEntry, MemoEngine } from "./memo-engine";
+import { TreeItems } from "./tree-items";
 
 export type TreeView = typeof treeView;
 
@@ -23,11 +23,11 @@ export async function getTreeView(): Promise<TreeView> {
 }
 
 const treeView: {
-	memoFetcher?: MemoFetcher;
+	memoEngine?: MemoEngine;
 	viewProvider?: ViewProvider;
 	view?: vsTreeView<TreeItems.TreeItemType>;
 
-	init(memoFetcher: MemoFetcher): Promise<void>;
+	init(memoEngine: MemoEngine): Promise<void>;
 
 	explorerExpandAll(): Promise<void>;
 	explorerCompleteAll(): Promise<void>;
@@ -40,7 +40,7 @@ const treeView: {
 	configMaid?: ConfigMaid;
 	eventEmitter?: EventEmitter;
 } = {
-	async init(memoFetcher: MemoFetcher): Promise<void> {
+	async init(memoEngine: MemoEngine): Promise<void> {
 		this.janitor = await getJanitor();
 		this.configMaid = await getConfigMaid();
 		this.eventEmitter = await getEventEmitter();
@@ -51,8 +51,8 @@ const treeView: {
 			this.configMaid.listen("view.expandSecondaryItemsByDefault"),
 		]);
 
-		this.memoFetcher = memoFetcher;
-		this.viewProvider = new ViewProvider(memoFetcher);
+		this.memoEngine = memoEngine;
+		this.viewProvider = new ViewProvider(memoEngine);
 		await this.updateViewType(null, { noReload: true });
 		await this.viewProvider.init();
 		this.view = window.createTreeView("better-memo.memoExplorer", {
@@ -139,8 +139,8 @@ const treeView: {
 	},
 
 	async explorerCompleteAll(): Promise<void> {
-		const { memoFetcher, viewProvider } = this;
-		await memoFetcher.suppressForceScan();
+		const { memoEngine, viewProvider } = this;
+		await memoEngine.suppressForceScan();
 		const memoCount = viewProvider.memoCount;
 		const items = viewProvider.items;
 
@@ -155,12 +155,12 @@ const treeView: {
 			"No",
 		);
 		if (!option || option === "No") {
-			await memoFetcher.unsuppressForceScan();
+			await memoEngine.unsuppressForceScan();
 			return;
 		}
 
 		for (const item of items) await item.completeMemos(this, { noConfirmation: true, _noExtraTasks: true });
-		await memoFetcher.removeAllMemos();
+		await memoEngine.removeAllMemos();
 		await viewProvider.removeAllItems();
 		await viewProvider.refresh();
 	},
@@ -209,10 +209,10 @@ const treeView: {
 
 	async handleChangeVisibility(visible: boolean): Promise<void> {
 		if (visible) {
-			await this.memoFetcher.disableBackgroundMode();
+			await this.memoEngine.disableBackgroundMode();
 			return;
 		}
-		await this.memoFetcher.enableBackgroundMode();
+		await this.memoEngine.enableBackgroundMode();
 	},
 };
 
@@ -226,7 +226,7 @@ export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 	>();
 	readonly onDidChangeTreeData: Event<void | undefined | TreeItems.TreeItemType> = this._onDidChangeTreeData.event;
 
-	constructor(private memoFetcher: MemoFetcher) {}
+	constructor(private memoEngine: MemoEngine) {}
 
 	async init(): Promise<void> {
 		await treeView.eventEmitter.wait("initExplorerView", async () => await this.reloadItems());
@@ -271,8 +271,8 @@ export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 		const expandPrimaryGroup = await treeView.configMaid.get("view.expandPrimaryItemsByDefault");
 		const expandSecondaryGroup = await treeView.configMaid.get("view.expandSecondaryItemsByDefault");
 
-		const memos = await this.memoFetcher.getMemos();
-		const tags = await this.memoFetcher.getTags();
+		const memos = await this.memoEngine.getMemos();
+		const tags = await this.memoEngine.getTags();
 		this.memoCount = memos.length;
 
 		const inner = await Aux.object.group(memos, isFileView ? "path" : "tag");
