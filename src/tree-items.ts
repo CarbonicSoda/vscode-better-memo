@@ -236,18 +236,19 @@ export namespace TreeItems {
 				return;
 
 			const memoEntry = this.memoEntry;
-			const doc = await workspace.openTextDocument(memoEntry.path);
-			await memoFetcher.scanDoc(doc);
-			if (!(await memoFetcher.includes(memoEntry))) {
-				await viewProvider.reloadItems();
-				return;
-			}
-
 			const memoRE = RegExp(
 				`${await Aux.reEscape(memoEntry.raw)}|${await Aux.reEscape(
 					await memoFetcher.getFormattedMemo(memoEntry),
 				)}`,
 			);
+			const doc = await workspace.openTextDocument(memoEntry.path);
+			
+			if (!memoRE.test(doc.lineAt(memoEntry.line).text)) {
+				await memoFetcher.scanDoc(doc);
+				await viewProvider.reloadItems();
+				return;
+			}
+
 			const doRemoveLine =
 				(await configMaid.get("actions.removeLineIfMemoIsOnSingleLine")) &&
 				memoEntry.line < doc.lineCount - 1 &&

@@ -34,7 +34,7 @@ const configMaid: {
 	onChange(configs: string | string[], callback: (...newValues: any[]) => void): Promise<void>;
 
 	configs: WorkspaceConfiguration;
-	configsMap: Map<string | ListenList, (retrieved: any) => any>;
+	configsMap: Map<string, (retrieved: any) => any>;
 	janitor?: Janitor;
 } = {
 	async listen(configNameOrList: string | ListenList, callback?: (retrieved: any) => any): Promise<void> {
@@ -62,12 +62,8 @@ const configMaid: {
 				!_configs.some((config) => ev.affectsConfiguration(`better-memo.${config}`))
 			)
 				return;
-			callback(
-				...(await Aux.asyncFor(_configs, async (configName) => {
-					this.configs = workspace.getConfiguration("better-memo");
-					await this.configsMap.get(configName)(this.configs.get(configName));
-				})),
-			);
+			this.configs = workspace.getConfiguration("better-memo");
+			callback(...(await Aux.asyncFor(_configs, async (configName) => await this.get(configName))));
 		};
 		await this.janitor.add(workspace.onDidChangeConfiguration(async (ev) => onChangeConfiguration(ev)));
 	},

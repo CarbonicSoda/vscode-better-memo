@@ -54,6 +54,6 @@ export async function resolver(): Promise<void> {
 	if (resolved) return;
 	resolved = true;
 
-	intervalMaid.configMaid = await getConfigMaid();
 	intervalMaid.janitor = await getJanitor();
+	intervalMaid.configMaid = await getConfigMaid();
 }
