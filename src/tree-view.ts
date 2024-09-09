@@ -11,7 +11,7 @@ import {
 } from "vscode";
 import { Aux } from "./utils/auxiliary";
 import { TreeItems } from "./tree-items";
-import { MemoEntry, MemoFetcher } from "./memo-fetcher";
+import { MemoEntry, MemoEngine } from "./memo-engine";
 import { Janitor, getJanitor } from "./utils/janitor";
 import { ConfigMaid, getConfigMaid } from "./utils/config-maid";
 import { EventEmitter, getEventEmitter } from "./utils/event-emitter";
@@ -23,11 +23,11 @@ export async function getTreeView(): Promise<TreeView> {
 }
 
 const treeView: {
-	memoFetcher?: MemoFetcher;
+	memoFetcher?: MemoEngine;
 	viewProvider?: ViewProvider;
 	view?: vsTreeView<TreeItems.TreeItemType>;
 
-	init(memoFetcher: MemoFetcher): Promise<void>;
+	init(memoFetcher: MemoEngine): Promise<void>;
 
 	explorerExpandAll(): Promise<void>;
 	explorerCompleteAll(): Promise<void>;
@@ -40,7 +40,7 @@ const treeView: {
 	configMaid?: ConfigMaid;
 	eventEmitter?: EventEmitter;
 } = {
-	async init(memoFetcher: MemoFetcher): Promise<void> {
+	async init(memoFetcher: MemoEngine): Promise<void> {
 		this.janitor = await getJanitor();
 		this.configMaid = await getConfigMaid();
 		this.eventEmitter = await getEventEmitter();
@@ -226,7 +226,7 @@ export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 	>();
 	readonly onDidChangeTreeData: Event<void | undefined | TreeItems.TreeItemType> = this._onDidChangeTreeData.event;
 
-	constructor(private memoFetcher: MemoFetcher) {}
+	constructor(private memoFetcher: MemoEngine) {}
 
 	async init(): Promise<void> {
 		await treeView.eventEmitter.wait("initExplorerView", async () => await this.reloadItems());

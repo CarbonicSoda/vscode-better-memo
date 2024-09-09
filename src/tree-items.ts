@@ -17,7 +17,7 @@ import { Colors } from "./utils/colors";
 import { ConfigMaid, getConfigMaid } from "./utils/config-maid";
 import { FileEdit } from "./utils/file-edit";
 import { TreeView, ViewProvider } from "./tree-view";
-import { MemoEntry } from "./memo-fetcher";
+import { MemoEntry } from "./memo-engine";
 
 let configMaid: ConfigMaid;
 

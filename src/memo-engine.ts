@@ -22,13 +22,13 @@ export type MemoEntry = {
 	readonly rawLength: number;
 };
 
-export type MemoFetcher = typeof memoFetcher;
+export type MemoEngine = typeof memoEngine;
 
-export async function getMemoFetcher(): Promise<MemoFetcher> {
-	return memoFetcher;
+export async function getMemoEngine(): Promise<MemoEngine> {
+	return memoEngine;
 }
 
-const memoFetcher: {
+const memoEngine: {
 	init(): Promise<void>;
 
 	watches(path: string): Promise<boolean>;
