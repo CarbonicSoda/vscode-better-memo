@@ -205,7 +205,7 @@
 			},
 			{
 				"view": "better-memo.memoExplorer",
-				"contents": "You have not yet opened any folders.\n[Open Folder](command:workbench.action.files.openFolder)",
+				"contents": "You have not yet opened any folders.\n[Open Folder](command:workbench.action.files.openFolder)\nOpening a folder will close all currently open editors. To keep them open, [add a folder](command:workbench.action.addRootFolder) instead.",
 				"when": "better-memo.explorerInitFinished && better-memo.noFiles"
 			},
 			{

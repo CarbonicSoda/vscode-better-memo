@@ -73,6 +73,7 @@ export namespace TreeItems {
 			treeView: TreeView,
 			options?: { noConfirmation?: boolean; _noExtraTasks?: boolean },
 		): Promise<void> {
+			// DOES NOT UPDATE EXPLORER CORRECTLY, GHOST MEMOS!
 			const { memoFetcher, viewProvider } = treeView;
 			await memoFetcher.suppressForceScan();
 			const memoEntries = await Aux.async.map(
@@ -255,7 +256,7 @@ export namespace TreeItems {
 
 			const doOpenFile = await configMaid.get("actions.alwaysOpenChangedFileOnCompletionOfMemo");
 
-			const start = doc.positionAt(memoEntry.offset);
+			const start = doRemoveLine ? doc.lineAt(memoEntry.line).range.start : doc.positionAt(memoEntry.offset);
 			const end = doRemoveLine ? new Position(memoEntry.line + 1, 0) : start.translate(0, memoEntry.rawLength);
 			const range = new Range(start, end);
 			const edit = new FileEdit();
@@ -305,8 +306,8 @@ export namespace TreeItems {
 			};
 
 			let currentTarget = MemoItem.currentCompletionConfirmationTarget;
-			const currentBackup = MemoItem.currentCompletionConfirmationBackup;
 			if (!currentTarget) await setConfirmingItem(this);
+			const currentBackup = MemoItem.currentCompletionConfirmationBackup;
 
 			if (this !== currentTarget) {
 				await reset(currentTarget);

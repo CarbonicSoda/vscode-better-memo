@@ -1,4 +1,4 @@
-import { ConfigurationChangeEvent, workspace, WorkspaceConfiguration } from "vscode";
+import { ConfigurationChangeEvent, workspace, WorkspaceConfiguration, window } from "vscode";
 import { Aux } from "./auxiliary";
 import { Janitor, getJanitor } from "./janitor";
 
@@ -35,6 +35,7 @@ const configMaid: {
 
 	configs: WorkspaceConfiguration;
 	configsMap: Map<string, (retrieved: any) => any>;
+
 	janitor?: Janitor;
 } = {
 	async listen(configNameOrList: string | ListenList, callback?: (retrieved: any) => any): Promise<void> {
@@ -80,9 +81,9 @@ export async function resolver(): Promise<void> {
 
 	configMaid.janitor = await getJanitor();
 	await configMaid.janitor.add(
-		workspace.onDidChangeConfiguration((ev) => {
+		workspace.onDidChangeConfiguration(async (ev) => {
 			if (!ev.affectsConfiguration("better-memo")) return;
-			this.configs = workspace.getConfiguration("better-memo");
+			configMaid.configs = workspace.getConfiguration("better-memo");
 		}),
 	);
 }
