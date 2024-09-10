@@ -243,12 +243,14 @@ export namespace TreeItems {
 			const doc = await workspace.openTextDocument(memoEntry.path);
 
 			if (!memoRE.test(doc.lineAt(memoEntry.line).text)) {
-				//FIX
+				//works?
+				window.showInformationMessage(`does not exist\${}`);
 				await memoEngine.scanDoc(doc);
 				await viewProvider.reloadItems();
 				return;
 			}
 
+			window.showInformationMessage(`does exist\${}`);
 			const doRemoveLine =
 				(await configMaid.get("actions.removeLineIfMemoIsOnSingleLine")) &&
 				memoEntry.line < doc.lineCount - 1 &&
