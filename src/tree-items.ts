@@ -361,11 +361,11 @@ export async function resolver(): Promise<void> {
 	resolved = true;
 
 	configMaid = await getConfigMaid();
-	await Promise.all([
+	await Aux.promise.all(
 		configMaid.listen("actions.askForConfirmationOnCompletionOfMemo"),
 		configMaid.listen("actions.timeoutOfConfirmationOnCompletionOfMemo"),
 		configMaid.listen("actions.alwaysOpenChangedFileOnCompletionOfMemo"),
 		configMaid.listen("actions.askForConfirmationOnCompletionOfMemos"),
 		configMaid.listen("actions.removeLineIfMemoIsOnSingleLine"),
-	]);
+	);
 }

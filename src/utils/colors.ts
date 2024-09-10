@@ -37,7 +37,7 @@ export namespace Colors {
 	 * Gets random RGB and then interpolates to get ThemeColor
 	 */
 	export async function randomColor(): Promise<ThemeColor> {
-		const rgb = await Promise.all([Aux.math.randInt(0, 255), Aux.math.randInt(0, 255), Aux.math.randInt(0, 255)]);
+		const rgb = await Aux.promise.all(Aux.math.randInt(0, 255), Aux.math.randInt(0, 255), Aux.math.randInt(0, 255));
 		return await this.interpolate(<RGB3>rgb);
 	}
 
@@ -72,6 +72,6 @@ export namespace Colors {
 			sum += hashString.charCodeAt(i) * (i + 1);
 		});
 		const getVal = async (param: number) => Math.trunc(Number(`0.${String(Math.sin(sum + param)).slice(6)}`) * 256);
-		return await Promise.all([getVal(1), getVal(2), getVal(3)]);
+		return <RGB3>await Aux.promise.all(getVal(1), getVal(2), getVal(3));
 	}
 }

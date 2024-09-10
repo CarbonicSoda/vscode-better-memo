@@ -99,15 +99,15 @@ const memoEngine: {
 		this.intervalMaid = await getIntervalMaid();
 		this.eventEmitter = await getEventEmitter();
 
-		await Promise.all([
+		await Aux.promise.all(
 			this.configMaid.listen("general.customTags"),
 			this.configMaid.listen({
 				"fetcher.watch": async (watch: string[]) => `{${watch.join(",")}}`,
 				"fetcher.ignore": async (ignore: string[]) => `{${ignore.join(",")}}`,
 			}),
-		]);
+		);
 
-		await Promise.all([
+		await Aux.promise.all(
 			this.intervalMaid.add(async () => await this.scanDocInterval(), "fetcher.scanDelay", {
 				min: 100,
 				max: 1000000,
@@ -120,7 +120,7 @@ const memoEngine: {
 				min: 1000,
 				max: 10000000,
 			}),
-		]);
+		);
 
 		await this.janitor.add(
 			workspace.onDidCreateFiles(async () => await this.fetchDocs()),
@@ -177,7 +177,7 @@ const memoEngine: {
 			if (!validTagRE.test(tag) || !validHexRE.test(<string>hex)) return;
 			uValidCustomTags[tag] = Colors.interpolate(<string>hex);
 		});
-		return await Aux.object.awaitProps(uValidCustomTags);
+		return await Aux.promise.props(uValidCustomTags);
 	},
 
 	async getTags(): Promise<{ [tag: string]: ThemeColor }> {
@@ -190,7 +190,7 @@ const memoEngine: {
 		await Aux.async.map(tags, async (tag) => {
 			if (!this.customTagsToColor[tag]) uMemoTags[tag] = Colors.hashColor(tag);
 		});
-		return Object.assign(await Aux.object.awaitProps(uMemoTags), this.customTagsToColor);
+		return Object.assign(await Aux.promise.props(uMemoTags), this.customTagsToColor);
 	},
 
 	async removeMemo(memo: MemoEntry): Promise<void> {
@@ -230,7 +230,7 @@ const memoEngine: {
 		this.watchedDocsToInfoMap.clear();
 		await commands.executeCommand("setContext", "better-memo.noFiles", docs.length === 0);
 
-		await Promise.all([
+		await Aux.promise.all(
 			Aux.async.map(
 				docs,
 				async (doc) => await this.watchedDocsToInfoMap.set(doc, { version: doc.version, lang: doc.languageId }),
@@ -241,7 +241,7 @@ const memoEngine: {
 			Aux.async.map(this.watchedDocsToInfoMap.keys(), async (doc) => {
 				if (!this.documentToMemosMap.has(doc)) this.scanDoc(doc);
 			}),
-		]);
+		);
 	},
 
 	async scanDoc(doc: TextDocument, options?: { updateView?: boolean }): Promise<void> {

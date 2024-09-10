@@ -51,21 +51,6 @@ export namespace Aux.object {
 		});
 		return groups;
 	}
-
-	/**
-	 * Implementation of Promise.props()
-	 * @param object object with properties to resolve
-	 */
-	export async function awaitProps<T>(object: {
-		[key: string | number | symbol]: T;
-	}): Promise<{ [key: string | number | symbol]: Awaited<T> }> {
-		const values = await Promise.all(Object.values(object));
-		const keys = Object.keys(object);
-		await async.range(keys.length, async (i) => {
-			object[keys[i]] = values[i];
-		});
-		return <{ [key: string | number | symbol]: Awaited<T> }>object;
-	}
 }
 
 export namespace Aux.async {
@@ -85,6 +70,26 @@ export namespace Aux.async {
 	export async function range<T>(n: number, callback: (i: number) => Promise<T>): Promise<Awaited<T>[]> {
 		return await map(await misc.range(n), callback);
 	}
+}
+export namespace Aux.promise {
+	/**
+	 * Implementation of Promise.props()
+	 * @param object object with properties to resolve
+	 */
+	export async function props<T>(object: {
+		[key: string | number | symbol]: T;
+	}): Promise<{ [key: string | number | symbol]: Awaited<T> }> {
+		const values = await Promise.all(Object.values(object));
+		const keys = Object.keys(object);
+		await async.range(keys.length, async (i) => {
+			object[keys[i]] = values[i];
+		});
+		return <{ [key: string | number | symbol]: Awaited<T> }>object;
+	}
+
+	export const all = async <T>(...promises: (T | Promise<T>)[]) => await Promise.all(promises);
+	
+	export const allSettled = async <T>(...promises: (T | Promise<T>)[]) => await Promise.allSettled(promises);
 }
 
 export namespace Aux.re {

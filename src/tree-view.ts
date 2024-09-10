@@ -45,11 +45,11 @@ const treeView: {
 		this.configMaid = await getConfigMaid();
 		this.eventEmitter = await getEventEmitter();
 
-		await Promise.all([
+		await Aux.promise.all(
 			this.configMaid.listen("view.defaultView"),
 			this.configMaid.listen("view.expandPrimaryItemsByDefault"),
 			this.configMaid.listen("view.expandSecondaryItemsByDefault"),
-		]);
+		);
 
 		this.memoEngine = memoEngine;
 		this.viewProvider = new ViewProvider(memoEngine);
@@ -61,7 +61,7 @@ const treeView: {
 			canSelectMany: false,
 		});
 
-		await Promise.all([
+		await Aux.promise.all(
 			this.configMaid.onChange(
 				"view.defaultView",
 				async (view: "File" | "Tag") => await this.updateViewType(view),
@@ -70,7 +70,7 @@ const treeView: {
 				["view.expandPrimaryItemsByDefault", "view.expandSecondaryItemsByDefault"],
 				async () => await this.updateItemCollapsibleState(),
 			),
-		]);
+		);
 
 		await this.janitor.add(
 			this.view,
