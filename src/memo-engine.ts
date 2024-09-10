@@ -33,6 +33,7 @@ const memoEngine: {
 
 	watches(path: string): Promise<boolean>;
 	includes(memo: MemoEntry): Promise<boolean>;
+	stillExists(memo: MemoEntry): Promise<boolean>;
 
 	getMemos(): Promise<MemoEntry[]>;
 	getMemosInDoc(doc: TextDocument): Promise<MemoEntry[]>;
@@ -155,6 +156,12 @@ const memoEngine: {
 
 	async includes(memo: MemoEntry): Promise<boolean> {
 		return await Aux.object.includes(this.documentToMemosMap.values(), memo);
+	},
+
+	async stillExists(memo: MemoEntry): Promise<boolean> {
+		// const doc = await workspace.openTextDocument(memo.path);
+		return true;
+		// return doc.lineAt(memo.line).
 	},
 
 	async getMemos(): Promise<MemoEntry[]> {

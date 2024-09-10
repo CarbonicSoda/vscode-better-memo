@@ -128,7 +128,8 @@ export namespace TreeItems {
 				const doRemoveLine =
 					(await configMaid.get("actions.removeLineIfMemoIsOnSingleLine")) &&
 					memoEntry.line < doc.lineCount - 1 &&
-					doc.lineAt(memoEntry.line).text.replace(memoRE, "").trim().length === 0;
+					doc.lineAt(memoEntry.line).firstNonWhitespaceCharacterIndex ===
+						doc.positionAt(memoEntry.offset).character;
 
 				const start = doc.positionAt(memoEntry.offset);
 				const end = doRemoveLine
@@ -249,12 +250,13 @@ export namespace TreeItems {
 				await viewProvider.reloadItems();
 				return;
 			}
-
 			window.showInformationMessage(`does exist\${}`);
+
 			const doRemoveLine =
 				(await configMaid.get("actions.removeLineIfMemoIsOnSingleLine")) &&
 				memoEntry.line < doc.lineCount - 1 &&
-				doc.lineAt(memoEntry.line).text.replace(memoRE, "").trim().length === 0;
+				doc.lineAt(memoEntry.line).firstNonWhitespaceCharacterIndex ===
+					doc.positionAt(memoEntry.offset).character;
 
 			const doOpenFile = await configMaid.get("actions.alwaysOpenChangedFileOnCompletionOfMemo");
 
