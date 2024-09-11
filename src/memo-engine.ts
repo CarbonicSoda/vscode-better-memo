@@ -1,4 +1,4 @@
-import { commands, TabGroup, TextDocument, ThemeColor, Uri, window, workspace } from "vscode";
+import { commands, Range, TabGroup, TextDocument, ThemeColor, Uri, window, workspace } from "vscode";
 import { Aux } from "./utils/auxiliary";
 import { Colors } from "./utils/colors";
 import { FileEdit } from "./utils/file-edit";
@@ -31,20 +31,16 @@ export async function getMemoEngine(): Promise<MemoEngine> {
 const memoEngine: {
 	init(): Promise<void>;
 
-	watchesDoc(docOrPath: TextDocument | string): Promise<boolean>;
-	includesMemo(memo: MemoEntry): Promise<boolean>;
-	stillExists(memo: MemoEntry): Promise<boolean>;
+	isDocWatched(docOrPath: TextDocument | string): Promise<boolean>;
+	isMemoKnown(memo: MemoEntry): Promise<boolean>;
+	isMemoExistent(memo: MemoEntry): Promise<boolean>;
 
 	getMemos(): Promise<MemoEntry[]>;
-	fetchCustomTags(): Promise<{ [tag: string]: ThemeColor }>;
+	getCustomTags(): Promise<{ [tag: string]: ThemeColor }>;
 	getTags(): Promise<{ [tag: string]: ThemeColor }>;
 
 	removeMemos(...memos: MemoEntry[]): Promise<void>;
 	removeAllMemos(): Promise<void>;
-
-	fetchMemos(options?: { updateView?: boolean }): Promise<void>;
-	fetchDocs(): Promise<void>;
-	scanDoc(doc: TextDocument, options?: { updateView?: boolean }): Promise<void>;
 
 	getFormattedMemo(memo: MemoEntry): Promise<string>;
 	formatMemosInDoc(doc: TextDocument): Promise<void>;
@@ -52,11 +48,16 @@ const memoEngine: {
 	enterBackgroundMode(): Promise<void>;
 	leaveBackgroundMode(): Promise<void>;
 
+	getMemoMatchRE(doc: TextDocument): Promise<RegExp>;
+	fetchMemos(options?: { updateView?: boolean }): Promise<void>;
+	fetchDocs(): Promise<void>;
+	scanDoc(doc: TextDocument, options?: { updateView?: boolean }): Promise<void>;
+
 	scanDocInterval(): Promise<void>;
 	forceScanInterval(): Promise<void>;
 	handleTabChange(changed: readonly TabGroup[]): Promise<void>;
 
-	validateForScan(doc?: TextDocument): Promise<boolean>;
+	isDocValidForScan(doc?: TextDocument): Promise<boolean>;
 
 	watchedDocsToInfoMap: Map<TextDocument, { version: number; lang: string }>;
 	documentToMemosMap: Map<TextDocument, MemoEntry[]>;
@@ -140,7 +141,7 @@ const memoEngine: {
 			workspace.onDidDeleteFiles(async () => await memoEngine.fetchDocs()),
 
 			workspace.onDidSaveTextDocument(async (doc) => {
-				if (await memoEngine.validateForScan(doc)) memoEngine.scanDoc(doc, { updateView: true });
+				if (await memoEngine.isDocValidForScan(doc)) memoEngine.scanDoc(doc, { updateView: true });
 			}),
 			window.tabGroups.onDidChangeTabGroups(async (ev) => await memoEngine.handleTabChange(ev.changed)),
 
@@ -156,7 +157,7 @@ const memoEngine: {
 		memoEngine.eventEmitter.emitWait("initEditorCommands");
 	},
 
-	async watchesDoc(docOrPath: TextDocument | string): Promise<boolean> {
+	async isDocWatched(docOrPath: TextDocument | string): Promise<boolean> {
 		try {
 			const doc = typeof docOrPath === "string" ? await workspace.openTextDocument(docOrPath) : docOrPath;
 			return memoEngine.watchedDocsToInfoMap.has(doc);
@@ -165,14 +166,15 @@ const memoEngine: {
 		}
 	},
 
-	async includesMemo(memo: MemoEntry): Promise<boolean> {
+	async isMemoKnown(memo: MemoEntry): Promise<boolean> {
 		return await Aux.object.includes(await memoEngine.getMemos(), memo);
 	},
 
-	async stillExists(memo: MemoEntry): Promise<boolean> {
-		// const doc = await workspace.openTextDocument(memo.path);
-		return true;
-		// return doc.lineAt(memo.line).
+	async isMemoExistent(memo: MemoEntry): Promise<boolean> {
+		const doc = await workspace.openTextDocument(memo.path);
+		const line = doc.lineAt(memo.line).text;
+		const matchRE = await memoEngine.getMemoMatchRE(doc);
+		return line.match(matchRE)[0] === memo.raw;
 	},
 
 	async getMemos(): Promise<MemoEntry[]> {
@@ -181,7 +183,7 @@ const memoEngine: {
 		return memos;
 	},
 
-	async fetchCustomTags(): Promise<{ [tag: string]: ThemeColor }> {
+	async getCustomTags(): Promise<{ [tag: string]: ThemeColor }> {
 		const customTags: { [tag: string]: string } = await memoEngine.configMaid.get("general.customTags");
 		const validTagRE = RegExp(`^[^\\r\\n\t ${memoEngine.commentCloseCharacters}]+$`);
 		const validHexRE = /(?:^#?[0-9a-f]{6}$)|(?:^#?[0-9a-f]{3}$)/i;
@@ -198,7 +200,7 @@ const memoEngine: {
 		const tags = await Aux.async.map(await memoEngine.getMemos(), async (memo: MemoEntry) => memo.tag);
 		if (memoEngine.customTagsChanged) {
 			memoEngine.customTagsChanged = false;
-			memoEngine.customTagsToColor = await memoEngine.fetchCustomTags();
+			memoEngine.customTagsToColor = await memoEngine.getCustomTags();
 		}
 		const uMemoTags = {};
 		await Aux.async.map(tags, async (tag) => {
@@ -220,103 +222,6 @@ const memoEngine: {
 
 	async removeAllMemos(): Promise<void> {
 		memoEngine.documentToMemosMap.clear();
-	},
-
-	async fetchMemos(options?: { updateView?: boolean }): Promise<void> {
-		await memoEngine.fetchDocs();
-		await Aux.async.map(memoEngine.watchedDocsToInfoMap.keys(), async (doc) => await memoEngine.scanDoc(doc));
-		if (options?.updateView) await memoEngine.eventEmitter.emit("updateView");
-	},
-
-	async fetchDocs(): Promise<void> {
-		const watch = await memoEngine.configMaid.get("fetcher.watch");
-		const ignore = await memoEngine.configMaid.get("fetcher.ignore");
-
-		const getDoc = async (uri: Uri) => {
-			try {
-				return await workspace.openTextDocument(uri);
-			} finally {
-			}
-		};
-		const unfilteredUris = await workspace.findFiles(watch, ignore);
-		const unfilteredDocs = await Aux.async.map(unfilteredUris, async (uri) => await getDoc(uri));
-		const docs: TextDocument[] = unfilteredDocs.filter((doc) => Object.hasOwn(LangCommentFormat, doc?.languageId));
-		await commands.executeCommand("setContext", "better-memo.noFiles", docs.length === 0);
-
-		memoEngine.watchedDocsToInfoMap.clear();
-		await Aux.promise.all(
-			Aux.async.map(docs, async (doc) =>
-				memoEngine.watchedDocsToInfoMap.set(doc, { version: doc.version, lang: doc.languageId }),
-			),
-			Aux.async.map(memoEngine.documentToMemosMap.keys(), async (doc) => {
-				if (!(await memoEngine.watchesDoc(doc))) memoEngine.documentToMemosMap.delete(doc);
-			}),
-			Aux.async.map(memoEngine.watchedDocsToInfoMap.keys(), async (doc) => {
-				if (!(await memoEngine.watchesDoc(doc))) memoEngine.scanDoc(doc);
-			}),
-		);
-	},
-
-	async scanDoc(doc: TextDocument, options?: { updateView?: boolean }): Promise<void> {
-		if (memoEngine.backgroundMode) {
-			if (memoEngine.backgroundScanBuffer < memoEngine.backgroundScanBufferMax) {
-				memoEngine.backgroundScanBuffer += doc.lineCount;
-				memoEngine.backgroundScanQueue.add(doc);
-				return;
-			} else {
-				memoEngine.backgroundScanBuffer -= doc.lineCount;
-			}
-		}
-
-		const docContent = doc.getText();
-		const langId = <keyof typeof LangCommentFormat>doc.languageId;
-		const commentFormats: { open: string; close?: string }[] = [LangCommentFormat[langId]].flat();
-		const commentFormatREs = await Aux.async.map(commentFormats, async (data, i) => {
-			const open = await Aux.re.escape(data.open);
-			const close = await Aux.re.escape(data.close ?? "");
-			return `(?<![${open}])${open}[\\t ]*mo[\\t ]+(?<tag${i}>[^\\r\\n\\t ${
-				memoEngine.commentCloseCharacters
-			}]+)[\\t ]*(?<priority${i}>!*)(?<content${i}>.*${close ? "?" : ""})${close}`;
-		});
-		const matchPatternRaw = await Aux.re.union(...commentFormatREs);
-		const matchPattern = RegExp(matchPatternRaw, "gim");
-
-		let memos = [];
-		await Aux.async.map(docContent.matchAll(matchPattern), async (match) => {
-			let tag: string;
-			let priority: number;
-			let content: string;
-			for (const [groupName, value] of Object.entries(match.groups)) {
-				if (value === undefined) continue;
-				if (groupName.startsWith("tag")) {
-					tag = value.toUpperCase();
-					continue;
-				}
-				if (groupName.startsWith("priority")) {
-					priority = value.length;
-					continue;
-				}
-				if (groupName.startsWith("content")) {
-					content = value.trimEnd();
-					continue;
-				}
-				break;
-			}
-			memos.push({
-				content: content,
-				tag: tag,
-				priority: priority,
-				line: doc.positionAt(match.index).line,
-				offset: match.index,
-				path: doc.fileName,
-				relativePath: workspace.asRelativePath(doc.fileName),
-				langId: langId,
-				raw: match[0],
-				rawLength: match[0].length,
-			});
-		});
-		memoEngine.documentToMemosMap.set(doc, memos);
-		if (options?.updateView) await memoEngine.eventEmitter.emit("updateView");
 	},
 
 	async getFormattedMemo(memo: MemoEntry): Promise<string> {
@@ -355,11 +260,112 @@ const memoEngine: {
 		await memoEngine.eventEmitter.emit("updateView");
 	},
 
+	async fetchMemos(options?: { updateView?: boolean }): Promise<void> {
+		await memoEngine.fetchDocs();
+		await Aux.async.map(memoEngine.watchedDocsToInfoMap.keys(), async (doc) => await memoEngine.scanDoc(doc));
+		if (options?.updateView) await memoEngine.eventEmitter.emit("updateView");
+	},
+
+	async fetchDocs(): Promise<void> {
+		const watch = await memoEngine.configMaid.get("fetcher.watch");
+		const ignore = await memoEngine.configMaid.get("fetcher.ignore");
+
+		const getDoc = async (uri: Uri) => {
+			try {
+				return await workspace.openTextDocument(uri);
+			} finally {
+			}
+		};
+		const unfilteredUris = await workspace.findFiles(watch, ignore);
+		const unfilteredDocs = await Aux.async.map(unfilteredUris, async (uri) => await getDoc(uri));
+		const docs: TextDocument[] = unfilteredDocs.filter((doc) => Object.hasOwn(LangCommentFormat, doc?.languageId));
+		await commands.executeCommand("setContext", "better-memo.noFiles", docs.length === 0);
+
+		memoEngine.watchedDocsToInfoMap.clear();
+		await Aux.promise.all(
+			Aux.async.map(docs, async (doc) =>
+				memoEngine.watchedDocsToInfoMap.set(doc, { version: doc.version, lang: doc.languageId }),
+			),
+			Aux.async.map(memoEngine.documentToMemosMap.keys(), async (doc) => {
+				if (!(await memoEngine.isDocWatched(doc))) memoEngine.documentToMemosMap.delete(doc);
+			}),
+			Aux.async.map(memoEngine.watchedDocsToInfoMap.keys(), async (doc) => {
+				if (!(await memoEngine.isDocWatched(doc))) memoEngine.scanDoc(doc);
+			}),
+		);
+	},
+
+	async getMemoMatchRE(doc: TextDocument): Promise<RegExp> {
+		const langId = <keyof typeof LangCommentFormat>doc.languageId;
+		const commentFormats: { open: string; close?: string }[] = [LangCommentFormat[langId]].flat();
+		const commentFormatREs = await Aux.async.map(commentFormats, async (data, i) => {
+			const open = await Aux.re.escape(data.open);
+			const close = await Aux.re.escape(data.close ?? "");
+			return `(?<![${open}])${open}[\\t ]*mo[\\t ]+(?<tag${i}>[^\\r\\n\\t ${
+				memoEngine.commentCloseCharacters
+			}]+)[\\t ]*(?<priority${i}>!*)(?<content${i}>.*${close ? "?" : ""})${close}`;
+		});
+		const matchPatternRaw = await Aux.re.union(...commentFormatREs);
+		return RegExp(matchPatternRaw, "gim");
+	},
+
+	async scanDoc(doc: TextDocument, options?: { updateView?: boolean }): Promise<void> {
+		if (memoEngine.backgroundMode) {
+			if (memoEngine.backgroundScanBuffer < memoEngine.backgroundScanBufferMax) {
+				memoEngine.backgroundScanBuffer += doc.lineCount;
+				memoEngine.backgroundScanQueue.add(doc);
+				return;
+			} else {
+				memoEngine.backgroundScanBuffer -= doc.lineCount;
+			}
+		}
+
+		const docContent = doc.getText();
+		const matchPattern = await memoEngine.getMemoMatchRE(doc);
+
+		let memos = [];
+		await Aux.async.map(docContent.matchAll(matchPattern), async (match) => {
+			let tag: string;
+			let priority: number;
+			let content: string;
+			for (const [groupName, value] of Object.entries(match.groups)) {
+				if (value === undefined) continue;
+				if (groupName.startsWith("tag")) {
+					tag = value.toUpperCase();
+					continue;
+				}
+				if (groupName.startsWith("priority")) {
+					priority = value.length;
+					continue;
+				}
+				if (groupName.startsWith("content")) {
+					content = value.trimEnd();
+					continue;
+				}
+				break;
+			}
+			memos.push({
+				content: content,
+				tag: tag,
+				priority: priority,
+				line: doc.positionAt(match.index).line,
+				offset: match.index,
+				path: doc.fileName,
+				relativePath: workspace.asRelativePath(doc.fileName),
+				langId: doc.languageId,
+				raw: match[0],
+				rawLength: match[0].length,
+			});
+		});
+		memoEngine.documentToMemosMap.set(doc, memos);
+		if (options?.updateView) await memoEngine.eventEmitter.emit("updateView");
+	},
+
 	async scanDocInterval(): Promise<void> {
 		const doc = window.activeTextEditor?.document;
 		if (!doc) return;
 		memoEngine.previousFocusedDocument = doc;
-		if (await memoEngine.validateForScan(doc)) memoEngine.scanDoc(doc, { updateView: true });
+		if (await memoEngine.isDocValidForScan(doc)) memoEngine.scanDoc(doc, { updateView: true });
 	},
 
 	async forceScanInterval(): Promise<void> {
@@ -381,11 +387,11 @@ const memoEngine: {
 		if (
 			!tabGroup.isActive ||
 			(activeTab && !activeTab?.isActive) ||
-			(input && !(await memoEngine.watchesDoc(input.uri?.path)))
+			(input && !(await memoEngine.isDocWatched(input.uri?.path)))
 		)
 			return;
 		if (memoEngine.previousFocusedDocument.isDirty) return;
-		if (await memoEngine.validateForScan(memoEngine.previousFocusedDocument))
+		if (await memoEngine.isDocValidForScan(memoEngine.previousFocusedDocument))
 			await memoEngine.scanDoc(memoEngine.previousFocusedDocument, { updateView: true });
 		memoEngine.formatMemosInDoc(memoEngine.previousFocusedDocument);
 		if (!input) return;
@@ -393,7 +399,7 @@ const memoEngine: {
 		memoEngine.previousFocusedDocument = doc;
 	},
 
-	async validateForScan(doc?: TextDocument): Promise<boolean> {
+	async isDocValidForScan(doc?: TextDocument): Promise<boolean> {
 		const docInfo = memoEngine.watchedDocsToInfoMap.get(doc);
 		if (!docInfo) return false;
 		const versionChanged = doc.version !== docInfo.version;

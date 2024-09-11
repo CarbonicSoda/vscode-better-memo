@@ -118,13 +118,9 @@ export namespace TreeItems {
 
 			const edit = new FileEdit();
 			await Aux.async.map(memoEntries, async (memoEntry) => {
-				if (!(await memoEngine.includesMemo(memoEntry))) return;
+				if (!(await memoEngine.isMemoKnown(memoEntry))) return;
 
 				const doc = await workspace.openTextDocument(memoEntry.path);
-				const memoRE = await Aux.re.union(
-					await Aux.re.escape(memoEntry.raw),
-					await Aux.re.escape(await memoEngine.getFormattedMemo(memoEntry)),
-				);
 				const doRemoveLine =
 					(await configMaid.get("actions.removeLineIfMemoIsOnSingleLine")) &&
 					memoEntry.line < doc.lineCount - 1 &&
@@ -237,20 +233,17 @@ export namespace TreeItems {
 				return;
 
 			const memoEntry = this.memoEntry;
-			const memoRE = await Aux.re.union(
-				await Aux.re.escape(memoEntry.raw),
-				await Aux.re.escape(await memoEngine.getFormattedMemo(memoEntry)),
-			);
+			// const memoRE = await memoEngine.getMemoRE(memoEntry);
 			const doc = await workspace.openTextDocument(memoEntry.path);
 
-			if (!memoRE.test(doc.lineAt(memoEntry.line).text)) {
-				//works?
-				window.showInformationMessage(`does not exist\${}`);
-				await memoEngine.scanDoc(doc);
-				await viewProvider.reloadItems();
-				return;
-			}
-			window.showInformationMessage(`does exist\${}`);
+			// if (!memoRE.test(doc.lineAt(memoEntry.line).text)) {
+			// 	//works?
+			// 	window.showInformationMessage(`does not exist\${}`);
+			// 	await memoEngine.scanDoc(doc);
+			// 	await viewProvider.reloadItems();
+			// 	return;
+			// }
+			window.showInformationMessage(`${await memoEngine.isMemoExistent(memoEntry)}`);
 
 			const doRemoveLine =
 				(await configMaid.get("actions.removeLineIfMemoIsOnSingleLine")) &&
