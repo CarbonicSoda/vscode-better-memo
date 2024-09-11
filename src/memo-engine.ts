@@ -1,4 +1,4 @@
-import { commands, Range, TabGroup, TextDocument, ThemeColor, Uri, window, workspace } from "vscode";
+import { commands, TabGroup, TextDocument, ThemeColor, Uri, window, workspace } from "vscode";
 import { Aux } from "./utils/auxiliary";
 import { Colors } from "./utils/colors";
 import { FileEdit } from "./utils/file-edit";
@@ -33,7 +33,6 @@ const memoEngine: {
 
 	isDocWatched(docOrPath: TextDocument | string): Promise<boolean>;
 	isMemoKnown(memo: MemoEntry): Promise<boolean>;
-	isMemoExistent(memo: MemoEntry): Promise<boolean>;
 
 	getMemos(): Promise<MemoEntry[]>;
 	getCustomTags(): Promise<{ [tag: string]: ThemeColor }>;
@@ -45,13 +44,13 @@ const memoEngine: {
 	getFormattedMemo(memo: MemoEntry): Promise<string>;
 	formatMemosInDoc(doc: TextDocument): Promise<void>;
 
-	enterBackgroundMode(): Promise<void>;
-	leaveBackgroundMode(): Promise<void>;
+	enterLazyMode(): Promise<void>;
+	leaveLazyMode(): Promise<void>;
 
 	getMemoMatchRE(doc: TextDocument): Promise<RegExp>;
 	fetchMemos(options?: { updateView?: boolean }): Promise<void>;
 	fetchDocs(): Promise<void>;
-	scanDoc(doc: TextDocument, options?: { updateView?: boolean }): Promise<void>;
+	scanDoc(doc: TextDocument, options?: { updateView?: boolean; ignoreLazyMode?: boolean }): Promise<void>;
 
 	scanDocInterval(): Promise<void>;
 	forceScanInterval(): Promise<void>;
@@ -65,10 +64,8 @@ const memoEngine: {
 	customTagsToColor: { [tag: string]: ThemeColor };
 	customTagsChanged: boolean;
 
-	backgroundMode: boolean;
-	backgroundScanQueue: Set<TextDocument>;
-	backgroundScanBuffer: number;
-	backgroundScanBufferMax: number;
+	inLazyMode: boolean;
+	lazyModeScanStack: Set<TextDocument>;
 
 	previousFocusedDocument?: TextDocument;
 
@@ -84,10 +81,8 @@ const memoEngine: {
 	customTagsToColor: {},
 	customTagsChanged: true,
 
-	backgroundMode: false,
-	backgroundScanQueue: new Set(),
-	backgroundScanBuffer: 0,
-	backgroundScanBufferMax: 1000,
+	inLazyMode: false,
+	lazyModeScanStack: new Set(),
 
 	async init(): Promise<void> {
 		const tmp = (
@@ -111,6 +106,7 @@ const memoEngine: {
 				"fetcher.watch": async (watch: string[]) => `{${watch.join(",")}}`,
 				"fetcher.ignore": async (ignore: string[]) => `{${ignore.join(",")}}`,
 			}),
+			memoEngine.configMaid.listen("fetcher.lazyModeLineBufferMax"),
 		);
 
 		await memoEngine.configMaid.onChange("general.customTags", async () => {
@@ -118,22 +114,9 @@ const memoEngine: {
 			memoEngine.eventEmitter.emit("updateView");
 		}),
 			await Aux.promise.all(
-				memoEngine.intervalMaid.add(async () => await memoEngine.scanDocInterval(), "fetcher.scanDelay", {
-					min: 100,
-					max: 1000000,
-				}),
-				memoEngine.intervalMaid.add(
-					async () => await memoEngine.forceScanInterval(),
-					"fetcher.forceScanDelay",
-					{
-						min: 500,
-						max: 5000000,
-					},
-				),
-				memoEngine.intervalMaid.add(async () => await memoEngine.fetchDocs(), "fetcher.workspaceScanDelay", {
-					min: 1000,
-					max: 10000000,
-				}),
+				memoEngine.intervalMaid.add(async () => await memoEngine.scanDocInterval(), "fetcher.scanDelay"),
+				memoEngine.intervalMaid.add(async () => await memoEngine.forceScanInterval(), "fetcher.forceScanDelay"),
+				memoEngine.intervalMaid.add(async () => await memoEngine.fetchDocs(), "fetcher.workspaceScanDelay"),
 			);
 
 		await memoEngine.janitor.add(
@@ -168,13 +151,6 @@ const memoEngine: {
 
 	async isMemoKnown(memo: MemoEntry): Promise<boolean> {
 		return await Aux.object.includes(await memoEngine.getMemos(), memo);
-	},
-
-	async isMemoExistent(memo: MemoEntry): Promise<boolean> {
-		const doc = await workspace.openTextDocument(memo.path);
-		const line = doc.lineAt(memo.line).text;
-		const matchRE = await memoEngine.getMemoMatchRE(doc);
-		return line.match(matchRE)[0] === memo.raw;
 	},
 
 	async getMemos(): Promise<MemoEntry[]> {
@@ -233,8 +209,9 @@ const memoEngine: {
 	},
 
 	async formatMemosInDoc(doc: TextDocument): Promise<void> {
+		await memoEngine.scanDoc(doc, { ignoreLazyMode: true });
 		const memos = memoEngine.documentToMemosMap.get(doc);
-		if (!memos) return;
+		if (memos.length === 0) return;
 
 		const formatMemo = async (memo: MemoEntry) =>
 			await edit.replace(
@@ -248,15 +225,14 @@ const memoEngine: {
 		await edit.apply({ isRefactoring: true });
 	},
 
-	async enterBackgroundMode(): Promise<void> {
-		memoEngine.backgroundMode = true;
+	async enterLazyMode(): Promise<void> {
+		memoEngine.inLazyMode = true;
 	},
 
-	async leaveBackgroundMode(): Promise<void> {
-		memoEngine.backgroundMode = false;
-		await Aux.async.map(memoEngine.backgroundScanQueue, async (doc) => await memoEngine.scanDoc(doc));
-		memoEngine.backgroundScanQueue.clear();
-		memoEngine.backgroundScanBuffer = 0;
+	async leaveLazyMode(): Promise<void> {
+		memoEngine.inLazyMode = false;
+		memoEngine.lazyModeScanStack.clear();
+		await Aux.async.map(memoEngine.lazyModeScanStack, async (doc) => await memoEngine.scanDoc(doc));
 		await memoEngine.eventEmitter.emit("updateView");
 	},
 
@@ -309,15 +285,15 @@ const memoEngine: {
 		return RegExp(matchPatternRaw, "gim");
 	},
 
-	async scanDoc(doc: TextDocument, options?: { updateView?: boolean }): Promise<void> {
-		if (memoEngine.backgroundMode) {
-			if (memoEngine.backgroundScanBuffer < memoEngine.backgroundScanBufferMax) {
-				memoEngine.backgroundScanBuffer += doc.lineCount;
-				memoEngine.backgroundScanQueue.add(doc);
-				return;
-			} else {
-				memoEngine.backgroundScanBuffer -= doc.lineCount;
-			}
+	async scanDoc(doc: TextDocument, options?: { updateView?: boolean; ignoreLazyMode?: boolean }): Promise<void> {
+		if (memoEngine.inLazyMode && !options?.ignoreLazyMode) {
+			memoEngine.lazyModeScanStack.add(doc);
+			const bufferDocs = [...memoEngine.lazyModeScanStack.values()];
+			const bufferLines = await Aux.async.map(bufferDocs, async (doc) => doc.lineCount);
+			const backgroundModeScanBuffer = await Aux.math.sum(...bufferLines);
+			const lazyModeLineBufferMax = await memoEngine.configMaid.get("fetcher.lazyModeLineBufferMax");
+			if (backgroundModeScanBuffer < lazyModeLineBufferMax) return;
+			memoEngine.lazyModeScanStack.delete(doc);
 		}
 
 		const docContent = doc.getText();
@@ -391,8 +367,6 @@ const memoEngine: {
 		)
 			return;
 		if (memoEngine.previousFocusedDocument.isDirty) return;
-		if (await memoEngine.isDocValidForScan(memoEngine.previousFocusedDocument))
-			await memoEngine.scanDoc(memoEngine.previousFocusedDocument, { updateView: true });
 		memoEngine.formatMemosInDoc(memoEngine.previousFocusedDocument);
 		if (!input) return;
 		const doc = await workspace.openTextDocument(input.uri);

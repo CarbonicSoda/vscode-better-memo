@@ -5,14 +5,7 @@ export namespace Aux.math {
 	 */
 	export const randInt = async (min: number, max: number) => Math.round(Math.random() * (max - min) + min);
 
-	/**
-	 * math.clamp(), fits x into [min, max]
-	 */
-	export async function clamp(x: number, min: number, max: number): Promise<number> {
-		if (x < min) return min;
-		if (x > max) return max;
-		return x;
-	}
+	export const sum = async (...numbers: number[]) => numbers.reduce((sum, n) => sum + n);
 }
 
 export namespace Aux.object {

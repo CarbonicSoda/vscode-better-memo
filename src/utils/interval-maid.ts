@@ -1,4 +1,3 @@
-import { Aux } from "./auxiliary";
 import { Janitor, getJanitor } from "./janitor";
 import { ConfigMaid, getConfigMaid } from "./config-maid";
 
@@ -14,7 +13,6 @@ const intervalMaid: {
 	add(
 		callback: () => void | Promise<void>,
 		delayConfigName: string,
-		delayClamp?: { min: number; max: number },
 		configCallback?: (retrieved: any) => any,
 	): Promise<number>;
 
@@ -27,17 +25,17 @@ const intervalMaid: {
 	async add(
 		callback: () => void | Promise<void>,
 		delayConfigName: string,
-		delayClamp?: { min: number; max: number },
 		configCallback?: (retrieved: any) => any,
 	): Promise<number> {
 		await intervalMaid.configMaid.listen(delayConfigName, configCallback);
 		const intervalId = await intervalMaid.janitor.add(
 			setInterval(callback, await intervalMaid.configMaid.get(delayConfigName)),
 		);
-		await intervalMaid.configMaid.onChange(delayConfigName, async (newDelay: number) => {
-			if (delayClamp) newDelay = await Aux.math.clamp(newDelay, delayClamp.min, delayClamp.max);
-			await intervalMaid.janitor.override(intervalId, setInterval(callback, newDelay));
-		});
+		await intervalMaid.configMaid.onChange(
+			delayConfigName,
+			async (newDelay: number) =>
+				await intervalMaid.janitor.override(intervalId, setInterval(callback, newDelay)),
+		);
 		return intervalId;
 	},
 

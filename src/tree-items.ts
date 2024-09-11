@@ -3,6 +3,7 @@ import {
 	Position,
 	Range,
 	Selection,
+	TextDocument,
 	ThemeColor,
 	ThemeIcon,
 	TreeItem,
@@ -73,9 +74,11 @@ export namespace TreeItems {
 			treeView: TreeView,
 			options?: { noConfirmation?: boolean; _noExtraTasks?: boolean },
 		): Promise<void> {
-			// DOES NOT UPDATE EXPLORER CORRECTLY, GHOST MEMOS!
 			const { memoEngine, viewProvider } = treeView;
+
 			await treeView.suppressViewUpdate();
+			let docs: TextDocument[];
+			// RESCAN ALL DOCS AND COMPLETE ALL
 			const memoEntries = await Aux.async.map(
 				this.hierarchy === "primary"
 					? this.children.flatMap((child: InnerItemType) => child.children)
@@ -233,17 +236,7 @@ export namespace TreeItems {
 				return;
 
 			const memoEntry = this.memoEntry;
-			// const memoRE = await memoEngine.getMemoRE(memoEntry);
 			const doc = await workspace.openTextDocument(memoEntry.path);
-
-			// if (!memoRE.test(doc.lineAt(memoEntry.line).text)) {
-			// 	//works?
-			// 	window.showInformationMessage(`does not exist\${}`);
-			// 	await memoEngine.scanDoc(doc);
-			// 	await viewProvider.reloadItems();
-			// 	return;
-			// }
-			window.showInformationMessage(`${await memoEngine.isMemoExistent(memoEntry)}`);
 
 			const doRemoveLine =
 				(await configMaid.get("actions.removeLineIfMemoIsOnSingleLine")) &&

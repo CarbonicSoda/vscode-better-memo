@@ -67,6 +67,7 @@ const treeView: {
 			showCollapseAll: true,
 			canSelectMany: false,
 		});
+		memoEngine.inLazyMode = !treeView.view.visible;
 
 		await Aux.promise.all(
 			treeView.configMaid.onChange(
@@ -189,7 +190,7 @@ const treeView: {
 	},
 
 	async updateView(): Promise<void> {
-		if (treeView.viewUpdateSuppressed) return;
+		if (!treeView.view.visible || treeView.viewUpdateSuppressed) return;
 		await treeView.viewProvider.reloadItems();
 	},
 
@@ -238,10 +239,10 @@ const treeView: {
 
 	async handleVisibilityChange(visible: boolean): Promise<void> {
 		if (visible) {
-			await treeView.memoEngine.leaveBackgroundMode();
+			await treeView.memoEngine.leaveLazyMode();
 			return;
 		}
-		await treeView.memoEngine.enterBackgroundMode();
+		await treeView.memoEngine.enterLazyMode();
 	},
 };
 

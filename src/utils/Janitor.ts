@@ -57,11 +57,11 @@ const janitor: {
 	async clear(id: number): Promise<void> {
 		if (janitor.managed[id]?.length === 0) return;
 		await Aux.async.map(janitor.managed[id], async (instance) => {
-			(<{ dispose?: (...args: any) => any }>instance).dispose?.();
-			try {
-				clearTimeout(<NodeJS.Timeout>instance);
-			} finally {
+			if (Object.hasOwn(instance, "dispose")) {
+				(<{ dispose?: (...args: any) => any }>instance).dispose();
+				return;
 			}
+			clearTimeout(<NodeJS.Timeout>instance);
 		});
 		janitor.managed[id] = [];
 	},

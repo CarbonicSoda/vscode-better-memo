@@ -3,7 +3,7 @@ import { commands, Position, Range, TextDocument, Uri, window, workspace, Worksp
 import { Aux } from "./auxiliary";
 
 type EditRange = [start: number | Position, end: number | Position];
-type FileEdits = Map<EditRange, string>;
+type FileEdits = { range: EditRange; edit: string }[];
 type FileEditMetaData = { isRefactoring?: boolean };
 
 export class FileEdit {
@@ -11,9 +11,8 @@ export class FileEdit {
 
 	async replace(uri: Uri, range: EditRange | Range, text: string): Promise<void> {
 		if (range instanceof Range) range = [range.start, range.end];
-		if (range.length !== 2) throw new Error(`Range must contain (only) start and end: ${range}`);
-		if (!this.edits.has(uri)) this.edits.set(uri, new Map());
-		this.edits.get(uri).set(<EditRange>range, text);
+		if (!this.edits.has(uri)) this.edits.set(uri, []);
+		this.edits.get(uri).push({ range: <EditRange>range, edit: text });
 	}
 
 	async delete(uri: Uri, range: EditRange | Range): Promise<void> {
@@ -41,11 +40,12 @@ export class FileEdit {
 	private async editFileWithFs(edits: FileEdits, doc: TextDocument): Promise<void> {
 		let text = doc.getText();
 		let delta = 0;
-		for (let [[start, end], replacement] of edits.entries()) {
+		for (let { range, edit } of edits) {
+			let [start, end] = range;
 			if (typeof start !== "number") start = doc.offsetAt(start);
 			if (typeof end !== "number") end = doc.offsetAt(end);
-			text = text.slice(0, start - delta) + replacement + text.slice(end - delta);
-			delta += end - start - replacement.length;
+			text = text.slice(0, start - delta) + edit + text.slice(end - delta);
+			delta += end - start - edit.length;
 		}
 		writeFileSync(doc.uri.fsPath, text);
 	}
@@ -63,14 +63,15 @@ export class FileEdit {
 		}
 		await window.showTextDocument(doc);
 		await commands.executeCommand("workbench.action.files.saveWithoutFormatting", doc);
-		const edit = new WorkspaceEdit();
-		await Aux.async.map(edits.entries(), async ([[start, end], replacement]) => {
+		const wsEdit = new WorkspaceEdit();
+		await Aux.async.map(edits.entries(), async ([_, { range, edit }]) => {
+			let [start, end] = range;
 			if (typeof start === "number") start = doc.positionAt(start);
 			if (typeof end === "number") end = doc.positionAt(end);
-			edit.replace(uri, new Range(start, end), replacement);
+			wsEdit.replace(uri, new Range(start, end), edit);
 		});
 		try {
-			await workspace.applyEdit(edit, metaData);
+			await workspace.applyEdit(wsEdit, metaData);
 			await commands.executeCommand("workbench.action.files.saveWithoutFormatting", doc);
 		} catch (err) {
 			throw new Error(`Failed modifying ${uri.path}: ${err}`);
