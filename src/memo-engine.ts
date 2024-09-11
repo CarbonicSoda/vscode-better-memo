@@ -152,8 +152,8 @@ const memoEngine: {
 
 		await memoEngine.fetchMemos();
 
-		memoEngine.eventEmitter.emitWait("initExplorerView");
-		memoEngine.eventEmitter.emitWait("initTextEditorCommands");
+		memoEngine.eventEmitter.emitWait("initViewProvider");
+		memoEngine.eventEmitter.emitWait("initEditorCommands");
 	},
 
 	async watchesDoc(docOrPath: TextDocument | string): Promise<boolean> {

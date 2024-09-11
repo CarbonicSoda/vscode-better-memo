@@ -16,8 +16,8 @@ export async function activate(): Promise<void> {
 	memoEngine = await getMemoEngine();
 	treeView = await getTreeView();
 
-	await memoEngine.init();
-	await treeView.init(memoEngine);
+	memoEngine.init();
+	treeView.init(memoEngine);
 }
 
 export async function deactivate(): Promise<void> {

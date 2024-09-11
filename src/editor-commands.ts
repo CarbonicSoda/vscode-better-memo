@@ -7,7 +7,7 @@
 // const eventEmitter = await EvEmitter.getEventEmitter();
 // const janitor = new Janitor();
 
-// eventEmitter.wait("initTextEditorCommands", initTextEditorCommands);
+// eventEmitter.wait("initEditorCommands", initTextEditorCommands);
 
 // function initTextEditorCommands(): void {
 // 	commands.registerTextEditorCommand("")

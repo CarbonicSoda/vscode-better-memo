@@ -258,7 +258,7 @@ export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 	constructor(private memoEngine: MemoEngine) {}
 
 	async init(): Promise<void> {
-		await treeView.eventEmitter.wait("initExplorerView", async () => await this.reloadItems());
+		await treeView.eventEmitter.wait("initViewProvider", async () => await this.reloadItems());
 	}
 
 	async getTreeItem(element: TreeItems.TreeItemType): Promise<TreeItems.TreeItemType> {
