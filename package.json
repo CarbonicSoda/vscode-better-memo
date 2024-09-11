@@ -200,7 +200,7 @@
 		"viewsWelcome": [
 			{
 				"view": "better-memo.memoExplorer",
-				"contents": "Memo Explorer is loading.\nIf this is taking too long, consider inspecting fetcher configurations.",
+				"contents": "Memo Explorer is loading.\nIf this is taking too long, consider [inspecting fetcher configurations](command:workbench.action.openSettings?[\"better-memo.fetcher\"]).",
 				"when": "!better-memo.explorerInitFinished && !treeView.better-memo.memoExplorer.toggleCollapseAll"
 			},
 			{
@@ -210,7 +210,7 @@
 			},
 			{
 				"view": "better-memo.memoExplorer",
-				"contents": "Oops, cannot spot any memos throughout the universe!\nConsider spicing up the place with some memos!\nIf this is not intended, consider inspecting fetcher configurations.",
+				"contents": "Oops, cannot spot any memos throughout the universe.\nConsider spicing up the place with some memos!\nIf this is not intended, consider [inspecting fetcher configurations](command:workbench.action.openSettings?[\"better-memo.fetcher\"]).",
 				"when": "better-memo.explorerInitFinished && !better-memo.noFiles && better-memo.noMemos"
 			}
 		],
