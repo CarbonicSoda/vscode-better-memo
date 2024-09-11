@@ -52,14 +52,14 @@ const eventEmitter: {
 	events: Map<string, ((...args: any) => void)[]>;
 } = {
 	async subscribe(event: string, callback: (...args: any) => void): Promise<Disposable> {
-		if (!this.events.has(event)) this.events.set(event, []);
-		this.events.get(event).push(callback);
-		return new Disposable(event, this.events.get(event).length - 1);
+		if (!eventEmitter.events.has(event)) eventEmitter.events.set(event, []);
+		eventEmitter.events.get(event).push(callback);
+		return new Disposable(event, eventEmitter.events.get(event).length - 1);
 	},
 
 	async emit(event: string, ...args: any): Promise<void> {
 		await Aux.async.map(
-			this.events.get(event) ?? [],
+			eventEmitter.events.get(event) ?? [],
 			async (callback?: (...args: any) => void | Promise<void>) => await callback?.(...args),
 		);
 	},
@@ -69,9 +69,9 @@ const eventEmitter: {
 		stopCriterion?: number | string | ((stop: () => Promise<void>) => void),
 		...args: any
 	): Promise<void> {
-		this.emit(event, ...args);
+		eventEmitter.emit(event, ...args);
 		return await new Promise(async (resolve) => {
-			const newListenerWatcher = await this.subscribe(
+			const newListenerWatcher = await eventEmitter.subscribe(
 				`__waitListenerAdded${event}`,
 				async (onDispatch: (...args: any) => Promise<void>) => await onDispatch(...args),
 			);
@@ -84,7 +84,7 @@ const eventEmitter: {
 					setTimeout(stop, stopCriterion);
 					break;
 				case "string":
-					const stopEvent = await this.subscribe(stopCriterion, async () => {
+					const stopEvent = await eventEmitter.subscribe(stopCriterion, async () => {
 						stop();
 						stopEvent.dispose();
 					});
@@ -93,7 +93,7 @@ const eventEmitter: {
 					stopCriterion(stop);
 					break;
 				default:
-					this.wait(`c__${event}`, stop);
+					eventEmitter.wait(`c__${event}`, stop);
 					break;
 			}
 		});
@@ -109,11 +109,11 @@ const eventEmitter: {
 			const onDispatch = async (...args: any) => {
 				resolve(await callback(...args));
 				disposable.dispose();
-				if (callbackEvent) this.emit(callbackEvent, ...callbackArgs);
-				this.emit(`c__${event}`);
+				if (callbackEvent) eventEmitter.emit(callbackEvent, ...callbackArgs);
+				eventEmitter.emit(`c__${event}`);
 			};
-			const disposable = await this.subscribe(event, onDispatch);
-			this.emit(`__waitListenerAdded${event}`, onDispatch);
+			const disposable = await eventEmitter.subscribe(event, onDispatch);
+			eventEmitter.emit(`__waitListenerAdded${event}`, onDispatch);
 		});
 	},
 

@@ -69,13 +69,13 @@ export namespace TreeItems {
 			});
 		}
 
-		async completeMemos(
+		async markMemosAsComplete(
 			treeView: TreeView,
 			options?: { noConfirmation?: boolean; _noExtraTasks?: boolean },
 		): Promise<void> {
 			// DOES NOT UPDATE EXPLORER CORRECTLY, GHOST MEMOS!
 			const { memoEngine, viewProvider } = treeView;
-			await memoEngine.suppressForceScan();
+			await treeView.suppressViewUpdate();
 			const memoEntries = await Aux.async.map(
 				this.hierarchy === "primary"
 					? this.children.flatMap((child: InnerItemType) => child.children)
@@ -102,26 +102,26 @@ export namespace TreeItems {
 				this.iconPath = iconPath;
 				await viewProvider.refresh(this);
 				if (!option || option === "No") {
-					await memoEngine.unsuppressForceScan();
+					await treeView.unsuppressViewUpdate();
 					return;
 				}
 			}
 
-			await Aux.async.map(
-				new Set(await Aux.async.map(memoEntries, async (memoEntry) => memoEntry.path)),
-				async (path) => {
-					const doc = await workspace.openTextDocument(path);
-					await memoEngine.scanDoc(doc);
-				},
-			);
-			await viewProvider.reloadItems();
+			// await Aux.async.map(
+			// 	new Set(await Aux.async.map(memoEntries, async (memoEntry) => memoEntry.path)),
+			// 	async (path) => {
+			// 		const doc = await workspace.openTextDocument(path);
+			// 		await memoEngine.scanDoc(doc);
+			// 	},
+			// ); //BROKEN
+			// await viewProvider.reloadItems();
 
 			const edit = new FileEdit();
 			await Aux.async.map(memoEntries, async (memoEntry) => {
-				if (!(await memoEngine.includes(memoEntry))) return;
+				if (!(await memoEngine.includesMemo(memoEntry))) return;
 
 				const doc = await workspace.openTextDocument(memoEntry.path);
-				const memoRE = await Aux.re.concat(
+				const memoRE = await Aux.re.union(
 					await Aux.re.escape(memoEntry.raw),
 					await Aux.re.escape(await memoEngine.getFormattedMemo(memoEntry)),
 				);
@@ -141,10 +141,10 @@ export namespace TreeItems {
 			await edit.apply({ isRefactoring: true });
 
 			if (options?._noExtraTasks) return;
-			await memoEngine.suppressForceScan();
+			await treeView.suppressViewUpdate();
 			await memoEngine.removeMemos(...memoEntries);
-			await viewProvider.reloadItems();
-			await memoEngine.unsuppressForceScan();
+			await viewProvider.refresh(await this.removeFromTree(viewProvider));
+			await treeView.unsuppressViewUpdate();
 		}
 	}
 
@@ -157,7 +157,7 @@ export namespace TreeItems {
 			this.iconPath = ThemeIcon.File;
 		}
 
-		async navigate(): Promise<void> {
+		async navigateTo(): Promise<void> {
 			const doc = await workspace.openTextDocument(this.path);
 			const editor = await window.showTextDocument(doc);
 			const pos = doc.lineAt(0).range.end;
@@ -216,7 +216,7 @@ export namespace TreeItems {
 			);
 		}
 
-		async navigate(): Promise<void> {
+		async navigateTo(): Promise<void> {
 			const memoEntry = this.memoEntry;
 			const doc = await workspace.openTextDocument(memoEntry.path);
 			const editor = await window.showTextDocument(doc);
@@ -225,10 +225,10 @@ export namespace TreeItems {
 			editor.revealRange(new Range(pos, pos));
 		}
 
-		async complete(treeView: TreeView, options?: { noConfirmation?: boolean }): Promise<void> {
+		async markAsComplete(treeView: TreeView, options?: { noConfirmation?: boolean }): Promise<void> {
 			const { memoEngine, viewProvider } = treeView;
 
-			await memoEngine.unsuppressForceScan();
+			await treeView.unsuppressViewUpdate();
 			if (
 				!options?.noConfirmation &&
 				(await configMaid.get("actions.askForConfirmationOnCompletionOfMemo")) &&
@@ -237,7 +237,7 @@ export namespace TreeItems {
 				return;
 
 			const memoEntry = this.memoEntry;
-			const memoRE = await Aux.re.concat(
+			const memoRE = await Aux.re.union(
 				await Aux.re.escape(memoEntry.raw),
 				await Aux.re.escape(await memoEngine.getFormattedMemo(memoEntry)),
 			);
@@ -265,7 +265,7 @@ export namespace TreeItems {
 			const range = new Range(start, end);
 			const edit = new FileEdit();
 			await edit.delete(doc.uri, range);
-			await memoEngine.removeMemo(memoEntry);
+			await memoEngine.removeMemos(memoEntry);
 			viewProvider.refresh(await this.removeFromTree(viewProvider));
 
 			await edit.apply({ isRefactoring: true }, doOpenFile);
@@ -290,7 +290,7 @@ export namespace TreeItems {
 				};
 			};
 			const reset = async (confirmingItem: MemoItem, options?: { noRefresh?: boolean }) => {
-				await treeView.memoEngine.unsuppressForceScan();
+				await treeView.unsuppressViewUpdate();
 				clearInterval(confirmingItem.confirmInterval);
 				clearTimeout(confirmingItem.confirmTimeout);
 				confirmingItem.attemptedToComplete = false;
@@ -333,7 +333,7 @@ export namespace TreeItems {
 			this.label = abbrevLabel;
 			this.contextValue = "MemoWaitingForCompletionConfirmation";
 
-			await treeView.memoEngine.suppressForceScan();
+			await treeView.suppressViewUpdate();
 			const timeout = await configMaid.get("actions.timeoutOfConfirmationOnCompletionOfMemo");
 			let time = timeout;
 			const updateTime = async (time: number) => {

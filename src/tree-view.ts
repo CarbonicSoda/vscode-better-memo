@@ -32,99 +32,112 @@ const treeView: {
 	explorerExpandAll(): Promise<void>;
 	explorerCompleteAll(): Promise<void>;
 
+	viewUpdateSuppressed: boolean;
+	suppressViewUpdate(): Promise<void>;
+	unsuppressViewUpdate(): Promise<void>;
+
+	updateView(): Promise<void>;
 	updateViewType(view?: "File" | "Tag", options?: { noReload?: boolean }): Promise<void>;
-	updateItemCollapsibleState(): Promise<void>;
-	handleChangeVisibility(visible: boolean): Promise<void>;
+	updateExpandStateOfItems(): Promise<void>;
+	handleVisibilityChange(visible: boolean): Promise<void>;
 
 	janitor?: Janitor;
 	configMaid?: ConfigMaid;
 	eventEmitter?: EventEmitter;
 } = {
+	viewUpdateSuppressed: false,
+
 	async init(memoEngine: MemoEngine): Promise<void> {
-		this.janitor = await getJanitor();
-		this.configMaid = await getConfigMaid();
-		this.eventEmitter = await getEventEmitter();
+		treeView.janitor = await getJanitor();
+		treeView.configMaid = await getConfigMaid();
+		treeView.eventEmitter = await getEventEmitter();
 
 		await Aux.promise.all(
-			this.configMaid.listen("view.defaultView"),
-			this.configMaid.listen("view.expandPrimaryItemsByDefault"),
-			this.configMaid.listen("view.expandSecondaryItemsByDefault"),
+			treeView.configMaid.listen("view.defaultView"),
+			treeView.configMaid.listen("view.expandPrimaryItemsByDefault"),
+			treeView.configMaid.listen("view.expandSecondaryItemsByDefault"),
 		);
 
-		this.memoEngine = memoEngine;
-		this.viewProvider = new ViewProvider(memoEngine);
-		await this.updateViewType(null, { noReload: true });
-		await this.viewProvider.init();
-		this.view = window.createTreeView("better-memo.memoExplorer", {
-			treeDataProvider: this.viewProvider,
+		treeView.memoEngine = memoEngine;
+		treeView.viewProvider = new ViewProvider(memoEngine);
+		await treeView.updateViewType(null, { noReload: true });
+		await treeView.viewProvider.init();
+		treeView.view = window.createTreeView("better-memo.memoExplorer", {
+			treeDataProvider: treeView.viewProvider,
 			showCollapseAll: true,
 			canSelectMany: false,
 		});
 
 		await Aux.promise.all(
-			this.configMaid.onChange(
+			treeView.configMaid.onChange(
 				"view.defaultView",
-				async (view: "File" | "Tag") => await this.updateViewType(view),
+				async (view: "File" | "Tag") => await treeView.updateViewType(view),
 			),
-			this.configMaid.onChange(
+			treeView.configMaid.onChange(
 				["view.expandPrimaryItemsByDefault", "view.expandSecondaryItemsByDefault"],
-				async () => await this.updateItemCollapsibleState(),
+				async () => await treeView.updateExpandStateOfItems(),
 			),
 		);
 
-		await this.janitor.add(
-			this.view,
+		await treeView.janitor.add(
+			treeView.view,
 
-			this.eventEmitter.subscribe("updateView", async () => await this.viewProvider.reloadItems()),
+			treeView.eventEmitter.subscribe("updateView", async () => await treeView.updateView()),
 
-			window.onDidChangeActiveColorTheme(async () => await this.viewProvider.reloadItems()),
+			window.onDidChangeActiveColorTheme(async () => await treeView.updateView()),
 
-			this.view.onDidChangeVisibility(
-				async (ev: TreeViewVisibilityChangeEvent) => await this.handleChangeVisibility(ev.visible),
+			treeView.view.onDidChangeVisibility(
+				async (ev: TreeViewVisibilityChangeEvent) => await treeView.handleVisibilityChange(ev.visible),
 			),
 
-			commands.registerCommand("better-memo.switchToFileView", async () => await this.updateViewType("File")),
-			commands.registerCommand("better-memo.switchToTagView", async () => await this.updateViewType("Tag")),
-			commands.registerCommand("better-memo.explorerCompleteAll", async () => await this.explorerCompleteAll()),
-			commands.registerCommand("better-memo.explorerExpandAll", async () => await this.explorerExpandAll()),
+			commands.registerCommand("better-memo.switchToFileView", async () => await treeView.updateViewType("File")),
+			commands.registerCommand("better-memo.switchToTagView", async () => await treeView.updateViewType("Tag")),
+			commands.registerCommand(
+				"better-memo.explorerCompleteAll",
+				async () => await treeView.explorerCompleteAll(),
+			),
+			commands.registerCommand("better-memo.explorerExpandAll", async () => await treeView.explorerExpandAll()),
 
 			commands.registerCommand(
 				"better-memo.navigateToFile",
-				async (fileItem: TreeItems.FileItem) => await fileItem.navigate(),
+				async (fileItem: TreeItems.FileItem) => await fileItem.navigateTo(),
 			),
 			commands.registerCommand(
 				"better-memo.completeFile",
-				async (fileItem: TreeItems.FileItem) => await fileItem.completeMemos(this),
+				async (fileItem: TreeItems.FileItem) => await fileItem.markMemosAsComplete(treeView),
 			),
 			commands.registerCommand(
 				"better-memo.completeFileNoConfirm",
-				async (fileItem: TreeItems.FileItem) => await fileItem.completeMemos(this, { noConfirmation: true }),
+				async (fileItem: TreeItems.FileItem) =>
+					await fileItem.markMemosAsComplete(treeView, { noConfirmation: true }),
 			),
 
 			commands.registerCommand(
 				"better-memo.completeTag",
-				async (tagItem: TreeItems.TagItem) => await tagItem.completeMemos(this),
+				async (tagItem: TreeItems.TagItem) => await tagItem.markMemosAsComplete(treeView),
 			),
 			commands.registerCommand(
 				"better-memo.completeTagNoConfirm",
-				async (tagItem: TreeItems.TagItem) => await tagItem.completeMemos(this, { noConfirmation: true }),
+				async (tagItem: TreeItems.TagItem) =>
+					await tagItem.markMemosAsComplete(treeView, { noConfirmation: true }),
 			),
 
 			commands.registerCommand(
 				"better-memo.navigateToMemo",
-				async (memoItem: TreeItems.MemoItem) => await memoItem.navigate(),
+				async (memoItem: TreeItems.MemoItem) => await memoItem.navigateTo(),
 			),
 			commands.registerCommand(
 				"better-memo.completeMemo",
-				async (memoItem: TreeItems.MemoItem) => await memoItem.complete(this),
+				async (memoItem: TreeItems.MemoItem) => await memoItem.markAsComplete(treeView),
 			),
 			commands.registerCommand(
 				"better-memo.confirmCompleteMemo",
-				async (memoItem: TreeItems.MemoItem) => await memoItem.complete(this),
+				async (memoItem: TreeItems.MemoItem) => await memoItem.markAsComplete(treeView),
 			),
 			commands.registerCommand(
 				"better-memo.completeMemoNoConfirm",
-				async (memoItem: TreeItems.MemoItem) => await memoItem.complete(this, { noConfirmation: true }),
+				async (memoItem: TreeItems.MemoItem) =>
+					await memoItem.markAsComplete(treeView, { noConfirmation: true }),
 			),
 		);
 
@@ -133,14 +146,14 @@ const treeView: {
 
 	async explorerExpandAll(): Promise<void> {
 		await Aux.async.map(
-			this.viewProvider.items,
-			async (item) => await this.view.reveal(item, { select: false, expand: 2 }),
+			treeView.viewProvider.items,
+			async (item) => await treeView.view.reveal(item, { select: false, expand: 2 }),
 		);
 	},
 
 	async explorerCompleteAll(): Promise<void> {
-		const { memoEngine, viewProvider } = this;
-		await memoEngine.suppressForceScan();
+		const { memoEngine, viewProvider } = treeView;
+		await treeView.suppressViewUpdate();
 		const memoCount = viewProvider.memoCount;
 		const items = viewProvider.items;
 
@@ -155,64 +168,80 @@ const treeView: {
 			"No",
 		);
 		if (!option || option === "No") {
-			await memoEngine.unsuppressForceScan();
+			await treeView.unsuppressViewUpdate();
 			return;
 		}
 
-		for (const item of items) await item.completeMemos(this, { noConfirmation: true, _noExtraTasks: true });
+		for (const item of items)
+			await item.markMemosAsComplete(treeView, { noConfirmation: true, _noExtraTasks: true });
 		await memoEngine.removeAllMemos();
 		await viewProvider.removeAllItems();
 		await viewProvider.refresh();
+		await treeView.unsuppressViewUpdate();
 	},
 
-	async updateViewType(view?: "File" | "Tag", options?: { noReload?: boolean }): Promise<void> {
-		this.viewProvider.viewType = view = view ?? (await this.configMaid.get("view.defaultView"));
-		await commands.executeCommand("setContext", "better-memo.explorerView", view);
+	async suppressViewUpdate(): Promise<void> {
+		treeView.viewUpdateSuppressed = true;
+	},
+
+	async unsuppressViewUpdate(): Promise<void> {
+		treeView.viewUpdateSuppressed = false;
+	},
+
+	async updateView(): Promise<void> {
+		if (treeView.viewUpdateSuppressed) return;
+		await treeView.viewProvider.reloadItems();
+	},
+
+	async updateViewType(viewType?: "File" | "Tag", options?: { noReload?: boolean }): Promise<void> {
+		if (treeView.viewUpdateSuppressed) return;
+		treeView.viewProvider.viewType = viewType = viewType ?? (await treeView.configMaid.get("view.defaultView"));
+		await commands.executeCommand("setContext", "better-memo.explorerView", viewType);
 		if (options?.noReload) return;
-		await this.viewProvider.reloadItems();
+		await treeView.viewProvider.reloadItems();
 	},
 
-	async updateItemCollapsibleState(): Promise<void> {
-		const expandPrimaryItems = await this.configMaid.get("view.expandPrimaryItemsByDefault");
-		const expandSecondaryItems = await this.configMaid.get("view.expandSecondaryItemsByDefault");
+	async updateExpandStateOfItems(): Promise<void> {
+		const expandPrimaryItems = await treeView.configMaid.get("view.expandPrimaryItemsByDefault");
+		const expandSecondaryItems = await treeView.configMaid.get("view.expandSecondaryItemsByDefault");
 
 		const onViewReveal = async () => {
 			await commands.executeCommand("list.collapseAll");
 			if (expandSecondaryItems) {
 				const uRevealPromises = [];
 				await Aux.async.map(
-					this.viewProvider.items.flatMap((item: TreeItems.InnerItemType) => item.children),
-					async (child) => uRevealPromises.push(this.view.reveal(child, { select: false, expand: true })),
+					treeView.viewProvider.items.flatMap((item) => item.children),
+					async (child) => uRevealPromises.push(treeView.view.reveal(child, { select: false, expand: true })),
 				);
 				await Promise.allSettled(uRevealPromises);
 			}
-			for (const item of this.viewProvider.items) {
+			for (const item of treeView.viewProvider.items) {
 				if (expandPrimaryItems) {
-					this.view.reveal(item, { select: false, expand: true });
+					treeView.view.reveal(item, { select: false, expand: true });
 					continue;
 				}
-				await this.view.reveal(item, { select: false, focus: true });
+				await treeView.view.reveal(item, { select: false, focus: true });
 				await commands.executeCommand("list.collapse");
 			}
-			await this.view.reveal(this.viewProvider.items[0], {
+			await treeView.view.reveal(treeView.viewProvider.items[0], {
 				select: false,
 				focus: true,
 			});
 		};
 
 		try {
-			await this.view.reveal(this.viewProvider.items[0], { select: false, focus: true });
+			await treeView.view.reveal(treeView.viewProvider.items[0], { select: false, focus: true });
 			await onViewReveal();
 		} finally {
 		}
 	},
 
-	async handleChangeVisibility(visible: boolean): Promise<void> {
+	async handleVisibilityChange(visible: boolean): Promise<void> {
 		if (visible) {
-			await this.memoEngine.disableBackgroundMode();
+			await treeView.memoEngine.leaveBackgroundMode();
 			return;
 		}
-		await this.memoEngine.enableBackgroundMode();
+		await treeView.memoEngine.enterBackgroundMode();
 	},
 };
 
@@ -274,6 +303,7 @@ export class ViewProvider implements TreeDataProvider<TreeItems.TreeItemType> {
 		const memos = await this.memoEngine.getMemos();
 		const tags = await this.memoEngine.getTags();
 		this.memoCount = memos.length;
+		if (this.memoCount === 0) return;
 
 		const inner = await Aux.object.group(memos, isFileView ? "path" : "tag");
 		const innerLabels = Object.keys(inner).sort();

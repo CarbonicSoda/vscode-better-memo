@@ -50,33 +50,33 @@ const janitor: {
 	async add(
 		...DisposableOrTimeout: (DisposableLike | Promise<DisposableLike> | NodeJS.Timeout | Promise<NodeJS.Timeout>)[]
 	): Promise<number> {
-		this.managed.push(await Promise.all(DisposableOrTimeout));
-		return this.autoIncrementInstanceID++;
+		janitor.managed.push(await Promise.all(DisposableOrTimeout));
+		return janitor.autoIncrementInstanceID++;
 	},
 
 	async clear(id: number): Promise<void> {
-		if (this.managed[id]?.length === 0) return;
-		await Aux.async.map(this.managed[id], async (instance) => {
+		if (janitor.managed[id]?.length === 0) return;
+		await Aux.async.map(janitor.managed[id], async (instance) => {
 			(<{ dispose?: (...args: any) => any }>instance).dispose?.();
 			try {
 				clearTimeout(<NodeJS.Timeout>instance);
 			} finally {
 			}
 		});
-		this.managed[id] = [];
+		janitor.managed[id] = [];
 	},
 
 	async clearAll(): Promise<void> {
-		await Aux.async.range(this.autoIncrementInstanceID, async (i) => await this.clear(i));
+		await Aux.async.range(janitor.autoIncrementInstanceID, async (i) => await janitor.clear(i));
 	},
 
 	async override(
 		id: number,
 		...DisposableOrTimeout: (DisposableLike | Promise<DisposableLike> | NodeJS.Timeout | Promise<NodeJS.Timeout>)[]
 	): Promise<void> {
-		if (this.managed[id].length === 0) throw new Error(`No managed instance to override with id ${id}`);
-		await this.clear(id);
-		this.managed[id] = await Promise.all(DisposableOrTimeout);
+		if (janitor.managed[id].length === 0) throw new Error(`No managed instance to override with id ${id}`);
+		await janitor.clear(id);
+		janitor.managed[id] = await Promise.all(DisposableOrTimeout);
 	},
 
 	managed: [],

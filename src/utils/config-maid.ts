@@ -43,16 +43,16 @@ const configMaid: {
 		if (typeof configNameOrList === "object") {
 			await Aux.async.map(
 				Object.entries(configNameOrList),
-				async ([configName, callback]) => await this.listen(configName, callback),
+				async ([configName, callback]) => await configMaid.listen(configName, callback),
 			);
 			return;
 		}
-		this.configsMap.set(configNameOrList, callback);
+		configMaid.configsMap.set(configNameOrList, callback);
 	},
 
 	async get(configName: string): Promise<any> {
-		if (!this.configsMap.has(configName)) throw new Error(`${configName} is not listened`);
-		return await this.configsMap.get(configName)(this.configs.get(configName));
+		if (!configMaid.configsMap.has(configName)) throw new Error(`${configName} is not listened`);
+		return await configMaid.configsMap.get(configName)(configMaid.configs.get(configName));
 	},
 
 	async onChange(configs: string | string[], callback: (...newValues: any[]) => void): Promise<void> {
@@ -63,10 +63,10 @@ const configMaid: {
 				!_configs.some((config) => ev.affectsConfiguration(`better-memo.${config}`))
 			)
 				return;
-			this.configs = workspace.getConfiguration("better-memo");
-			callback(...(await Aux.async.map(_configs, async (configName) => await this.get(configName))));
+			configMaid.configs = workspace.getConfiguration("better-memo");
+			callback(...(await Aux.async.map(_configs, async (configName) => await configMaid.get(configName))));
 		};
-		await this.janitor.add(workspace.onDidChangeConfiguration(async (ev) => onChangeConfiguration(ev)));
+		await configMaid.janitor.add(workspace.onDidChangeConfiguration(async (ev) => onChangeConfiguration(ev)));
 	},
 
 	configs: workspace.getConfiguration("better-memo"),

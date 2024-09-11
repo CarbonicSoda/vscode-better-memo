@@ -31,35 +31,30 @@ export async function getMemoEngine(): Promise<MemoEngine> {
 const memoEngine: {
 	init(): Promise<void>;
 
-	watches(path: string): Promise<boolean>;
-	includes(memo: MemoEntry): Promise<boolean>;
+	watchesDoc(docOrPath: TextDocument | string): Promise<boolean>;
+	includesMemo(memo: MemoEntry): Promise<boolean>;
 	stillExists(memo: MemoEntry): Promise<boolean>;
 
 	getMemos(): Promise<MemoEntry[]>;
-	getMemosInDoc(doc: TextDocument): Promise<MemoEntry[]>;
 	fetchCustomTags(): Promise<{ [tag: string]: ThemeColor }>;
 	getTags(): Promise<{ [tag: string]: ThemeColor }>;
 
-	removeMemo(memo: MemoEntry): Promise<void>;
 	removeMemos(...memos: MemoEntry[]): Promise<void>;
 	removeAllMemos(): Promise<void>;
 
+	fetchMemos(options?: { updateView?: boolean }): Promise<void>;
 	fetchDocs(): Promise<void>;
 	scanDoc(doc: TextDocument, options?: { updateView?: boolean }): Promise<void>;
-	fetchMemos(options?: { updateView?: boolean }): Promise<void>;
 
 	getFormattedMemo(memo: MemoEntry): Promise<string>;
-	formatMemos(doc: TextDocument): Promise<void>;
+	formatMemosInDoc(doc: TextDocument): Promise<void>;
 
-	suppressForceScan(): Promise<void>;
-	unsuppressForceScan(): Promise<void>;
-
-	enableBackgroundMode(): Promise<void>;
-	disableBackgroundMode(): Promise<void>;
+	enterBackgroundMode(): Promise<void>;
+	leaveBackgroundMode(): Promise<void>;
 
 	scanDocInterval(): Promise<void>;
 	forceScanInterval(): Promise<void>;
-	onTabChange(changed: readonly TabGroup[]): Promise<void>;
+	handleTabChange(changed: readonly TabGroup[]): Promise<void>;
 
 	validateForScan(doc?: TextDocument): Promise<boolean>;
 
@@ -68,8 +63,6 @@ const memoEngine: {
 
 	customTagsToColor: { [tag: string]: ThemeColor };
 	customTagsChanged: boolean;
-
-	forceScanSuppressed: boolean;
 
 	backgroundMode: boolean;
 	backgroundScanQueue: Set<TextDocument>;
@@ -84,6 +77,17 @@ const memoEngine: {
 	intervalMaid?: IntervalMaid;
 	eventEmitter?: EventEmitter;
 } = {
+	watchedDocsToInfoMap: new Map(),
+	documentToMemosMap: new Map(),
+
+	customTagsToColor: {},
+	customTagsChanged: true,
+
+	backgroundMode: false,
+	backgroundScanQueue: new Set(),
+	backgroundScanBuffer: 0,
+	backgroundScanBufferMax: 1000,
+
 	async init(): Promise<void> {
 		const tmp = (
 			await Aux.async.map(
@@ -93,69 +97,76 @@ const memoEngine: {
 		)
 			.join("")
 			.split("");
-		this.commentCloseCharacters = await Aux.re.escape([...new Set(tmp)].join(""));
+		memoEngine.commentCloseCharacters = await Aux.re.escape([...new Set(tmp)].join(""));
 
-		this.janitor = await getJanitor();
-		this.configMaid = await getConfigMaid();
-		this.intervalMaid = await getIntervalMaid();
-		this.eventEmitter = await getEventEmitter();
+		memoEngine.janitor = await getJanitor();
+		memoEngine.configMaid = await getConfigMaid();
+		memoEngine.intervalMaid = await getIntervalMaid();
+		memoEngine.eventEmitter = await getEventEmitter();
 
 		await Aux.promise.all(
-			this.configMaid.listen("general.customTags"),
-			this.configMaid.listen({
+			memoEngine.configMaid.listen("general.customTags"),
+			memoEngine.configMaid.listen({
 				"fetcher.watch": async (watch: string[]) => `{${watch.join(",")}}`,
 				"fetcher.ignore": async (ignore: string[]) => `{${ignore.join(",")}}`,
 			}),
 		);
 
-		await Aux.promise.all(
-			this.intervalMaid.add(async () => await this.scanDocInterval(), "fetcher.scanDelay", {
-				min: 100,
-				max: 1000000,
-			}),
-			this.intervalMaid.add(async () => await this.forceScanInterval(), "fetcher.forceScanDelay", {
-				min: 500,
-				max: 5000000,
-			}),
-			this.intervalMaid.add(async () => await this.fetchDocs(), "fetcher.workspaceScanDelay", {
-				min: 1000,
-				max: 10000000,
-			}),
-		);
+		await memoEngine.configMaid.onChange("general.customTags", async () => {
+			memoEngine.customTagsChanged = true;
+			memoEngine.eventEmitter.emit("updateView");
+		}),
+			await Aux.promise.all(
+				memoEngine.intervalMaid.add(async () => await memoEngine.scanDocInterval(), "fetcher.scanDelay", {
+					min: 100,
+					max: 1000000,
+				}),
+				memoEngine.intervalMaid.add(
+					async () => await memoEngine.forceScanInterval(),
+					"fetcher.forceScanDelay",
+					{
+						min: 500,
+						max: 5000000,
+					},
+				),
+				memoEngine.intervalMaid.add(async () => await memoEngine.fetchDocs(), "fetcher.workspaceScanDelay", {
+					min: 1000,
+					max: 10000000,
+				}),
+			);
 
-		await this.janitor.add(
-			workspace.onDidCreateFiles(async () => await this.fetchDocs()),
-			workspace.onDidDeleteFiles(async () => await this.fetchDocs()),
+		await memoEngine.janitor.add(
+			workspace.onDidCreateFiles(async () => await memoEngine.fetchDocs()),
+			workspace.onDidDeleteFiles(async () => await memoEngine.fetchDocs()),
 
 			workspace.onDidSaveTextDocument(async (doc) => {
-				if (this.validateForScan(doc)) this.scanDoc(doc, { updateView: true });
+				if (await memoEngine.validateForScan(doc)) memoEngine.scanDoc(doc, { updateView: true });
 			}),
-			window.tabGroups.onDidChangeTabGroups(async (ev) => await this.onTabChange(ev.changed)),
-
-			this.configMaid.onChange("general.customTags", async () => {
-				this.customTagsChanged = true;
-				this.eventEmitter.emit("updateView");
-			}),
+			window.tabGroups.onDidChangeTabGroups(async (ev) => await memoEngine.handleTabChange(ev.changed)),
 
 			commands.registerCommand(
 				"better-memo.reloadExplorer",
-				async () => await this.fetchMemos({ updateView: true }),
+				async () => await memoEngine.fetchMemos({ updateView: true }),
 			),
 		);
 
-		await this.fetchMemos();
+		await memoEngine.fetchMemos();
 
-		this.eventEmitter.emitWait("initExplorerView");
-		this.eventEmitter.emitWait("initTextEditorCommands");
+		memoEngine.eventEmitter.emitWait("initExplorerView");
+		memoEngine.eventEmitter.emitWait("initTextEditorCommands");
 	},
 
-	async watches(docOrPath: TextDocument | string): Promise<boolean> {
-		const doc = typeof docOrPath === "string" ? await workspace.openTextDocument(docOrPath) : docOrPath;
-		return this.watchedDocsToInfoMap.has(doc);
+	async watchesDoc(docOrPath: TextDocument | string): Promise<boolean> {
+		try {
+			const doc = typeof docOrPath === "string" ? await workspace.openTextDocument(docOrPath) : docOrPath;
+			return memoEngine.watchedDocsToInfoMap.has(doc);
+		} catch {
+			return false;
+		}
 	},
 
-	async includes(memo: MemoEntry): Promise<boolean> {
-		return await Aux.object.includes(this.documentToMemosMap.values(), memo);
+	async includesMemo(memo: MemoEntry): Promise<boolean> {
+		return await Aux.object.includes(await memoEngine.getMemos(), memo);
 	},
 
 	async stillExists(memo: MemoEntry): Promise<boolean> {
@@ -165,64 +176,61 @@ const memoEngine: {
 	},
 
 	async getMemos(): Promise<MemoEntry[]> {
-		const memos = [...this.documentToMemosMap.values()].flat();
+		const memos = [...memoEngine.documentToMemosMap.values()].flat();
 		await commands.executeCommand("setContext", "better-memo.noMemos", memos.length === 0);
 		return memos;
 	},
 
-	async getMemosInDoc(doc: TextDocument): Promise<MemoEntry[]> {
-		return this.documentToMemosMap.get(doc);
-	},
-
 	async fetchCustomTags(): Promise<{ [tag: string]: ThemeColor }> {
-		const customTags = await this.configMaid.get("general.customTags");
-		const validTagRE = RegExp(`^[^\\r\\n\t ${this.commentCloseCharacters}]+$`);
+		const customTags: { [tag: string]: string } = await memoEngine.configMaid.get("general.customTags");
+		const validTagRE = RegExp(`^[^\\r\\n\t ${memoEngine.commentCloseCharacters}]+$`);
 		const validHexRE = /(?:^#?[0-9a-f]{6}$)|(?:^#?[0-9a-f]{3}$)/i;
 		const uValidCustomTags: { [tag: string]: Promise<ThemeColor> } = {};
 		await Aux.async.map(Object.entries(customTags), async ([tag, hex]) => {
-			[tag, hex] = [tag.trim().toUpperCase(), (<string>hex).trim()];
-			if (!validTagRE.test(tag) || !validHexRE.test(<string>hex)) return;
-			uValidCustomTags[tag] = Colors.interpolate(<string>hex);
+			[tag, hex] = [tag.trim().toUpperCase(), hex.trim()];
+			if (!validTagRE.test(tag) || !validHexRE.test(hex)) return;
+			uValidCustomTags[tag] = Colors.interpolate(hex);
 		});
 		return await Aux.promise.props(uValidCustomTags);
 	},
 
 	async getTags(): Promise<{ [tag: string]: ThemeColor }> {
-		const tags = await Aux.async.map(await this.getMemos(), async (memo: MemoEntry) => memo.tag);
-		if (this.customTagsChanged) {
-			this.customTagsChanged = false;
-			this.customTagsToColor = await this.fetchCustomTags();
+		const tags = await Aux.async.map(await memoEngine.getMemos(), async (memo: MemoEntry) => memo.tag);
+		if (memoEngine.customTagsChanged) {
+			memoEngine.customTagsChanged = false;
+			memoEngine.customTagsToColor = await memoEngine.fetchCustomTags();
 		}
 		const uMemoTags = {};
 		await Aux.async.map(tags, async (tag) => {
-			if (!this.customTagsToColor[tag]) uMemoTags[tag] = Colors.hashColor(tag);
+			if (!memoEngine.customTagsToColor[tag]) uMemoTags[tag] = Colors.hashColor(tag);
 		});
-		return Object.assign(await Aux.promise.props(uMemoTags), this.customTagsToColor);
-	},
-
-	async removeMemo(memo: MemoEntry): Promise<void> {
-		await Aux.async.map(
-			(<Map<TextDocument, MemoEntry[]>>this.documentToMemosMap).entries(),
-			async ([doc, memos]) => {
-				if (!(await Aux.object.includes(memos, memo))) return;
-				const memoIndex = await Aux.object.indexOf(memos, memo);
-				const removed = (<MemoEntry[]>memos).filter((_, i) => i !== memoIndex);
-				this.documentToMemosMap.set(doc, removed);
-			},
-		);
+		return Object.assign(await Aux.promise.props(uMemoTags), memoEngine.customTagsToColor);
 	},
 
 	async removeMemos(...memos: MemoEntry[]): Promise<void> {
-		await Aux.async.map(memos, async (memo) => await this.removeMemo(memo));
+		const removeMemo = async (memo: MemoEntry) =>
+			await Aux.async.map(memoEngine.documentToMemosMap.entries(), async ([doc, memos]) => {
+				if (!(await Aux.object.includes(memos, memo))) return;
+				const memoIndex = await Aux.object.indexOf(memos, memo);
+				const removed = memos.filter((_, i) => i !== memoIndex);
+				memoEngine.documentToMemosMap.set(doc, removed);
+			});
+		await Aux.async.map(memos, async (memo) => await removeMemo(memo));
 	},
 
 	async removeAllMemos(): Promise<void> {
-		this.documentToMemosMap.clear();
+		memoEngine.documentToMemosMap.clear();
+	},
+
+	async fetchMemos(options?: { updateView?: boolean }): Promise<void> {
+		await memoEngine.fetchDocs();
+		await Aux.async.map(memoEngine.watchedDocsToInfoMap.keys(), async (doc) => await memoEngine.scanDoc(doc));
+		if (options?.updateView) await memoEngine.eventEmitter.emit("updateView");
 	},
 
 	async fetchDocs(): Promise<void> {
-		const watch = await this.configMaid.get("fetcher.watch");
-		const ignore = await this.configMaid.get("fetcher.ignore");
+		const watch = await memoEngine.configMaid.get("fetcher.watch");
+		const ignore = await memoEngine.configMaid.get("fetcher.ignore");
 
 		const getDoc = async (uri: Uri) => {
 			try {
@@ -233,32 +241,30 @@ const memoEngine: {
 		const unfilteredUris = await workspace.findFiles(watch, ignore);
 		const unfilteredDocs = await Aux.async.map(unfilteredUris, async (uri) => await getDoc(uri));
 		const docs: TextDocument[] = unfilteredDocs.filter((doc) => Object.hasOwn(LangCommentFormat, doc?.languageId));
-
-		this.watchedDocsToInfoMap.clear();
 		await commands.executeCommand("setContext", "better-memo.noFiles", docs.length === 0);
 
+		memoEngine.watchedDocsToInfoMap.clear();
 		await Aux.promise.all(
-			Aux.async.map(
-				docs,
-				async (doc) => await this.watchedDocsToInfoMap.set(doc, { version: doc.version, lang: doc.languageId }),
+			Aux.async.map(docs, async (doc) =>
+				memoEngine.watchedDocsToInfoMap.set(doc, { version: doc.version, lang: doc.languageId }),
 			),
-			Aux.async.map(this.documentToMemosMap.keys(), async (doc) => {
-				if (!this.watchedDocsToInfoMap.has(doc)) this.documentToMemosMap.delete(doc);
+			Aux.async.map(memoEngine.documentToMemosMap.keys(), async (doc) => {
+				if (!(await memoEngine.watchesDoc(doc))) memoEngine.documentToMemosMap.delete(doc);
 			}),
-			Aux.async.map(this.watchedDocsToInfoMap.keys(), async (doc) => {
-				if (!this.documentToMemosMap.has(doc)) this.scanDoc(doc);
+			Aux.async.map(memoEngine.watchedDocsToInfoMap.keys(), async (doc) => {
+				if (!(await memoEngine.watchesDoc(doc))) memoEngine.scanDoc(doc);
 			}),
 		);
 	},
 
 	async scanDoc(doc: TextDocument, options?: { updateView?: boolean }): Promise<void> {
-		if (this.backgroundMode) {
-			if (this.backgroundScanBuffer < this.backgroundScanBufferMax) {
-				this.backgroundScanBuffer += doc.lineCount;
-				this.backgroundScanQueue.add(doc);
+		if (memoEngine.backgroundMode) {
+			if (memoEngine.backgroundScanBuffer < memoEngine.backgroundScanBufferMax) {
+				memoEngine.backgroundScanBuffer += doc.lineCount;
+				memoEngine.backgroundScanQueue.add(doc);
 				return;
 			} else {
-				this.backgroundScanBuffer -= doc.lineCount;
+				memoEngine.backgroundScanBuffer -= doc.lineCount;
 			}
 		}
 
@@ -269,10 +275,10 @@ const memoEngine: {
 			const open = await Aux.re.escape(data.open);
 			const close = await Aux.re.escape(data.close ?? "");
 			return `(?<![${open}])${open}[\\t ]*mo[\\t ]+(?<tag${i}>[^\\r\\n\\t ${
-				this.commentCloseCharacters
+				memoEngine.commentCloseCharacters
 			}]+)[\\t ]*(?<priority${i}>!*)(?<content${i}>.*${close ? "?" : ""})${close}`;
 		});
-		const matchPatternRaw = await Aux.re.concat(...commentFormatREs);
+		const matchPatternRaw = await Aux.re.union(...commentFormatREs);
 		const matchPattern = RegExp(matchPatternRaw, "gim");
 
 		let memos = [];
@@ -309,14 +315,8 @@ const memoEngine: {
 				rawLength: match[0].length,
 			});
 		});
-		this.documentToMemosMap.set(doc, memos);
-		if (options?.updateView) await this.eventEmitter.emit("updateView");
-	},
-
-	async fetchMemos(options?: { updateView?: boolean }): Promise<void> {
-		await this.fetchDocs();
-		await Aux.async.map(this.watchedDocsToInfoMap.keys(), async (doc) => await this.scanDoc(doc));
-		if (options?.updateView) await this.eventEmitter.emit("updateView");
+		memoEngine.documentToMemosMap.set(doc, memos);
+		if (options?.updateView) await memoEngine.eventEmitter.emit("updateView");
 	},
 
 	async getFormattedMemo(memo: MemoEntry): Promise<string> {
@@ -327,56 +327,51 @@ const memoEngine: {
 		}${padding}${commentFormat.close ?? ""}`;
 	},
 
-	async formatMemos(doc: TextDocument): Promise<void> {
-		const memos = this.documentToMemosMap.get(doc);
+	async formatMemosInDoc(doc: TextDocument): Promise<void> {
+		const memos = memoEngine.documentToMemosMap.get(doc);
 		if (!memos) return;
 
 		const formatMemo = async (memo: MemoEntry) =>
-			await edit.replace(doc.uri, [memo.offset, memo.offset + memo.rawLength], await this.getFormattedMemo(memo));
+			await edit.replace(
+				doc.uri,
+				[memo.offset, memo.offset + memo.rawLength],
+				await memoEngine.getFormattedMemo(memo),
+			);
 
 		const edit = new FileEdit();
 		await Aux.async.map(memos, async (memo: MemoEntry) => await formatMemo(memo));
 		await edit.apply({ isRefactoring: true });
 	},
 
-	async suppressForceScan(): Promise<void> {
-		this.forceScanSuppressed = true;
+	async enterBackgroundMode(): Promise<void> {
+		memoEngine.backgroundMode = true;
 	},
 
-	async unsuppressForceScan(): Promise<void> {
-		this.forceScanSuppressed = false;
-	},
-
-	async enableBackgroundMode(): Promise<void> {
-		this.backgroundMode = true;
-	},
-
-	async disableBackgroundMode(): Promise<void> {
-		this.backgroundMode = false;
-		await Aux.async.map(this.backgroundScanQueue, async (doc) => await this.scanDoc(doc));
-		this.backgroundScanQueue.clear();
-		this.backgroundScanBuffer = 0;
-		await this.eventEmitter.emit("updateView");
+	async leaveBackgroundMode(): Promise<void> {
+		memoEngine.backgroundMode = false;
+		await Aux.async.map(memoEngine.backgroundScanQueue, async (doc) => await memoEngine.scanDoc(doc));
+		memoEngine.backgroundScanQueue.clear();
+		memoEngine.backgroundScanBuffer = 0;
+		await memoEngine.eventEmitter.emit("updateView");
 	},
 
 	async scanDocInterval(): Promise<void> {
 		const doc = window.activeTextEditor?.document;
 		if (!doc) return;
-		this.previousFocusedDocument = doc;
-		if (await this.validateForScan(doc)) this.scanDoc(doc, { updateView: true });
+		memoEngine.previousFocusedDocument = doc;
+		if (await memoEngine.validateForScan(doc)) memoEngine.scanDoc(doc, { updateView: true });
 	},
 
 	async forceScanInterval(): Promise<void> {
-		if (this.forceScanSuppressed) return;
 		const doc = window.activeTextEditor?.document;
-		if (!doc || !this.watchedDocsToInfoMap.has(doc)) return;
-		this.scanDoc(doc, { updateView: true });
+		if (!doc || !memoEngine.watchedDocsToInfoMap.has(doc)) return;
+		memoEngine.scanDoc(doc, { updateView: true });
 	},
 
-	async onTabChange(changed: readonly TabGroup[]): Promise<void> {
+	async handleTabChange(changed: readonly TabGroup[]): Promise<void> {
 		if (
-			!this.previousFocusedDocument ||
-			!this.watchedDocsToInfoMap.has(this.previousFocusedDocument) ||
+			!memoEngine.previousFocusedDocument ||
+			!memoEngine.watchedDocsToInfoMap.has(memoEngine.previousFocusedDocument) ||
 			changed.length !== 1
 		)
 			return;
@@ -386,20 +381,20 @@ const memoEngine: {
 		if (
 			!tabGroup.isActive ||
 			(activeTab && !activeTab?.isActive) ||
-			(input && !(await this.watches(input.uri?.path)))
+			(input && !(await memoEngine.watchesDoc(input.uri?.path)))
 		)
 			return;
-		if (this.previousFocusedDocument.isDirty) return;
-		if (await this.validateForScan(this.previousFocusedDocument))
-			await this.scanDoc(this.previousFocusedDocument, { updateView: true });
-		this.formatMemos(this.previousFocusedDocument);
+		if (memoEngine.previousFocusedDocument.isDirty) return;
+		if (await memoEngine.validateForScan(memoEngine.previousFocusedDocument))
+			await memoEngine.scanDoc(memoEngine.previousFocusedDocument, { updateView: true });
+		memoEngine.formatMemosInDoc(memoEngine.previousFocusedDocument);
 		if (!input) return;
 		const doc = await workspace.openTextDocument(input.uri);
-		this.previousFocusedDocument = doc;
+		memoEngine.previousFocusedDocument = doc;
 	},
 
 	async validateForScan(doc?: TextDocument): Promise<boolean> {
-		const docInfo = this.watchedDocsToInfoMap.get(doc);
+		const docInfo = memoEngine.watchedDocsToInfoMap.get(doc);
 		if (!docInfo) return false;
 		const versionChanged = doc.version !== docInfo.version;
 		const langChanged = doc.languageId !== docInfo.lang;
@@ -407,17 +402,4 @@ const memoEngine: {
 		if (langChanged) docInfo.lang = doc.languageId;
 		return versionChanged || langChanged;
 	},
-
-	watchedDocsToInfoMap: new Map(),
-	documentToMemosMap: new Map(),
-
-	customTagsToColor: {},
-	customTagsChanged: true,
-
-	forceScanSuppressed: false,
-
-	backgroundMode: false,
-	backgroundScanQueue: new Set(),
-	backgroundScanBuffer: 0,
-	backgroundScanBufferMax: 1000,
 };

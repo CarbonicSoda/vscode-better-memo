@@ -87,9 +87,9 @@ export namespace Aux.promise {
 		return <{ [key: string | number | symbol]: Awaited<T> }>object;
 	}
 
-	export const all = async <T>(...promises: (T | Promise<T>)[]) => await Promise.all(promises);
+	export const all = async (...promises: any[]) => await Promise.all(promises);
 	
-	export const allSettled = async <T>(...promises: (T | Promise<T>)[]) => await Promise.allSettled(promises);
+	export const allSettled = async (...promises: any[]) => await Promise.allSettled(promises);
 }
 
 export namespace Aux.re {
@@ -104,7 +104,7 @@ export namespace Aux.re {
 	/**
 	 * Concats several regular expressions into a union RegExp
 	 */
-	export const concat = async (...regExps: string[]) => RegExp(`(?:${regExps.join(")|(?:")})`);
+	export const union = async (...regExps: string[]) => RegExp(`(?:${regExps.join(")|(?:")})`);
 }
 
 export namespace Aux.string {
