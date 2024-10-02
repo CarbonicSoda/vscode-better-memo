@@ -54,7 +54,7 @@ export namespace TreeItems {
 		children: ExplorerTreeItem[] = [];
 		hierarchy: "primary" | "secondary";
 
-		constructor(label: string, expand: boolean, context: string, parent?: InnerItemType) {
+		constructor(label: string, expand: boolean, context: "File" | "Tag", parent?: InnerItemType) {
 			if (!resolved) throw moduleUnresolvedError;
 
 			super(label, expand, parent);
@@ -77,14 +77,24 @@ export namespace TreeItems {
 			const { memoEngine, viewProvider } = treeView;
 
 			await treeView.suppressViewUpdate();
-			let docs: TextDocument[];
-			// RESCAN ALL DOCS AND COMPLETE ALL
-			const memoEntries = await Aux.async.map(
-				this.hierarchy === "primary"
-					? this.children.flatMap((child: InnerItemType) => child.children)
-					: this.children,
-				async (memoItem: MemoItem) => memoItem.memoEntry,
-			);
+
+			let memoEntries = [];
+			if (this.contextValue === "File") {
+				const fileItem = <FileItem>(<unknown>this);
+				const doc = await workspace.openTextDocument(fileItem.path);
+				await memoEngine.scanDoc(doc, { ignoreLazyMode: true });
+				memoEntries = await memoEngine.getMemosInDoc(doc);
+			} else {
+				const tagItem = <TagItem>(<unknown>this);
+				const filePaths = await Aux.async.map(tagItem.children, async (file: FileItem) => file.path);
+				const docs = [];
+				await Aux.async.map(filePaths, async (path) => {
+					const doc = await workspace.openTextDocument(path);
+					docs.push(doc);
+					await memoEngine.scanDoc(doc, { ignoreLazyMode: true });
+				});
+				memoEntries = await memoEngine.getMemosWithTag(tagItem.tag);
+			}
 
 			if (!options?.noConfirmation && (await configMaid.get("actions.askForConfirmationOnCompletionOfMemos"))) {
 				const iconPath = this.iconPath;
@@ -109,15 +119,6 @@ export namespace TreeItems {
 					return;
 				}
 			}
-
-			// await Aux.async.map(
-			// 	new Set(await Aux.async.map(memoEntries, async (memoEntry) => memoEntry.path)),
-			// 	async (path) => {
-			// 		const doc = await workspace.openTextDocument(path);
-			// 		await memoEngine.scanDoc(doc);
-			// 	},
-			// ); //BROKEN
-			// await viewProvider.reloadItems();
 
 			const edit = new FileEdit();
 			await Aux.async.map(memoEntries, async (memoEntry) => {
@@ -166,7 +167,7 @@ export namespace TreeItems {
 	}
 
 	export class TagItem extends InnerItem {
-		constructor(tag: string, expand: boolean, parent?: FileItem) {
+		constructor(readonly tag: string, expand: boolean, parent?: FileItem) {
 			if (!resolved) throw moduleUnresolvedError;
 
 			super(tag, expand, "Tag", parent);
@@ -186,7 +187,7 @@ export namespace TreeItems {
 		confirmInterval?: NodeJS.Timeout;
 		confirmTimeout?: NodeJS.Timeout;
 
-		constructor(public memoEntry: MemoEntry, parent: InnerItem) {
+		constructor(public memoEntry: MemoEntry, parent: InnerItemType) {
 			if (!resolved) throw moduleUnresolvedError;
 
 			const content = memoEntry.content === "" ? "Placeholder T^T" : memoEntry.content;

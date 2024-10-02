@@ -35,6 +35,8 @@ const memoEngine: {
 	isMemoKnown(memo: MemoEntry): Promise<boolean>;
 
 	getMemos(): Promise<MemoEntry[]>;
+	getMemosInDoc(doc: TextDocument): Promise<MemoEntry[]>;
+	getMemosWithTag(tag: string): Promise<MemoEntry[]>;
 	getCustomTags(): Promise<{ [tag: string]: ThemeColor }>;
 	getTags(): Promise<{ [tag: string]: ThemeColor }>;
 
@@ -157,6 +159,15 @@ const memoEngine: {
 		const memos = [...memoEngine.documentToMemosMap.values()].flat();
 		await commands.executeCommand("setContext", "better-memo.noMemos", memos.length === 0);
 		return memos;
+	},
+
+	async getMemosInDoc(doc: TextDocument): Promise<MemoEntry[]> {
+		return memoEngine.documentToMemosMap.get(doc);
+	},
+
+	async getMemosWithTag(tag: string): Promise<MemoEntry[]> {
+		const memos = await memoEngine.getMemos();
+		return memos.filter((memo) => memo.tag === tag);
 	},
 
 	async getCustomTags(): Promise<{ [tag: string]: ThemeColor }> {
