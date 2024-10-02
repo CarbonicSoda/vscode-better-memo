@@ -21,74 +21,87 @@
 		"commands": [
 			{
 				"command": "better-memo.switchToFileView",
-				"title": "Switch to File View",
+				"title": "Better Memo: Switch to File View",
 				"enablement": "treeView.better-memo.memoExplorer.toggleCollapseAll && better-memo.explorerView == Tag",
 				"icon": "$(folder-library)"
 			},
 			{
 				"command": "better-memo.switchToTagView",
-				"title": "Switch to Tag View",
+				"title": "Better Memo: Switch to Tag View",
 				"enablement": "treeView.better-memo.memoExplorer.toggleCollapseAll && better-memo.explorerView == File",
 				"icon": "$(symbol-parameter)"
 			},
 			{
 				"command": "better-memo.reloadExplorer",
-				"title": "Refresh Explorer",
+				"title": "Better Memo: Refresh Explorer",
 				"enablement": "better-memo.explorerInitFinished",
 				"icon": "$(refresh)"
 			},
 			{
 				"command": "better-memo.explorerCompleteAll",
-				"title": "Mark All Memos as Completed",
+				"title": "Better Memo: Mark All Memos as Completed",
 				"enablement": "treeView.better-memo.memoExplorer.toggleCollapseAll",
 				"icon": "$(checklist)"
 			},
 			{
 				"command": "better-memo.explorerExpandAll",
-				"title": "Expand All",
+				"title": "Better Memo: Expand Explorer",
 				"enablement": "treeView.better-memo.memoExplorer.toggleCollapseAll",
 				"icon": "$(expand-all)"
 			},
 			{
 				"command": "better-memo.navigateToFile",
-				"title": "Navigate to File",
+				"title": "Better Memo: Navigate to File",
+				"enablement": "view.better-memo.memoExplorer.visible && viewItem == File",
 				"icon": "$(go-to-file)"
 			},
 			{
 				"command": "better-memo.completeFile",
-				"title": "Mark All Memos in File as Completed",
+				"title": "Better Memo: Mark All Memos in File as Completed",
+				"enablement": "view.better-memo.memoExplorer.visible && viewItem == File",
 				"icon": "$(check-all)"
 			},
 			{
 				"command": "better-memo.completeFileNoConfirm",
-				"title": "Mark All Memos in File as Completed"
+				"title": "Better Memo: Mark All Memos in File as Completed",
+				"enablement": "view.better-memo.memoExplorer.visible && viewItem == File"
 			},
 			{
 				"command": "better-memo.completeTag",
-				"title": "Mark All Memos Under Tag as Completed",
+				"title": "Better Memo: Mark All Memos Under Tag as Completed",
+				"enablement": "view.better-memo.memoExplorer.visible && viewItem == Tag",
 				"icon": "$(check-all)"
 			},
 			{
 				"command": "better-memo.completeTagNoConfirm",
-				"title": "Mark All Memos Under Tag as Completed"
+				"title": "Better Memo: Mark All Memos Under Tag as Completed",
+				"enablement": "view.better-memo.memoExplorer.visible && viewItem == Tag"
 			},
 			{
 				"command": "better-memo.navigateToMemo",
-				"title": "Navigate to Memo"
+				"title": "Better Memo: Navigate to Memo",
+				"enablement": "view.better-memo.memoExplorer.visible && viewItem == Memo"
 			},
 			{
 				"command": "better-memo.completeMemo",
-				"title": "Mark Memo as Completed",
+				"title": "Better Memo: Mark Memo as Completed",
+				"enablement": "view.better-memo.memoExplorer.visible && viewItem == Memo",
 				"icon": "$(check)"
 			},
 			{
 				"command": "better-memo.confirmCompleteMemo",
-				"title": "Confirm Completion",
+				"title": "Better Memo: Confirm Completion",
+				"enablement": "view.better-memo.memoExplorer.visible && viewItem == Memo",
 				"icon": "$(trash)"
 			},
 			{
 				"command": "better-memo.completeMemoNoConfirm",
-				"title": "Mark Memo as Completed"
+				"enablement": "view.better-memo.memoExplorer.visible && viewItem == Memo",
+				"title": "Better Memo: Mark Memo as Completed"
+			},
+			{
+				"command": "better-memo.completeMemoOnLine",
+				"title": "Better Memo: Mark Memo on Line as Completed"
 			}
 		],
 		"keybindings": [
@@ -106,6 +119,10 @@
 				"command": "better-memo.reloadExplorer",
 				"when": "focusedView == 'better-memo.memoExplorer' && better-memo.explorerInitFinished",
 				"key": "Ctrl+R"
+			},
+			{
+				"command": "better-memo.completeMemoOnLine",
+				"key": "Alt+Shift+M"
 			}
 		],
 		"viewsContainers": {

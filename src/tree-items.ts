@@ -3,7 +3,6 @@ import {
 	Position,
 	Range,
 	Selection,
-	TextDocument,
 	ThemeColor,
 	ThemeIcon,
 	TreeItem,

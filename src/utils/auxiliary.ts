@@ -111,14 +111,18 @@ export namespace Aux.string {
 
 export namespace Aux.algorithm {
 	/**
-	 * Returns index of the latest element in array <= candid. If sorted[0] > candid, returns -1
+	 * Returns index of the latest element in array <= candid.
+	 * If sorted[0] > candid, returns -1.
+	 * If sorted.length === 0, returns undefined.
 	 * @param transform optional function that returns a number for comparing if T is not number
 	 */
 	export async function binaryMinSearch<T>(
 		sorted: T[],
 		candid: T,
 		transform: (a: T) => number | Promise<number> = async (a) => Number(a),
-	): Promise<number> {
+	): Promise<number | undefined> {
+		if (sorted.length === 0) return undefined;
+
 		const _candid = await transform(candid);
 		const firstEle = await transform(sorted[0]);
 		const lastEle = await transform(sorted.at(-1));

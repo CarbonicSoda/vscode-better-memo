@@ -120,7 +120,7 @@ const eventEmitter: {
 	events: new Map(),
 };
 
-class Disposable {
+export class Disposable {
 	constructor(private readonly event: string, private readonly id: number) {}
 
 	async dispose(): Promise<void> {
