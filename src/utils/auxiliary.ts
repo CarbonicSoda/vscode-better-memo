@@ -116,7 +116,7 @@ export namespace Aux.algorithm {
 	 * If sorted.length === 0, returns undefined.
 	 * @param transform optional function that returns a number for comparing if T is not number
 	 */
-	export async function binaryMinSearch<T>(
+	export async function predecessorSearch<T>(
 		sorted: T[],
 		candid: T,
 		transform: (a: T) => number | Promise<number> = async (a) => Number(a),

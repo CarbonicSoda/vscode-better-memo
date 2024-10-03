@@ -30,7 +30,7 @@ namespace editorCommands {
 		const memoOffsets = await Aux.async.map(memosInDoc, async (memo) => memo.offset + memo.rawLength);
 		const offset = doc.offsetAt(active) - 1;
 
-		let lastMemoIndex = await Aux.algorithm.binaryMinSearch(memoOffsets, offset);
+		let lastMemoIndex = await Aux.algorithm.predecessorSearch(memoOffsets, offset);
 		if (!lastMemoIndex) return;
 
 		if (lastMemoIndex === memosInDoc.length - 1) lastMemoIndex--;
