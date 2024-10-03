@@ -81,7 +81,7 @@ export namespace Aux.promise {
 	}
 
 	export const all = async (...promises: any[]) => await Promise.all(promises);
-	
+
 	export const allSettled = async (...promises: any[]) => await Promise.allSettled(promises);
 }
 
@@ -118,26 +118,25 @@ export namespace Aux.algorithm {
 	 */
 	export async function predecessorSearch<T>(
 		sorted: T[],
-		candid: T,
-		transform: (a: T) => number | Promise<number> = async (a) => Number(a),
+		candid: number,
+		transform: (a: T) => Promise<number> = async (a) => Number(a),
 	): Promise<number | undefined> {
 		if (sorted.length === 0) return undefined;
 
-		const _candid = await transform(candid);
 		const firstEle = await transform(sorted[0]);
 		const lastEle = await transform(sorted.at(-1));
-		if (firstEle > _candid) return -1;
-		if (firstEle === _candid) return 0;
-		if (_candid >= lastEle) return sorted.length - 1;
+		if (firstEle > candid) return -1;
+		if (firstEle === candid) return 0;
+		if (candid >= lastEle) return sorted.length - 1;
 
 		let left = 0;
 		let right = sorted.length - 1;
 		while (true) {
 			const mid = Math.trunc((left + right) / 2);
 			const midEle = await transform(sorted[mid]);
-			if (_candid >= midEle) {
+			if (candid >= midEle) {
 				const nextEle = await transform(sorted[mid + 1]);
-				if (nextEle > _candid) return mid;
+				if (nextEle > candid) return mid;
 				left = mid + 1;
 				continue;
 			}
