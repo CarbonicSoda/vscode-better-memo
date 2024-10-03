@@ -30,13 +30,14 @@ namespace editorCommands {
 		const memoOffsets = await Aux.async.map(memosInDoc, async (memo) => memo.offset + memo.rawLength);
 		const offset = doc.offsetAt(active) - 1;
 
-		const lastMemoIndex = await Aux.algorithm.binaryMinSearch(memoOffsets, offset);
+		let lastMemoIndex = await Aux.algorithm.binaryMinSearch(memoOffsets, offset);
 		if (!lastMemoIndex) return;
 
+		if (lastMemoIndex === memosInDoc.length - 1) lastMemoIndex--;
 		const targetMemo = memosInDoc[lastMemoIndex + 1];
 		const start = doc.positionAt(targetMemo.offset);
 		const end = start.translate(0, targetMemo.rawLength);
-		
+
 		const deleteRange = new Range(start, end);
 		await editor.edit(async (editBuilder) => {
 			editBuilder.delete(deleteRange);
