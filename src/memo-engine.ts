@@ -1,317 +1,165 @@
-import { commands, TabGroup, TextDocument, ThemeColor, Uri, window, workspace } from "vscode";
+import { commands, TabGroupChangeEvent, TextDocument, ThemeColor, Uri, window, workspace } from "vscode";
 import { Aux } from "./utils/auxiliary";
-import { Colors } from "./utils/colors";
+import { ConfigMaid } from "./utils/config-maid";
+import { EventEmitter } from "./utils/event-emitter";
 import { FileEdit } from "./utils/file-edit";
-import { Janitor, getJanitor } from "./utils/janitor";
-import { ConfigMaid, getConfigMaid } from "./utils/config-maid";
-import { IntervalMaid, getIntervalMaid } from "./utils/interval-maid";
-import { EventEmitter, getEventEmitter } from "./utils/event-emitter";
+import { Janitor } from "./utils/janitor";
+import { VSColors } from "./utils/vs-colors";
 
 import LangCommentFormat from "./json/lang-comment-format.json";
 
-export type MemoEntry = {
-	readonly content: string;
-	readonly tag: string;
-	readonly priority: number;
-	readonly line: number;
-	readonly offset: number;
-	readonly path: string;
-	readonly relativePath: string;
-	readonly langId: keyof typeof LangCommentFormat;
-	readonly raw: string;
-	readonly rawLength: number;
-};
+export namespace MemoEngine {
+	const langCommentFormat: {
+		[lang: string]: { open: string; close?: string } | { open: string; close?: string }[];
+	} = LangCommentFormat;
 
-export type MemoEngine = typeof memoEngine;
+	export type MemoEntry = {
+		readonly content: string;
+		readonly tag: string;
+		readonly priority: number;
+		readonly line: number;
+		readonly offset: number;
+		readonly path: string;
+		readonly relativePath: string;
+		readonly langId: keyof typeof langCommentFormat;
+		readonly raw: string;
+		readonly rawLength: number;
+	};
 
-export async function getMemoEngine(): Promise<MemoEngine> {
-	return memoEngine;
-}
+	const dupCloseChars = Object.values(langCommentFormat)
+		.flat()
+		.map((format) => format.close)
+		.join("")
+		.split("");
+	const commentCloseChars = Aux.re.escape([...new Set(dupCloseChars)].join(""));
 
-const memoEngine: {
-	init(): Promise<void>;
+	const validTagRE = RegExp(`^[^\\r\\n\t ${commentCloseChars}]+$`);
+	const validHexRE = /(?:^#?[0-9a-f]{6}$)|(?:^#?[0-9a-f]{3}$)/i;
 
-	isDocWatched(docOrPath: TextDocument | string): Promise<boolean>;
-	isMemoKnown(memo: MemoEntry): Promise<boolean>;
+	const watchedDocInfoMap: Map<TextDocument, { version: number; lang: string }> = new Map();
+	const docMemosMap: Map<TextDocument, MemoEntry[]> = new Map();
 
-	getMemos(): Promise<MemoEntry[]>;
-	getMemosInDoc(doc: TextDocument): Promise<MemoEntry[]>;
-	getMemosWithTag(tag: string): Promise<MemoEntry[]>;
-	getCustomTags(): Promise<{ [tag: string]: ThemeColor }>;
-	getTags(): Promise<{ [tag: string]: ThemeColor }>;
+	let customTagColors: { [tag: string]: ThemeColor } = {};
+	let customTagsChanged = true;
 
-	removeMemos(...memos: MemoEntry[]): Promise<void>;
-	removeAllMemos(): Promise<void>;
+	let prevFocusTab: string | undefined;
 
-	getFormattedMemo(memo: MemoEntry): Promise<string>;
-	formatMemosInDoc(doc: TextDocument): Promise<void>;
+	let inLazyMode = false;
+	const lazyModeScanStack: Set<TextDocument> = new Set();
 
-	enterLazyMode(): Promise<void>;
-	leaveLazyMode(): Promise<void>;
+	export async function initEngine(): Promise<void> {
+		ConfigMaid.listen("general.customTags");
+		ConfigMaid.listen({
+			"fetcher.watch": (watch: string[]) => `{${watch.join(",")}}`,
+			"fetcher.ignore": (ignore: string[]) => `{${ignore.join(",")}}`,
+		});
+		ConfigMaid.listen("fetcher.lazyModeLineBufferMax");
 
-	getMemoMatchRE(doc: TextDocument): Promise<RegExp>;
-	fetchMemos(options?: { updateView?: boolean }): Promise<void>;
-	fetchDocs(): Promise<void>;
-	scanDoc(doc: TextDocument, options?: { updateView?: boolean; ignoreLazyMode?: boolean }): Promise<void>;
+		ConfigMaid.onChange("general.customTags", () => {
+			customTagsChanged = true;
+			EventEmitter.emit("updateView");
+		});
 
-	scanDocInterval(): Promise<void>;
-	forceScanInterval(): Promise<void>;
-	handleTabChange(changed: readonly TabGroup[]): Promise<void>;
+		ConfigMaid.newInterval(scanInterval, "fetcher.scanDelay");
+		ConfigMaid.newInterval(forceScanInterval, "fetcher.forceScanDelay");
+		ConfigMaid.newInterval(fetchDocs, "fetcher.workspaceScanDelay");
 
-	isDocValidForScan(doc?: TextDocument): Promise<boolean>;
+		Janitor.add(
+			workspace.onDidCreateFiles(fetchDocs),
+			workspace.onDidDeleteFiles(fetchDocs),
 
-	watchedDocsToInfoMap: Map<TextDocument, { version: number; lang: string }>;
-	documentToMemosMap: Map<TextDocument, MemoEntry[]>;
-
-	customTagsToColor: { [tag: string]: ThemeColor };
-	customTagsChanged: boolean;
-
-	inLazyMode: boolean;
-	lazyModeScanStack: Set<TextDocument>;
-
-	previousFocusedDocument?: TextDocument;
-
-	commentCloseCharacters?: string;
-	janitor?: Janitor;
-	configMaid?: ConfigMaid;
-	intervalMaid?: IntervalMaid;
-	eventEmitter?: EventEmitter;
-} = {
-	watchedDocsToInfoMap: new Map(),
-	documentToMemosMap: new Map(),
-
-	customTagsToColor: {},
-	customTagsChanged: true,
-
-	inLazyMode: false,
-	lazyModeScanStack: new Set(),
-
-	async init(): Promise<void> {
-		const tmp = (
-			await Aux.async.map(
-				Object.values(LangCommentFormat).flat(),
-				async (format) => (<{ open: string; close?: string }>format).close,
-			)
-		)
-			.join("")
-			.split("");
-		memoEngine.commentCloseCharacters = await Aux.re.escape([...new Set(tmp)].join(""));
-
-		memoEngine.janitor = await getJanitor();
-		memoEngine.configMaid = await getConfigMaid();
-		memoEngine.intervalMaid = await getIntervalMaid();
-		memoEngine.eventEmitter = await getEventEmitter();
-
-		await Aux.promise.all(
-			memoEngine.configMaid.listen("general.customTags"),
-			memoEngine.configMaid.listen({
-				"fetcher.watch": async (watch: string[]) => `{${watch.join(",")}}`,
-				"fetcher.ignore": async (ignore: string[]) => `{${ignore.join(",")}}`,
+			workspace.onDidSaveTextDocument((doc) => {
+				if (validateForScan(doc)) scanDoc(doc, { updateView: true });
 			}),
-			memoEngine.configMaid.listen("fetcher.lazyModeLineBufferMax"),
+			window.tabGroups.onDidChangeTabGroups(onTabChange),
+
+			commands.registerCommand("better-memo.reloadExplorer", () => fetchMemos({ updateView: true })),
 		);
 
-		await memoEngine.configMaid.onChange("general.customTags", async () => {
-			memoEngine.customTagsChanged = true;
-			memoEngine.eventEmitter.emit("updateView");
-		}),
-			await Aux.promise.all(
-				memoEngine.intervalMaid.add(async () => await memoEngine.scanDocInterval(), "fetcher.scanDelay"),
-				memoEngine.intervalMaid.add(async () => await memoEngine.forceScanInterval(), "fetcher.forceScanDelay"),
-				memoEngine.intervalMaid.add(async () => await memoEngine.fetchDocs(), "fetcher.workspaceScanDelay"),
-			);
+		await fetchMemos();
+		EventEmitter.emitAndWait("initEditorCommands", null);
+	}
 
-		await memoEngine.janitor.add(
-			workspace.onDidCreateFiles(async () => await memoEngine.fetchDocs()),
-			workspace.onDidDeleteFiles(async () => await memoEngine.fetchDocs()),
+	export function isDocWatched(doc: TextDocument): boolean {
+		return watchedDocInfoMap.has(doc);
+	}
 
-			workspace.onDidSaveTextDocument(async (doc) => {
-				if (await memoEngine.isDocValidForScan(doc)) memoEngine.scanDoc(doc, { updateView: true });
-			}),
-			window.tabGroups.onDidChangeTabGroups(async (ev) => await memoEngine.handleTabChange(ev.changed)),
+	export function isMemoKnown(memo: MemoEntry): boolean {
+		return Aux.object.includes(getMemos(), memo);
+	}
 
-			commands.registerCommand(
-				"better-memo.reloadExplorer",
-				async () => await memoEngine.fetchMemos({ updateView: true }),
-			),
-		);
-
-		await memoEngine.fetchMemos();
-
-		memoEngine.eventEmitter.emitWait("initViewProvider");
-		memoEngine.eventEmitter.emitWait("initEditorCommands");
-	},
-
-	async isDocWatched(docOrPath: TextDocument | string): Promise<boolean> {
-		try {
-			const doc = typeof docOrPath === "string" ? await workspace.openTextDocument(docOrPath) : docOrPath;
-			return memoEngine.watchedDocsToInfoMap.has(doc);
-		} catch {
-			return false;
-		}
-	},
-
-	async isMemoKnown(memo: MemoEntry): Promise<boolean> {
-		return await Aux.object.includes(await memoEngine.getMemos(), memo);
-	},
-
-	async getMemos(): Promise<MemoEntry[]> {
-		const memos = [...memoEngine.documentToMemosMap.values()].flat();
-		await commands.executeCommand("setContext", "better-memo.noMemos", memos.length === 0);
+	export function getMemos(): MemoEntry[] {
+		const memos = [...docMemosMap.values()].flat();
+		commands.executeCommand("setContext", "better-memo.noMemos", memos.length === 0);
 		return memos;
-	},
+	}
 
-	async getMemosInDoc(doc: TextDocument): Promise<MemoEntry[]> {
-		return memoEngine.documentToMemosMap.get(doc);
-	},
+	export function getMemosInDoc(doc: TextDocument): MemoEntry[] {
+		return docMemosMap.get(doc);
+	}
 
-	async getMemosWithTag(tag: string): Promise<MemoEntry[]> {
-		const memos = await memoEngine.getMemos();
+	export function getMemosWithTag(tag: string): MemoEntry[] {
+		const memos = getMemos();
 		return memos.filter((memo) => memo.tag === tag);
-	},
+	}
 
-	async getCustomTags(): Promise<{ [tag: string]: ThemeColor }> {
-		const customTags: { [tag: string]: string } = await memoEngine.configMaid.get("general.customTags");
-		const validTagRE = RegExp(`^[^\\r\\n\t ${memoEngine.commentCloseCharacters}]+$`);
-		const validHexRE = /(?:^#?[0-9a-f]{6}$)|(?:^#?[0-9a-f]{3}$)/i;
-		const uValidCustomTags: { [tag: string]: Promise<ThemeColor> } = {};
-		await Aux.async.map(Object.entries(customTags), async ([tag, hex]) => {
-			[tag, hex] = [tag.trim().toUpperCase(), hex.trim()];
-			if (!validTagRE.test(tag) || !validHexRE.test(hex)) return;
-			uValidCustomTags[tag] = Colors.interpolate(hex);
-		});
-		return await Aux.promise.props(uValidCustomTags);
-	},
-
-	async getTags(): Promise<{ [tag: string]: ThemeColor }> {
-		const tags = await Aux.async.map(await memoEngine.getMemos(), async (memo: MemoEntry) => memo.tag);
-		if (memoEngine.customTagsChanged) {
-			memoEngine.customTagsChanged = false;
-			memoEngine.customTagsToColor = await memoEngine.getCustomTags();
+	export async function getTagColors(): Promise<{ [tag: string]: ThemeColor }> {
+		const tags = getMemos().map((memo) => memo.tag);
+		if (customTagsChanged) {
+			customTagColors = await fetchCustomTagColors();
+			customTagsChanged = false;
 		}
-		const uMemoTags = {};
+		const tagColors = customTagColors;
 		await Aux.async.map(tags, async (tag) => {
-			if (!memoEngine.customTagsToColor[tag]) uMemoTags[tag] = Colors.hashColor(tag);
+			if (!tagColors[tag]) tagColors[tag] = VSColors.hashColor(tag);
 		});
-		return Object.assign(await Aux.promise.props(uMemoTags), memoEngine.customTagsToColor);
-	},
+		return tagColors;
+	}
 
-	async removeMemos(...memos: MemoEntry[]): Promise<void> {
-		const removeMemo = async (memo: MemoEntry) =>
-			await Aux.async.map(memoEngine.documentToMemosMap.entries(), async ([doc, memos]) => {
-				if (!(await Aux.object.includes(memos, memo))) return;
-				const memoIndex = await Aux.object.indexOf(memos, memo);
-				const removed = memos.filter((_, i) => i !== memoIndex);
-				memoEngine.documentToMemosMap.set(doc, removed);
-			});
-		await Aux.async.map(memos, async (memo) => await removeMemo(memo));
-	},
+	export function forgetMemos(...memos: MemoEntry[]): void {
+		for (const [doc, docMemos] of docMemosMap.entries()) {
+			const removed = docMemos.filter((memo) => !Aux.object.includes(memos, memo));
+			docMemosMap.set(doc, removed);
+		}
+		getMemos();
+	}
 
-	async removeAllMemos(): Promise<void> {
-		memoEngine.documentToMemosMap.clear();
-	},
+	export function forgetAllMemos(): void {
+		docMemosMap.clear();
+		commands.executeCommand("setContext", "better-memo.noMemos", true);
+	}
 
-	async getFormattedMemo(memo: MemoEntry): Promise<string> {
-		const commentFormat: { open: string; close?: string } = [LangCommentFormat[memo.langId]].flat()[0];
-		const padding = commentFormat.close ? " " : "";
-		return `${commentFormat.open}${padding}MO ${memo.tag}${memo.content ? " " : ""}${"!".repeat(memo.priority)}${
-			memo.content
-		}${padding}${commentFormat.close ?? ""}`;
-	},
+	export function enterLazyMode(): void {
+		inLazyMode = true;
+		lazyModeScanStack.clear();
+	}
 
-	async formatMemosInDoc(doc: TextDocument): Promise<void> {
-		await memoEngine.scanDoc(doc, { ignoreLazyMode: true });
-		const memos = memoEngine.documentToMemosMap.get(doc);
-		if (memos.length === 0) return;
+	export function leaveLazyMode(): void {
+		inLazyMode = false;
+		for (const doc of lazyModeScanStack) scanDoc(doc);
+		lazyModeScanStack.clear();
+		EventEmitter.emit("updateView");
+	}
 
-		const formatMemo = async (memo: MemoEntry) =>
-			await edit.replace(
-				doc.uri,
-				[memo.offset, memo.offset + memo.rawLength],
-				await memoEngine.getFormattedMemo(memo),
-			);
+	export async function scanDoc(
+		doc: TextDocument,
+		options?: { updateView?: boolean; ignoreLazyMode?: boolean },
+	): Promise<void> {
+		if (inLazyMode && !options?.ignoreLazyMode) {
+			lazyModeScanStack.add(doc);
+			const bufferDocs = [...lazyModeScanStack.values()];
+			const bufferLines = bufferDocs.map((doc) => doc.lineCount);
+			const backgroundModeScanBuffer = Aux.math.sum(...bufferLines);
+			if (backgroundModeScanBuffer < ConfigMaid.get("fetcher.lazyModeLineBufferMax")) return;
 
-		const edit = new FileEdit();
-		await Aux.async.map(memos, async (memo: MemoEntry) => await formatMemo(memo));
-		await edit.apply({ isRefactoring: true });
-	},
-
-	async enterLazyMode(): Promise<void> {
-		memoEngine.inLazyMode = true;
-	},
-
-	async leaveLazyMode(): Promise<void> {
-		memoEngine.inLazyMode = false;
-		memoEngine.lazyModeScanStack.clear();
-		await Aux.async.map(memoEngine.lazyModeScanStack, async (doc) => await memoEngine.scanDoc(doc));
-		await memoEngine.eventEmitter.emit("updateView");
-	},
-
-	async fetchMemos(options?: { updateView?: boolean }): Promise<void> {
-		await memoEngine.fetchDocs();
-		await Aux.async.map(memoEngine.watchedDocsToInfoMap.keys(), async (doc) => await memoEngine.scanDoc(doc));
-		if (options?.updateView) await memoEngine.eventEmitter.emit("updateView");
-	},
-
-	async fetchDocs(): Promise<void> {
-		const watch = await memoEngine.configMaid.get("fetcher.watch");
-		const ignore = await memoEngine.configMaid.get("fetcher.ignore");
-
-		const getDoc = async (uri: Uri) => {
-			try {
-				return await workspace.openTextDocument(uri);
-			} finally {
-			}
-		};
-		const unfilteredUris = await workspace.findFiles(watch, ignore);
-		const unfilteredDocs = await Aux.async.map(unfilteredUris, async (uri) => await getDoc(uri));
-		const docs: TextDocument[] = unfilteredDocs.filter((doc) => Object.hasOwn(LangCommentFormat, doc?.languageId));
-		await commands.executeCommand("setContext", "better-memo.noFiles", docs.length === 0);
-
-		memoEngine.watchedDocsToInfoMap.clear();
-		await Aux.promise.all(
-			Aux.async.map(docs, async (doc) =>
-				memoEngine.watchedDocsToInfoMap.set(doc, { version: doc.version, lang: doc.languageId }),
-			),
-			Aux.async.map(memoEngine.documentToMemosMap.keys(), async (doc) => {
-				if (!(await memoEngine.isDocWatched(doc))) memoEngine.documentToMemosMap.delete(doc);
-			}),
-			Aux.async.map(memoEngine.watchedDocsToInfoMap.keys(), async (doc) => {
-				if (!(await memoEngine.isDocWatched(doc))) memoEngine.scanDoc(doc);
-			}),
-		);
-	},
-
-	async getMemoMatchRE(doc: TextDocument): Promise<RegExp> {
-		const langId = <keyof typeof LangCommentFormat>doc.languageId;
-		const commentFormats: { open: string; close?: string }[] = [LangCommentFormat[langId]].flat();
-		const commentFormatREs = await Aux.async.map(commentFormats, async (data, i) => {
-			const open = await Aux.re.escape(data.open);
-			const close = await Aux.re.escape(data.close ?? "");
-			return `(?<![${open}])${open}[\\t ]*mo[\\t ]+(?<tag${i}>[^\\r\\n\\t ${
-				memoEngine.commentCloseCharacters
-			}]+)[\\t ]*(?<priority${i}>!*)(?<content${i}>.*${close ? "?" : ""})${close}`;
-		});
-		const matchPatternRaw = await Aux.re.union(...commentFormatREs);
-		return RegExp(matchPatternRaw, "gim");
-	},
-
-	async scanDoc(doc: TextDocument, options?: { updateView?: boolean; ignoreLazyMode?: boolean }): Promise<void> {
-		if (memoEngine.inLazyMode && !options?.ignoreLazyMode) {
-			memoEngine.lazyModeScanStack.add(doc);
-			const bufferDocs = [...memoEngine.lazyModeScanStack.values()];
-			const bufferLines = await Aux.async.map(bufferDocs, async (doc) => doc.lineCount);
-			const backgroundModeScanBuffer = await Aux.math.sum(...bufferLines);
-			const lazyModeLineBufferMax = await memoEngine.configMaid.get("fetcher.lazyModeLineBufferMax");
-			if (backgroundModeScanBuffer < lazyModeLineBufferMax) return;
-			memoEngine.lazyModeScanStack.delete(doc);
+			lazyModeScanStack.delete(doc);
 		}
 
 		const docContent = doc.getText();
-		const matchPattern = await memoEngine.getMemoMatchRE(doc);
+		const matchRE = getMemoMatchRE(doc);
 
-		let memos = [];
-		await Aux.async.map(docContent.matchAll(matchPattern), async (match) => {
+		let memos: MemoEntry[] = [];
+		await Aux.async.map(docContent.matchAll(matchRE), async (match) => {
 			let tag: string;
 			let priority: number;
 			let content: string;
@@ -331,6 +179,7 @@ const memoEngine: {
 				}
 				break;
 			}
+
 			memos.push({
 				content: content,
 				tag: tag,
@@ -344,53 +193,123 @@ const memoEngine: {
 				rawLength: match[0].length,
 			});
 		});
-		memoEngine.documentToMemosMap.set(doc, memos);
-		if (options?.updateView) await memoEngine.eventEmitter.emit("updateView");
-	},
 
-	async scanDocInterval(): Promise<void> {
-		const doc = window.activeTextEditor?.document;
-		if (!doc) return;
-		memoEngine.previousFocusedDocument = doc;
-		if (await memoEngine.isDocValidForScan(doc)) memoEngine.scanDoc(doc, { updateView: true });
-	},
+		docMemosMap.set(doc, memos);
+		if (options?.updateView) EventEmitter.emit("updateView");
+	}
 
-	async forceScanInterval(): Promise<void> {
-		const doc = window.activeTextEditor?.document;
-		if (!doc || !memoEngine.watchedDocsToInfoMap.has(doc)) return;
-		memoEngine.scanDoc(doc, { updateView: true });
-	},
+	async function fetchDocs(): Promise<void> {
+		const watch = ConfigMaid.get("fetcher.watch");
+		const ignore = ConfigMaid.get("fetcher.ignore");
 
-	async handleTabChange(changed: readonly TabGroup[]): Promise<void> {
-		if (
-			!memoEngine.previousFocusedDocument ||
-			!memoEngine.watchedDocsToInfoMap.has(memoEngine.previousFocusedDocument) ||
-			changed.length !== 1
-		)
-			return;
-		const tabGroup = changed[0];
-		const activeTab = tabGroup.activeTab;
-		const input: { uri?: Uri } = activeTab?.input;
-		if (
-			!tabGroup.isActive ||
-			(activeTab && !activeTab?.isActive) ||
-			(input && !(await memoEngine.isDocWatched(input.uri?.path)))
-		)
-			return;
-		if (memoEngine.previousFocusedDocument.isDirty) return;
-		memoEngine.formatMemosInDoc(memoEngine.previousFocusedDocument);
-		if (!input) return;
-		const doc = await workspace.openTextDocument(input.uri);
-		memoEngine.previousFocusedDocument = doc;
-	},
+		const getDoc = async (uri: Uri) => {
+			try {
+				return await workspace.openTextDocument(uri);
+			} finally {
+			}
+		};
+		const fileUris = await workspace.findFiles(watch, ignore);
+		const files = await Aux.async.map(fileUris, async (uri) => await getDoc(uri));
+		const docs = files.filter((doc) => langCommentFormat[doc?.languageId]);
+		commands.executeCommand("setContext", "better-memo.noFiles", docs.length === 0);
 
-	async isDocValidForScan(doc?: TextDocument): Promise<boolean> {
-		const docInfo = memoEngine.watchedDocsToInfoMap.get(doc);
+		watchedDocInfoMap.clear();
+		for (const doc of docs) watchedDocInfoMap.set(doc, { version: doc.version, lang: doc.languageId });
+		for (const doc of docMemosMap.keys()) if (!isDocWatched(doc)) docMemosMap.delete(doc);
+		for (const doc of watchedDocInfoMap.keys()) if (!isDocWatched(doc)) scanDoc(doc);
+	}
+
+	async function fetchMemos(options?: { updateView?: boolean }): Promise<void> {
+		await fetchDocs();
+		await Aux.async.map(watchedDocInfoMap.keys(), async (doc) => await scanDoc(doc));
+		if (options?.updateView) EventEmitter.emit("updateView");
+	}
+
+	function getMemoMatchRE(doc: TextDocument): RegExp {
+		const commentFormats = [langCommentFormat[doc.languageId]].flat();
+		const commentFormatREs = commentFormats.map((data, i) => {
+			const open = Aux.re.escape(data.open);
+			const close = Aux.re.escape(data.close ?? "");
+			return `(?<![${open}])${open}[\\t ]*mo[\\t ]+(?<tag${i}>[^\\r\\n\\t ${commentCloseChars}]+)[\\t ]*(?<priority${i}>!*)(?<content${i}>.*${
+				close ? "?" : ""
+			})${close}`;
+		});
+		const matchPattern = Aux.re.union(...commentFormatREs);
+		return RegExp(matchPattern, "gim");
+	}
+
+	function validateForScan(doc?: TextDocument): boolean {
+		const docInfo = watchedDocInfoMap.get(doc);
 		if (!docInfo) return false;
 		const versionChanged = doc.version !== docInfo.version;
 		const langChanged = doc.languageId !== docInfo.lang;
 		if (versionChanged) docInfo.version = doc.version;
 		if (langChanged) docInfo.lang = doc.languageId;
 		return versionChanged || langChanged;
-	},
-};
+	}
+
+	function scanInterval(): void {
+		const doc = window.activeTextEditor?.document;
+		if (doc && validateForScan(doc)) scanDoc(doc, { updateView: true });
+	}
+
+	function forceScanInterval(): void {
+		const doc = window.activeTextEditor?.document;
+		if (!doc || !isDocWatched(doc)) return;
+		scanDoc(doc, { updateView: true });
+	}
+
+	async function onTabChange(ev: TabGroupChangeEvent): Promise<void> {
+		for (const changedTab of ev.changed) {
+			if (!changedTab.isActive) continue;
+			const activeTab = changedTab.activeTab;
+			if (!activeTab) {
+				prevFocusTab = undefined;
+				break;
+			}
+			if (!activeTab.isActive || activeTab.label === prevFocusTab) continue;
+
+			let doc;
+			try {
+				doc = await workspace.openTextDocument((<{ uri?: Uri }>activeTab.input).uri);
+			} catch {
+				continue;
+			}
+			if (!isDocWatched(doc)) continue;
+
+			prevFocusTab = activeTab.label;
+			await formatMemosInDoc(doc);
+			break;
+		}
+	}
+
+	async function fetchCustomTagColors(): Promise<{ [tag: string]: ThemeColor }> {
+		const customTags: { [tag: string]: string } = ConfigMaid.get("general.customTags");
+		const validCustomTags: { [tag: string]: ThemeColor } = {};
+		await Aux.async.map(Object.entries(customTags), async ([tag, hex]) => {
+			[tag, hex] = [tag.trim().toUpperCase(), hex.trim()];
+			if (!validTagRE.test(tag) || !validHexRE.test(hex)) return;
+			validCustomTags[tag] = VSColors.interpolate(hex);
+		});
+		return validCustomTags;
+	}
+
+	function getFormattedMemo(memo: MemoEntry): string {
+		const commentFormat = [langCommentFormat[memo.langId]].flat()[0];
+		const padding = commentFormat.close ? " " : "";
+		return `${commentFormat.open}${padding}MO ${memo.tag}${memo.content ? " " : ""}${"!".repeat(memo.priority)}${
+			memo.content
+		}${padding}${commentFormat.close ?? ""}`;
+	}
+
+	async function formatMemosInDoc(doc: TextDocument): Promise<void> {
+		await scanDoc(doc, { ignoreLazyMode: true });
+		const memos = docMemosMap.get(doc);
+		if (memos.length === 0) return;
+
+		const edit = new FileEdit.Edit();
+		for (const memo of memos)
+			edit.replace(doc.uri, [memo.offset, memo.offset + memo.rawLength], getFormattedMemo(memo));
+		await edit.apply();
+	}
+}

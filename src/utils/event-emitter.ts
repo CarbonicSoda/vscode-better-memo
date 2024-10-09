@@ -1,130 +1,110 @@
-import { Aux } from "./auxiliary";
+export namespace EventEmitter {
+	const eventCallbacksMap: Map<string, ((...args: any) => void | Promise<void>)[]> = new Map();
 
-export type EventEmitter = typeof eventEmitter;
+	export class Disposable {
+		constructor(private readonly event: string, private readonly id: number) {}
 
-export async function getEventEmitter(): Promise<EventEmitter> {
-	return eventEmitter;
-}
+		dispose(): void {
+			const removed = eventCallbacksMap.get(this.event).filter((_, i) => i !== this.id);
+			eventCallbacksMap.set(this.event, removed);
+		}
+	}
 
-const eventEmitter: {
 	/**
-	 * @param event event name to subscribe to, names that start with __ or c__ are preserved
+	 * @param event event name to subscribe to, names that start with __ are reserved
 	 * @param callback callback function evoked on event dispatch
 	 */
-	subscribe(event: string, callback: (...args: any) => void | Promise<void>): Promise<Disposable>;
+	export function subscribe(event: string, callback: (...args: any) => any): Disposable {
+		if (!eventCallbacksMap.has(event)) eventCallbacksMap.set(event, []);
+		eventCallbacksMap.get(event).push(callback);
+		return new Disposable(event, eventCallbacksMap.get(event).length - 1);
+	}
 
 	/**
 	 * @param event event name to dispatch
 	 * @param args arguments to pass to callback functions
 	 */
-	emit(event: string, ...args: any): Promise<void>;
+	export function emit(event: string, ...args: any): void {
+		for (const callback of eventCallbacksMap.get(event) ?? []) callback?.(...args);
+	}
 
 	/**
-	 * Almost identical to dispatch(), but wait()s binded afterwards &
-	 * before stopCriterion is met will also resolve
-	 *
-	 * If only event is provided, yields until default callback is returned
-	 *
-	 * @param stopCriterion determines when to stop listening to new wait()s...
-	 * @param stopCriterion: number ~ timeout (in ms)
-	 * @param stopCriterion: string ~ EventEmitter event name
-	 * @param stopCriterion: callback ~ when invokes stop()
+	 * Almost identical to emit(),
+	 * but listeners binded before stop will also be invoked
+	 * @param stop: after `_stop` is manually invoked in `stop`()
 	 */
-	emitWait(event: string, stopCriterion?: number, ...args: any): Promise<void>;
+	export async function emitAndWait(event: string, stop: (_stop: () => void) => any, ...args: any): Promise<void>;
 
-	emitWait(event: string, stopCriterion?: string, ...args: any): Promise<void>;
+	/**
+	 * Almost identical to emit(),
+	 * but listeners binded before stop will also be invoked
+	 * @param stop: after timeout(`stop`) (in ms)
+	 */
+	export async function emitAndWait(event: string, stop: number, ...args: any): Promise<void>;
 
-	emitWait(
+	/**
+	 * Almost identical to emit(),
+	 * but listeners binded before stop will also be invoked
+	 * @param stop: after `stop` is emitted
+	 */
+	export async function emitAndWait(event: string, stop: string, ...args: any): Promise<void>;
+
+	/**
+	 * Almost identical to emit(),
+	 * but listeners binded before stop will also be invoked
+	 * @param stop: after at least one `event` waiter callbacks
+	 */
+	export async function emitAndWait(event: string, stop: null, ...args: any): Promise<void>;
+
+	export async function emitAndWait(
 		event: string,
-		stopCriterion?: (stop: () => Promise<void>) => void | Promise<void>,
+		stop: ((stop: () => void) => any) | number | string | null,
 		...args: any
-	): Promise<void>;
+	): Promise<void> {
+		switch (typeof stop) {
+			case "number":
+				return await emitAndWait(event, (_stop) => setTimeout(_stop, stop), ...args);
+			case "string":
+				return await emitAndWait(event, (_stop) => wait(stop, _stop), ...args);
+		}
+		if (stop === null) return await emitAndWait(event, (_stop) => wait(`__callback$${event}`, _stop), ...args);
+
+		const promise = new Promise<void>((res) => {
+			const newListenerWatcher = subscribe(`__listenerAdded$${event}`, (onDispatch: (...args: any) => void) =>
+				onDispatch(...args),
+			);
+			stop(() => {
+				newListenerWatcher.dispose();
+				res();
+			});
+		});
+
+		emit(event, ...args);
+		return await promise;
+	}
 
 	/**
 	 * @param event event name to wait for dispatch
 	 * @param callback optional callback function evoked on dispatch
 	 * @param callbackEvent optional event to emit after callback
 	 * @param callbackArgs passes to callbackEvent emit
-	 * @returns the returned value of callback
+	 * @returns returned value of Awaited\<callback()\>
 	 */
-	wait<R>(event: string, callback?: (...args: any) => R, callbackEvent?: string, ...callbackArgs: any): Promise<R>;
-
-	events: Map<string, ((...args: any) => void)[]>;
-} = {
-	async subscribe(event: string, callback: (...args: any) => void): Promise<Disposable> {
-		if (!eventEmitter.events.has(event)) eventEmitter.events.set(event, []);
-		eventEmitter.events.get(event).push(callback);
-		return new Disposable(event, eventEmitter.events.get(event).length - 1);
-	},
-
-	async emit(event: string, ...args: any): Promise<void> {
-		await Aux.async.map(
-			eventEmitter.events.get(event) ?? [],
-			async (callback?: (...args: any) => void | Promise<void>) => await callback?.(...args),
-		);
-	},
-
-	async emitWait(
+	export async function wait<R>(
 		event: string,
-		stopCriterion?: number | string | ((stop: () => Promise<void>) => void),
-		...args: any
-	): Promise<void> {
-		eventEmitter.emit(event, ...args);
-		return await new Promise(async (resolve) => {
-			const newListenerWatcher = await eventEmitter.subscribe(
-				`__waitListenerAdded${event}`,
-				async (onDispatch: (...args: any) => Promise<void>) => await onDispatch(...args),
-			);
-			const stop = async () => {
-				newListenerWatcher.dispose();
-				resolve();
-			};
-			switch (typeof stopCriterion) {
-				case "number":
-					setTimeout(stop, stopCriterion);
-					break;
-				case "string":
-					const stopEvent = await eventEmitter.subscribe(stopCriterion, async () => {
-						stop();
-						stopEvent.dispose();
-					});
-					break;
-				case "function":
-					stopCriterion(stop);
-					break;
-				default:
-					eventEmitter.wait(`c__${event}`, stop);
-					break;
-			}
-		});
-	},
-
-	async wait<R>(
-		event: string,
-		callback: (...args: any) => R | Promise<R> = async () => undefined,
+		callback?: (...args: any) => R,
 		callbackEvent?: string,
 		...callbackArgs: any
 	): Promise<R> {
-		return await new Promise(async (resolve) => {
+		return new Promise((res) => {
 			const onDispatch = async (...args: any) => {
-				resolve(await callback(...args));
-				disposable.dispose();
-				if (callbackEvent) eventEmitter.emit(callbackEvent, ...callbackArgs);
-				eventEmitter.emit(`c__${event}`);
+				sub.dispose();
+				res(await callback(...args));
+				if (callbackEvent) emit(callbackEvent, ...callbackArgs);
+				emit(`__callback$${event}`);
 			};
-			const disposable = await eventEmitter.subscribe(event, onDispatch);
-			eventEmitter.emit(`__waitListenerAdded${event}`, onDispatch);
+			const sub = subscribe(event, onDispatch);
+			emit(`__listenerAdded$${event}`, onDispatch);
 		});
-	},
-
-	events: new Map(),
-};
-
-export class Disposable {
-	constructor(private readonly event: string, private readonly id: number) {}
-
-	async dispose(): Promise<void> {
-		const removed = eventEmitter.events.get(this.event).filter((_, i) => i !== this.id);
-		eventEmitter.events.set(this.event, removed);
 	}
 }

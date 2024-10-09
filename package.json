@@ -1,14 +1,34 @@
 {
 	"name": "better-memo",
 	"displayName": "Better Memo",
-	"description": "pass",
+	"description": "",
 	"version": "0.0.1",
+	"publisher": "carbonsoda",
+	"author": {
+		"name": "David W."
+	},
+	"homepage": "https://marketplace.visualstudio.com/items?itemName=carbonsoda.better-memo",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/CarbonicSoda/vscode-better-memo"
+	},
+	"license": "MIT",
+	"bugs": {
+		"url": "https://github.com/CarbonicSoda/vscode-better-memo/issues",
+		"email": "carbonsoda@outlook.com"
+	},
 	"engines": {
 		"vscode": "^1.75.0"
 	},
-	"extensionKind": [
-		"ui",
-		"workspace"
+	"keywords": [
+		"memo",
+		"comment",
+		"explorer",
+		"manage",
+		"tag",
+		"file",
+		"reminder",
+		"tree"
 	],
 	"categories": [
 		"Other"
@@ -16,92 +36,127 @@
 	"activationEvents": [
 		"onStartupFinished"
 	],
-	"main": "./out/extension.js",
+	"main": "./dist/extension",
+	"browser": "./dist/web-extension",
+	"scripts": {
+		"vscode:prepublish": "webpack --mode production",
+		"compile": "webpack",
+		"watch": "tsc --watch -p ./",
+		"webpack-dev": "webpack --mode development --watch",
+		"webpack": "webpack --mode development",
+		"package": "webpack --mode production --devtool hidden-source-map",
+		"pretest": "npm run compile-tests && npm run compile && npm run lint",
+		"lint": "eslint src"
+	},
+	"devDependencies": {
+		"@types/vscode": "^1.80.0",
+		"@types/mocha": "^10.0.6",
+		"@types/node": "18.x",
+		"eslint": "^8.57.0",
+		"typescript": "^5.4.5",
+		"@vscode/test-cli": "^0.0.9",
+		"@vscode/test-electron": "^2.3.9"
+	},
 	"contributes": {
 		"commands": [
 			{
 				"command": "better-memo.switchToFileView",
-				"title": "Better Memo: Switch to File View",
-				"enablement": "treeView.better-memo.memoExplorer.toggleCollapseAll && better-memo.explorerView == Tag",
-				"icon": "$(folder-library)"
+				"title": "Switch to File View",
+				"enablement": "treeView.better-memo.memoExplorer.toggleCollapseAll && view.better-memo.memoExplorer.visible && better-memo.explorerView == Tag",
+				"icon": "$(folder-library)",
+				"category": "Better Memo"
 			},
 			{
 				"command": "better-memo.switchToTagView",
-				"title": "Better Memo: Switch to Tag View",
-				"enablement": "treeView.better-memo.memoExplorer.toggleCollapseAll && better-memo.explorerView == File",
-				"icon": "$(symbol-parameter)"
+				"title": "Switch to Tag View",
+				"enablement": "treeView.better-memo.memoExplorer.toggleCollapseAll && view.better-memo.memoExplorer.visible && better-memo.explorerView == File",
+				"icon": "$(symbol-parameter)",
+				"category": "Better Memo"
 			},
 			{
 				"command": "better-memo.reloadExplorer",
-				"title": "Better Memo: Refresh Explorer",
-				"enablement": "better-memo.explorerInitFinished",
-				"icon": "$(refresh)"
+				"title": "Refresh Explorer",
+				"enablement": "better-memo.explorerInitFinished && view.better-memo.memoExplorer.visible",
+				"icon": "$(refresh)",
+				"category": "Better Memo"
 			},
 			{
-				"command": "better-memo.explorerCompleteAll",
-				"title": "Better Memo: Mark All Memos as Completed",
-				"enablement": "treeView.better-memo.memoExplorer.toggleCollapseAll",
-				"icon": "$(checklist)"
+				"command": "better-memo.completeAllMemos",
+				"title": "Mark All Memos as Completed",
+				"icon": "$(checklist)",
+				"category": "Better Memo"
 			},
 			{
-				"command": "better-memo.explorerExpandAll",
-				"title": "Better Memo: Expand Explorer",
-				"enablement": "treeView.better-memo.memoExplorer.toggleCollapseAll",
-				"icon": "$(expand-all)"
+				"command": "better-memo.expandExplorer",
+				"title": "Expand Explorer",
+				"enablement": "treeView.better-memo.memoExplorer.toggleCollapseAll && view.better-memo.memoExplorer.visible",
+				"icon": "$(expand-all)",
+				"category": "Better Memo"
 			},
 			{
 				"command": "better-memo.navigateToFile",
-				"title": "Better Memo: Navigate to File",
+				"title": "Navigate to File",
 				"enablement": "view.better-memo.memoExplorer.visible && viewItem == File",
-				"icon": "$(go-to-file)"
+				"icon": "$(go-to-file)",
+				"category": "Better Memo"
 			},
 			{
 				"command": "better-memo.completeFile",
-				"title": "Better Memo: Mark All Memos in File as Completed",
+				"title": "Mark All Memos in File as Completed",
 				"enablement": "view.better-memo.memoExplorer.visible && viewItem == File",
-				"icon": "$(check-all)"
+				"icon": "$(check-all)",
+				"category": "Better Memo"
 			},
 			{
 				"command": "better-memo.completeFileNoConfirm",
-				"title": "Better Memo: Mark All Memos in File as Completed",
-				"enablement": "view.better-memo.memoExplorer.visible && viewItem == File"
+				"title": "Mark All Memos in File as Completed",
+				"enablement": "view.better-memo.memoExplorer.visible && viewItem == File",
+				"category": "Better Memo"
 			},
 			{
 				"command": "better-memo.completeTag",
-				"title": "Better Memo: Mark All Memos Under Tag as Completed",
+				"title": "Mark All Memos Under Tag as Completed",
 				"enablement": "view.better-memo.memoExplorer.visible && viewItem == Tag",
-				"icon": "$(check-all)"
+				"icon": "$(check-all)",
+				"category": "Better Memo"
 			},
 			{
 				"command": "better-memo.completeTagNoConfirm",
-				"title": "Better Memo: Mark All Memos Under Tag as Completed",
-				"enablement": "view.better-memo.memoExplorer.visible && viewItem == Tag"
+				"title": "Mark All Memos Under Tag as Completed",
+				"enablement": "view.better-memo.memoExplorer.visible && viewItem == Tag",
+				"category": "Better Memo"
 			},
 			{
 				"command": "better-memo.navigateToMemo",
-				"title": "Better Memo: Navigate to Memo",
-				"enablement": "view.better-memo.memoExplorer.visible && viewItem == Memo"
+				"title": "Navigate to Memo",
+				"enablement": "view.better-memo.memoExplorer.visible",
+				"category": "Better Memo"
 			},
 			{
 				"command": "better-memo.completeMemo",
-				"title": "Better Memo: Mark Memo as Completed",
+				"title": "Mark Memo as Completed",
 				"enablement": "view.better-memo.memoExplorer.visible && viewItem == Memo",
-				"icon": "$(check)"
+				"icon": "$(check)",
+				"category": "Better Memo"
 			},
 			{
 				"command": "better-memo.confirmCompleteMemo",
-				"title": "Better Memo: Confirm Completion",
-				"enablement": "view.better-memo.memoExplorer.visible && viewItem == Memo",
-				"icon": "$(trash)"
+				"title": "Confirm Completion",
+				"enablement": "view.better-memo.memoExplorer.visible && viewItem == MemoCompletionPending",
+				"icon": "$(trash)",
+				"category": "Better Memo"
 			},
 			{
 				"command": "better-memo.completeMemoNoConfirm",
+				"title": "Mark Memo as Completed",
 				"enablement": "view.better-memo.memoExplorer.visible && viewItem == Memo",
-				"title": "Better Memo: Mark Memo as Completed"
+				"category": "Better Memo"
 			},
 			{
 				"command": "better-memo.completeMemoOnLine",
-				"title": "Better Memo: Mark Memo on Line as Completed"
+				"title": "Mark Memo on Line as Completed",
+				"enablement": "editorIsOpen",
+				"category": "Better Memo"
 			}
 		],
 		"keybindings": [
@@ -160,12 +215,12 @@
 					"group": "navigation@2"
 				},
 				{
-					"command": "better-memo.explorerCompleteAll",
+					"command": "better-memo.completeAllMemos",
 					"when": "view.better-memo.memoExplorer.visible && better-memo.explorerInitFinished && !better-memo.noFiles && !better-memo.noMemos",
 					"group": "navigation@3"
 				},
 				{
-					"command": "better-memo.explorerExpandAll",
+					"command": "better-memo.expandExplorer",
 					"when": "view.better-memo.memoExplorer.visible && better-memo.explorerInitFinished",
 					"group": "navigation@4"
 				}
@@ -205,7 +260,7 @@
 				},
 				{
 					"command": "better-memo.confirmCompleteMemo",
-					"when": "view.better-memo.memoExplorer.visible && viewItem == MemoWaitingForCompletionConfirmation",
+					"when": "view.better-memo.memoExplorer.visible && viewItem == MemoCompletionPending",
 					"group": "inline@1"
 				},
 				{
@@ -217,17 +272,17 @@
 		"viewsWelcome": [
 			{
 				"view": "better-memo.memoExplorer",
-				"contents": "Memo Explorer is loading.\nIf this is taking too long, consider [inspecting fetcher configurations](command:workbench.action.openSettings?[\"better-memo.fetcher\"]).",
+				"contents": "Memo Explorer is loading.\nIf this is taking too long, [inspect fetcher configurations](command:workbench.action.openSettings?[\"better-memo.fetcher\"]).",
 				"when": "!better-memo.explorerInitFinished && !treeView.better-memo.memoExplorer.toggleCollapseAll"
 			},
 			{
 				"view": "better-memo.memoExplorer",
-				"contents": "You have not yet opened any folders.\n[Open Folder](command:workbench.action.files.openFolder)\nOpening a folder will close all currently open editors. To keep them open, [add a folder](command:workbench.action.addRootFolder) instead.",
+				"contents": "No supported file in workspace.\n[Open Folder](command:workbench.action.files.openFolderViaWorkspace)\nOpening a folder will close all currently open editors. To keep them open, [add a folder](command:workbench.action.addRootFolder) instead.",
 				"when": "better-memo.explorerInitFinished && better-memo.noFiles"
 			},
 			{
 				"view": "better-memo.memoExplorer",
-				"contents": "Oops, cannot spot any memos throughout the universe.\nConsider spicing up the place with some memos!\nIf this is not intended, consider [inspecting fetcher configurations](command:workbench.action.openSettings?[\"better-memo.fetcher\"]).",
+				"contents": "Oops, cannot spot any memos throughout the universe.\nConsider spicing up the place with some memos!\nIf this is not intended, [inspect fetcher configurations](command:workbench.action.openSettings?[\"better-memo.fetcher\"]).",
 				"when": "better-memo.explorerInitFinished && !better-memo.noFiles && better-memo.noMemos"
 			}
 		],
@@ -266,13 +321,13 @@
 						],
 						"default": "File"
 					},
-					"better-memo.view.expandPrimaryItemsByDefault": {
+					"better-memo.view.defaultExpandPrimaryItems": {
 						"order": 201,
 						"title": "Expand Primary Items by Default",
 						"type": "boolean",
 						"default": true
 					},
-					"better-memo.view.expandSecondaryItemsByDefault": {
+					"better-memo.view.defaultExpandSecondaryItems": {
 						"order": 202,
 						"title": "Expand Secondary Items by Default",
 						"type": "boolean",
@@ -284,33 +339,33 @@
 				"title": "Actions",
 				"order": 3,
 				"properties": {
-					"better-memo.actions.askForConfirmationOnCompletionOfMemo": {
+					"better-memo.actions.askForConfirmOnMemoCompletion": {
 						"order": 101,
 						"title": "Ask for Confirmation on Completion of Memo",
 						"type": "boolean",
 						"default": false
 					},
-					"better-memo.actions.timeoutOfConfirmationOnCompletionOfMemo": {
+					"better-memo.actions.memoCompletionConfirmTimeout": {
 						"order": 102,
 						"title": "Timeout of Confirmation on Completion of Memo",
 						"type": "integer",
 						"default": 3000
 					},
-					"better-memo.actions.alwaysOpenChangedFileOnCompletionOfMemo": {
+					"better-memo.actions.alwaysOpenFileOnMemoCompletion": {
 						"order": 103,
-						"title": "Always Open Changed File on Completion of Memo",
+						"title": "Always Open File on Completion of Memo",
 						"type": "boolean",
 						"default": true
 					},
-					"better-memo.actions.askForConfirmationOnCompletionOfMemos": {
+					"better-memo.actions.askForConfirmOnMemosCompletion": {
 						"order": 201,
 						"title": "Ask for Confirmation on Completion of Memos",
 						"type": "boolean",
 						"default": true
 					},
-					"better-memo.actions.removeLineIfMemoIsOnSingleLine": {
+					"better-memo.actions.removeLineIfMemoSpansLine": {
 						"order": 301,
-						"title": "Remove Line if Memo Is on Single Line",
+						"title": "Remove Line if Memo Spans Line",
 						"type": "boolean",
 						"default": true
 					}
@@ -368,7 +423,7 @@
 					},
 					"better-memo.fetcher.lazyModeLineBufferMax": {
 						"order": 301,
-						"title": "Background Mode Line Buffer Max",
+						"title": "Lazy Mode Line Buffer Max",
 						"type": "integer",
 						"default": 1000,
 						"minimum": 1,
@@ -377,25 +432,5 @@
 				}
 			}
 		]
-	},
-	"scripts": {
-		"vscode:prepublish": "npm run compile",
-		"compile": "tsc -p ./",
-		"watch": "tsc -watch -p ./",
-		"pretest": "npm run compile && npm run lint",
-		"lint": "eslint src --ext ts",
-		"test": "vscode-test"
-	},
-	"devDependencies": {
-		"@types/vscode": "^1.91.0",
-		"@types/mocha": "^10.0.6",
-		"@types/node": "18.x",
-		"@typescript-eslint/eslint-plugin": "^7.7.1",
-		"@typescript-eslint/parser": "^7.7.1",
-		"eslint": "^8.57.0",
-		"typescript": "^5.4.5",
-		"@vscode/test-cli": "^0.0.9",
-		"@vscode/test-electron": "^2.3.9"
 	}
 }
-

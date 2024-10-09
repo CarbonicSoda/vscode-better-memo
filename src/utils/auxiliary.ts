@@ -1,28 +1,42 @@
 export namespace Aux.math {
 	/**
 	 * Returns a random integer within the ranges
-	 * @returns integer within [min, max] (!!includes max)
+	 * @returns integer within [min, max)
 	 */
-	export const randInt = async (min: number, max: number) => Math.round(Math.random() * (max - min) + min);
+	export const randInt = (min: number, max: number) => Math.trunc(Math.random() * (max - min) + min);
 
-	export const sum = async (...numbers: number[]) => numbers.reduce((sum, n) => sum + n);
+	export const sum = (...numbers: number[]) => numbers.reduce((sum, n) => sum + n);
+}
+
+export namespace Aux.array {
+	/**
+	 * Implementation of Python's range()
+	 */
+	export function range(n: number): Iterable<number> {
+		return Array(n).keys();
+	}
+
+	export function removeFrom<T>(array: T[], ...items: T[]): T[] {
+		return array.filter((item) => !items.some((_item) => _item === item));
+	}
 }
 
 export namespace Aux.object {
+	export const is = (obj1: Object, obj2: Object) => obj1 === obj2 || JSON.stringify(obj1) === JSON.stringify(obj2);
+
 	/**
 	 * Array.includes() for objects
 	 */
-	export async function includes(objects: Object[], object: Object): Promise<boolean> {
-		return (await async.map(objects, async (obj) => JSON.stringify(obj)))
-			.join("\n")
-			.includes(JSON.stringify(object));
+	export function includes(objects: Object[], object: Object): boolean {
+		for (const obj of objects) if (is(obj, object)) return true;
+		return false;
 	}
 
 	/**
 	 * Array.indexOf() for objects
 	 */
-	export async function indexOf(objects: Object[], object: Object): Promise<number> {
-		return (await async.map(objects, async (obj) => JSON.stringify(obj))).indexOf(JSON.stringify(object));
+	export function indexOf(objects: Object[], object: Object): number {
+		return objects.map((obj) => JSON.stringify(obj)).indexOf(JSON.stringify(object));
 	}
 
 	/**
@@ -31,17 +45,13 @@ export namespace Aux.object {
 	 * @param grouper key of objects used to group them
 	 * @returns different values of object[grouper] as keys and their corresponding objects[] as values
 	 */
-	export async function group(
+	export function group(
 		objects: { [key: string]: any }[],
 		grouper: string,
-	): Promise<{ [group: string]: { [key: string]: any }[] }> {
+	): { [group: string]: { [key: string]: any }[] } {
 		const groups: { [group: string]: { [key: string]: any }[] } = {};
-		await async.map(objects, async (object) => {
-			groups[object[grouper]] = [];
-		});
-		await async.map(objects, async (object) => {
-			groups[object[grouper]].push(object);
-		});
+		for (const object of objects) groups[object[grouper]] = [];
+		for (const object of objects) groups[object[grouper]].push(object);
 		return groups;
 	}
 }
@@ -61,9 +71,10 @@ export namespace Aux.async {
 	 * Sugar for the async for loop Promise.all((await range(n)).map(async (i) => {...}))
 	 */
 	export async function range<T>(n: number, callback: (i: number) => Promise<T>): Promise<Awaited<T>[]> {
-		return await map(await misc.range(n), callback);
+		return await map(array.range(n), callback);
 	}
 }
+
 export namespace Aux.promise {
 	/**
 	 * Implementation of Promise.props()
@@ -74,9 +85,7 @@ export namespace Aux.promise {
 	}): Promise<{ [key: string | number | symbol]: Awaited<T> }> {
 		const values = await Promise.all(Object.values(object));
 		const keys = Object.keys(object);
-		await async.range(keys.length, async (i) => {
-			object[keys[i]] = values[i];
-		});
+		for (let i = 0; i < keys.length; i++) object[keys[i]] = values[i];
 		return <{ [key: string | number | symbol]: Awaited<T> }>object;
 	}
 
@@ -92,12 +101,12 @@ export namespace Aux.re {
 	 * @returns escaped RE for RegExp()
 	 * @example "[(1+1)-2]*3" becomes "\[\(1\+1\)\-2\]\*3"
 	 */
-	export const escape = async (str: string) => str.replace(/[[\]*+?{}.()^$|/\\-]/g, "\\$&");
+	export const escape = (str: string) => str.replace(/[[\]*+?{}.()^$|/\\-]/g, "\\$&");
 
 	/**
 	 * Concats several regular expressions into a union RegExp
 	 */
-	export const union = async (...regExps: string[]) => RegExp(`(?:${regExps.join(")|(?:")})`);
+	export const union = (...regExps: string[]) => RegExp(`(?:${regExps.join(")|(?:")})`);
 }
 
 export namespace Aux.string {
@@ -105,8 +114,8 @@ export namespace Aux.string {
 	 * @param countable number or iterable
 	 * @returns "s" if countable is plural or else ""
 	 */
-	export const plural = async (countable: number | any[]) =>
-		((<{ length: number }>countable).length ?? countable) === 1 ? "" : "s";
+	export const plural = (countable: number | any[]) =>
+		((<{ length?: number }>countable).length ?? countable) === 1 ? "" : "s";
 }
 
 export namespace Aux.algorithm {
@@ -116,15 +125,15 @@ export namespace Aux.algorithm {
 	 * If sorted.length === 0, returns undefined.
 	 * @param transform optional function that returns a number for comparing if T is not number
 	 */
-	export async function predecessorSearch<T>(
+	export function predecessorSearch<T>(
 		sorted: T[],
 		candid: number,
-		transform: (a: T) => Promise<number> = async (a) => Number(a),
-	): Promise<number | undefined> {
+		transform: (ele: T) => number = (ele) => Number(ele),
+	): number | undefined {
 		if (sorted.length === 0) return undefined;
 
-		const firstEle = await transform(sorted[0]);
-		const lastEle = await transform(sorted.at(-1));
+		const firstEle = transform(sorted[0]);
+		const lastEle = transform(sorted.at(-1));
 		if (firstEle > candid) return -1;
 		if (firstEle === candid) return 0;
 		if (candid >= lastEle) return sorted.length - 1;
@@ -133,23 +142,14 @@ export namespace Aux.algorithm {
 		let right = sorted.length - 1;
 		while (true) {
 			const mid = Math.trunc((left + right) / 2);
-			const midEle = await transform(sorted[mid]);
+			const midEle = transform(sorted[mid]);
 			if (candid >= midEle) {
-				const nextEle = await transform(sorted[mid + 1]);
+				const nextEle = transform(sorted[mid + 1]);
 				if (nextEle > candid) return mid;
 				left = mid + 1;
 				continue;
 			}
 			right = mid;
 		}
-	}
-}
-
-export namespace Aux.misc {
-	/**
-	 * Implementation of Python's range()
-	 */
-	export async function range(n: number): Promise<Iterable<number>> {
-		return Array(n).keys();
 	}
 }

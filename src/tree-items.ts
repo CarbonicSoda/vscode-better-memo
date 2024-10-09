@@ -7,28 +7,23 @@ import {
 	ThemeIcon,
 	TreeItem,
 	TreeItemCollapsibleState,
-	TreeItemLabel,
 	Uri,
 	window,
 	workspace,
 } from "vscode";
 import { Aux } from "./utils/auxiliary";
-import { Colors } from "./utils/colors";
+import { ConfigMaid } from "./utils/config-maid";
 import { FileEdit } from "./utils/file-edit";
-import { ConfigMaid, getConfigMaid } from "./utils/config-maid";
-import { TreeView, ViewProvider } from "./tree-view";
-import { MemoEntry } from "./memo-engine";
-
-let configMaid: ConfigMaid;
+import { VSColors } from "./utils/vs-colors";
+import { ExplorerView } from "./explorer-view";
+import { MemoEngine } from "./memo-engine";
 
 export namespace TreeItems {
+	export type TreeItemType = ExplorerItem | FileItem | TagItem | MemoItem;
 	export type InnerItemType = FileItem | TagItem;
-	export type TreeItemType = ExplorerTreeItem | FileItem | TagItem | MemoItem;
 
-	class ExplorerTreeItem extends TreeItem {
+	class ExplorerItem extends TreeItem {
 		constructor(label: string, expand: boolean | "none", public parent?: InnerItemType) {
-			if (!resolved) throw moduleUnresolvedError;
-
 			let collapsibleState: TreeItemCollapsibleState;
 			if (expand === "none") collapsibleState = TreeItemCollapsibleState.None;
 			else collapsibleState = expand ? TreeItemCollapsibleState.Expanded : TreeItemCollapsibleState.Collapsed;
@@ -36,130 +31,112 @@ export namespace TreeItems {
 			super(label, collapsibleState);
 		}
 
-		async removeFromTree(viewProvider: ViewProvider): Promise<InnerItemType | undefined> {
+		removeFromTree(): InnerItemType | undefined {
 			if (!this.parent) {
-				await viewProvider.removeItems(<InnerItemType>(<unknown>this));
+				ExplorerView.provider.removeItems(<InnerItemType>(<unknown>this));
 				return;
 			}
-			await this.parent.removeChildren(this);
-			if (this.parent.children.length === 0) return await this.parent.removeFromTree(viewProvider);
+			this.parent.removeChildren(<TreeItemType>(<unknown>this));
+			if (this.parent.children.length === 0) return this.parent.removeFromTree();
 			return this.parent;
 		}
 	}
 
-	class InnerItem extends ExplorerTreeItem {
-		static waitingForCompletionConfirmationIcon = new ThemeIcon("loading~spin");
+	class InnerItem extends ExplorerItem {
+		static pendingCompletionIcon = new ThemeIcon("loading~spin");
 
-		children: ExplorerTreeItem[] = [];
-		hierarchy: "primary" | "secondary";
+		children: TreeItemType[] = [];
+		isPrimary: boolean;
 
-		constructor(label: string, expand: boolean, context: "File" | "Tag", parent?: InnerItemType) {
-			if (!resolved) throw moduleUnresolvedError;
-
+		constructor(public contextValue: "File" | "Tag", label: string, expand: boolean, parent?: InnerItemType) {
 			super(label, expand, parent);
-			this.contextValue = context;
-			this.hierarchy = parent ? "secondary" : "primary";
+			this.isPrimary = !parent;
 		}
 
-		async removeChildren(...children: ExplorerTreeItem[]): Promise<void> {
-			await Aux.async.map(children, async (child) => {
-				if (!this.children.includes(child)) return;
-				const childIndex = this.children.indexOf(child);
-				this.children = this.children.filter((_, i) => i !== childIndex);
-			});
+		removeChildren(...children: TreeItemType[]): void {
+			this.children = Aux.array.removeFrom(this.children, ...children);
 		}
 
-		async markMemosAsComplete(
-			treeView: TreeView,
-			options?: { noConfirmation?: boolean; _noExtraTasks?: boolean },
-		): Promise<void> {
-			const { memoEngine, viewProvider } = treeView;
-
-			await treeView.suppressViewUpdate();
+		async markMemosAsCompleted(options?: { noConfirm?: boolean; _noExtraTasks?: boolean }): Promise<void> {
+			ExplorerView.suppressUpdate();
 
 			let memoEntries = [];
 			if (this.contextValue === "File") {
 				const fileItem = <FileItem>(<unknown>this);
 				const doc = await workspace.openTextDocument(fileItem.path);
-				await memoEngine.scanDoc(doc, { ignoreLazyMode: true });
-				memoEntries = await memoEngine.getMemosInDoc(doc);
+				await MemoEngine.scanDoc(doc, { ignoreLazyMode: true });
+				memoEntries = MemoEngine.getMemosInDoc(doc);
 			} else {
 				const tagItem = <TagItem>(<unknown>this);
-				const filePaths = await Aux.async.map(tagItem.children, async (file: FileItem) => file.path);
+				let filePaths = tagItem.isPrimary
+					? tagItem.children.map((child) => (<FileItem>child).path)
+					: tagItem.children.map((memo) => (<MemoItem>memo).memoEntry.path);
+				filePaths = [...new Set(filePaths)];
 				const docs = [];
 				await Aux.async.map(filePaths, async (path) => {
 					const doc = await workspace.openTextDocument(path);
 					docs.push(doc);
-					await memoEngine.scanDoc(doc, { ignoreLazyMode: true });
+					await MemoEngine.scanDoc(doc, { ignoreLazyMode: true });
 				});
-				memoEntries = await memoEngine.getMemosWithTag(tagItem.tag);
+				memoEntries = MemoEngine.getMemosWithTag(tagItem.tag);
 			}
 
-			if (!options?.noConfirmation && (await configMaid.get("actions.askForConfirmationOnCompletionOfMemos"))) {
-				const iconPath = this.iconPath;
-				this.iconPath = InnerItem.waitingForCompletionConfirmationIcon;
-				await viewProvider.refresh(this);
+			if (!options?.noConfirm && ConfigMaid.get("actions.askForConfirmOnMemosCompletion")) {
+				const icon = this.iconPath;
+				this.iconPath = InnerItem.pendingCompletionIcon;
+				ExplorerView.refresh(this);
 
 				const completionDetails = `Are you sure you want to proceed?
-					This will mark all ${memoEntries.length} memo${await Aux.string.plural(memoEntries)} ${
+					This will mark all ${memoEntries.length} memo${Aux.string.plural(memoEntries)} ${
 					this.contextValue === "File" ? "in" : "under"
 				} the ${this.contextValue.toLowerCase()} ${this.label} as completed.`;
 				const option = await window.showInformationMessage(
 					"Confirm Completion of Memos",
 					{ modal: true, detail: completionDetails },
 					"Yes",
-					"No",
 				);
 
-				this.iconPath = iconPath;
-				await viewProvider.refresh(this);
-				if (!option || option === "No") {
-					await treeView.unsuppressViewUpdate();
+				this.iconPath = icon;
+				ExplorerView.refresh(this);
+				if (!option) {
+					ExplorerView.unsuppressUpdate();
 					return;
 				}
 			}
 
-			const edit = new FileEdit();
-			await Aux.async.map(memoEntries, async (memoEntry) => {
-				if (!(await memoEngine.isMemoKnown(memoEntry))) return;
+			const edit = new FileEdit.Edit();
+			await Aux.async.map(memoEntries, async (memo) => {
+				if (!MemoEngine.isMemoKnown(memo)) return;
+				const doc = await workspace.openTextDocument(memo.path);
 
-				const doc = await workspace.openTextDocument(memoEntry.path);
 				const doRemoveLine =
-					(await configMaid.get("actions.removeLineIfMemoIsOnSingleLine")) &&
-					memoEntry.line < doc.lineCount - 1 &&
-					doc.lineAt(memoEntry.line).firstNonWhitespaceCharacterIndex ===
-						doc.positionAt(memoEntry.offset).character;
-
-				const start = doc.positionAt(memoEntry.offset);
-				const end = doRemoveLine
-					? new Position(memoEntry.line + 1, 0)
-					: start.translate(0, memoEntry.rawLength);
-				const range = new Range(start, end);
-				await edit.delete(doc.uri, range);
+					ConfigMaid.get("actions.removeLineIfMemoSpansLine") &&
+					memo.line < doc.lineCount - 1 &&
+					doc.lineAt(memo.line).firstNonWhitespaceCharacterIndex === doc.positionAt(memo.offset).character;
+				const start = doc.positionAt(memo.offset);
+				const end = doRemoveLine ? new Position(memo.line + 1, 0) : start.translate(0, memo.rawLength);
+				edit.delete(doc.uri, new Range(start, end));
 			});
-			await edit.apply({ isRefactoring: true });
+			await edit.apply();
 
-			if (options?._noExtraTasks) return;
-			await treeView.suppressViewUpdate();
-			await memoEngine.removeMemos(...memoEntries);
-			await viewProvider.refresh(await this.removeFromTree(viewProvider));
-			await treeView.unsuppressViewUpdate();
+			if (!options?._noExtraTasks) {
+				MemoEngine.forgetMemos(...memoEntries);
+				ExplorerView.refresh(this.removeFromTree());
+			}
+			ExplorerView.unsuppressUpdate();
 		}
 	}
 
 	export class FileItem extends InnerItem {
 		constructor(readonly path: string, expand: boolean, parent?: TagItem) {
-			if (!resolved) throw moduleUnresolvedError;
-
-			super(workspace.asRelativePath(path), expand, "File", parent);
+			super("File", workspace.asRelativePath(path), expand, parent);
 			this.resourceUri = Uri.file(path);
 			this.iconPath = ThemeIcon.File;
 		}
 
 		async navigateTo(): Promise<void> {
-			const doc = await workspace.openTextDocument(this.path);
-			const editor = await window.showTextDocument(doc);
-			const pos = doc.lineAt(0).range.end;
+			const editor = await window.showTextDocument(this.resourceUri);
+			const pos = editor.document.lineAt(0).range.end;
 			editor.selection = new Selection(pos, pos);
 			editor.revealRange(new Range(pos, pos));
 		}
@@ -167,28 +144,29 @@ export namespace TreeItems {
 
 	export class TagItem extends InnerItem {
 		constructor(readonly tag: string, expand: boolean, parent?: FileItem) {
-			if (!resolved) throw moduleUnresolvedError;
-
-			super(tag, expand, "Tag", parent);
+			super("Tag", tag, expand, parent);
 		}
 	}
 
-	export class MemoItem extends ExplorerTreeItem {
-		static currentCompletionConfirmationTarget?: MemoItem;
-		static currentCompletionConfirmationBackup?: {
-			label: string | TreeItemLabel;
-			description: string | boolean;
+	export class MemoItem extends ExplorerItem {
+		static currCompletionTarget?: MemoItem;
+		static currCompletionState?: {
+			label: string;
+			description: string;
 			iconPath: ThemeIcon;
 			contextValue: string;
 		};
-
-		attemptedToComplete?: boolean;
-		confirmInterval?: NodeJS.Timeout;
+		completionPending?: boolean;
+		updateTimeoutInterval?: NodeJS.Timeout;
+		timerCorrection?: NodeJS.Timeout;
 		confirmTimeout?: NodeJS.Timeout;
 
-		constructor(public memoEntry: MemoEntry, parent: InnerItemType) {
-			if (!resolved) throw moduleUnresolvedError;
-
+		constructor(
+			public memoEntry: MemoEngine.MemoEntry,
+			tagColor: ThemeColor,
+			parent: InnerItemType,
+			maxPriority: number,
+		) {
 			const content = memoEntry.content === "" ? "Placeholder T^T" : memoEntry.content;
 			super(content, "none", parent);
 			this.description = `Ln ${memoEntry.line + 1}`;
@@ -196,6 +174,13 @@ export namespace TreeItems {
 				`${memoEntry.tag} ~ *${memoEntry.relativePath}* - Ln ${memoEntry.line + 1}\n***\n${content}`,
 			);
 			this.contextValue = "Memo";
+			this.iconPath =
+				memoEntry.priority === 0
+					? new ThemeIcon("circle-filled", tagColor)
+					: new ThemeIcon(
+							"circle-outline",
+							VSColors.interpolate([255, (1 - this.memoEntry.priority / maxPriority) * 255, 0]),
+					  );
 			this.command = {
 				command: "better-memo.navigateToMemo",
 				title: "Navigate to Memo",
@@ -204,111 +189,86 @@ export namespace TreeItems {
 			};
 		}
 
-		async setIcon(tagColor: ThemeColor, maxPriority: number): Promise<void> {
-			if (this.memoEntry.priority === 0) {
-				this.iconPath = new ThemeIcon("circle-filled", tagColor);
-				return;
-			}
-			this.iconPath = new ThemeIcon(
-				"circle-outline",
-				await Colors.interpolate([255, (1 - this.memoEntry.priority / maxPriority) * 255, 0]),
-			);
-		}
-
 		async navigateTo(): Promise<void> {
-			const memoEntry = this.memoEntry;
-			const doc = await workspace.openTextDocument(memoEntry.path);
-			const editor = await window.showTextDocument(doc);
-			const pos = doc.positionAt(memoEntry.offset + memoEntry.rawLength);
+			const memo = this.memoEntry;
+			const editor = await window.showTextDocument(Uri.file(memo.path));
+			const pos = editor.document.positionAt(memo.offset + memo.rawLength);
 			editor.selection = new Selection(pos, pos);
 			editor.revealRange(new Range(pos, pos));
 		}
 
-		async markAsComplete(treeView: TreeView, options?: { noConfirmation?: boolean }): Promise<void> {
-			const { memoEngine, viewProvider } = treeView;
-
-			await treeView.unsuppressViewUpdate();
+		async markAsCompleted(options?: { noConfirm?: boolean }): Promise<void> {
 			if (
-				!options?.noConfirmation &&
-				(await configMaid.get("actions.askForConfirmationOnCompletionOfMemo")) &&
-				!(await this.completionConfirmationHandle(treeView, { words: 3, maxLength: 12 }))
+				!options?.noConfirm &&
+				ConfigMaid.get("actions.askForConfirmOnMemoCompletion") &&
+				!this.confirmCompletion({ words: 3, maxLength: 12 }) //BROKEN
 			)
 				return;
 
-			const memoEntry = this.memoEntry;
-			const doc = await workspace.openTextDocument(memoEntry.path);
+			const memo = this.memoEntry;
+			const doc = await workspace.openTextDocument(memo.path);
 
 			const doRemoveLine =
-				(await configMaid.get("actions.removeLineIfMemoIsOnSingleLine")) &&
-				memoEntry.line < doc.lineCount - 1 &&
-				doc.lineAt(memoEntry.line).firstNonWhitespaceCharacterIndex ===
-					doc.positionAt(memoEntry.offset).character;
+				ConfigMaid.get("actions.removeLineIfMemoSpansLine") &&
+				memo.line < doc.lineCount - 1 &&
+				doc.lineAt(memo.line).firstNonWhitespaceCharacterIndex === doc.positionAt(memo.offset).character;
+			const start = doRemoveLine ? doc.lineAt(memo.line).range.start : doc.positionAt(memo.offset);
+			const end = doRemoveLine ? new Position(memo.line + 1, 0) : start.translate(0, memo.rawLength);
 
-			const doOpenFile = await configMaid.get("actions.alwaysOpenChangedFileOnCompletionOfMemo");
+			const edit = new FileEdit.Edit();
+			edit.delete(doc.uri, new Range(start, end));
+			await edit.apply({
+				alwaysOpenFile: ConfigMaid.get("actions.alwaysOpenFileOnMemoCompletion"),
+			});
+			MemoEngine.forgetMemos(memo);
+			ExplorerView.refresh(this.removeFromTree());
 
-			const start = doRemoveLine ? doc.lineAt(memoEntry.line).range.start : doc.positionAt(memoEntry.offset);
-			const end = doRemoveLine ? new Position(memoEntry.line + 1, 0) : start.translate(0, memoEntry.rawLength);
-			const range = new Range(start, end);
-			const edit = new FileEdit();
-			await edit.delete(doc.uri, range);
-			await memoEngine.removeMemos(memoEntry);
-			viewProvider.refresh(await this.removeFromTree(viewProvider));
-
-			await edit.apply({ isRefactoring: true }, doOpenFile);
 			const editor = window.activeTextEditor;
 			if (editor?.document === doc) {
-				editor.revealRange(new Range(start, start));
 				editor.selection = new Selection(start, start);
+				editor.revealRange(new Range(start, start));
 			}
 		}
 
-		private async completionConfirmationHandle(
-			treeView: TreeView,
-			labelOptions: { words?: number; maxLength: number },
-		): Promise<boolean> {
-			const setConfirmingItem = async (item: MemoItem) => {
-				MemoItem.currentCompletionConfirmationTarget = currentTarget = item;
-				MemoItem.currentCompletionConfirmationBackup = {
-					label: item.label,
-					description: item.description,
+		private confirmCompletion(labelOptions: { words?: number; maxLength: number }): boolean {
+			const setPendingItem = (item: MemoItem) => {
+				MemoItem.currCompletionTarget = item;
+				MemoItem.currCompletionState = {
+					label: <string>item.label,
+					description: <string>item.description,
 					iconPath: <ThemeIcon>item.iconPath,
 					contextValue: item.contextValue,
 				};
 			};
-			const reset = async (confirmingItem: MemoItem, options?: { noRefresh?: boolean }) => {
-				await treeView.unsuppressViewUpdate();
-				clearInterval(confirmingItem.confirmInterval);
-				clearTimeout(confirmingItem.confirmTimeout);
-				confirmingItem.attemptedToComplete = false;
-				[
-					confirmingItem.label,
-					confirmingItem.description,
-					confirmingItem.iconPath,
-					confirmingItem.contextValue,
-				] = [
-					currentBackup.label,
-					currentBackup.description,
-					currentBackup.iconPath,
-					currentBackup.contextValue,
-				];
+			const resetPendingItem = (item: MemoItem, options?: { noRefresh?: boolean }) => {
+				clearInterval(item.updateTimeoutInterval);
+				clearInterval(item.timerCorrection);
+				clearTimeout(item.confirmTimeout);
+				item.completionPending = false;
+				({
+					label: item.label,
+					description: item.description,
+					iconPath: item.iconPath,
+					contextValue: item.contextValue,
+				} = MemoItem.currCompletionState);
+				ExplorerView.unsuppressUpdate();
 				if (options?.noRefresh) return;
-				await treeView.viewProvider.refresh(confirmingItem);
+				ExplorerView.refresh(item);
 			};
 
-			let currentTarget = MemoItem.currentCompletionConfirmationTarget;
-			if (!currentTarget) await setConfirmingItem(this);
-			const currentBackup = MemoItem.currentCompletionConfirmationBackup;
-
-			if (this !== currentTarget) {
-				await reset(currentTarget);
-				await setConfirmingItem(this);
+			const prevTarget = MemoItem.currCompletionTarget;
+			if (!prevTarget) setPendingItem(this);
+			else if (this !== prevTarget) {
+				resetPendingItem(prevTarget);
+				setPendingItem(this);
 			}
-
-			if (this.attemptedToComplete) {
-				await reset(this, { noRefresh: true });
+			if (this.completionPending) {
+				resetPendingItem(this, { noRefresh: true });
+				MemoItem.currCompletionTarget = null;
+				MemoItem.currCompletionState = null;
 				return true;
 			}
-			this.attemptedToComplete = true;
+			this.completionPending = true;
 
 			let abbrevLabel = `${this.label
 				.toString()
@@ -317,45 +277,38 @@ export namespace TreeItems {
 			if (abbrevLabel.length > labelOptions.maxLength)
 				abbrevLabel = `${abbrevLabel.slice(0, labelOptions.maxLength)}...`;
 			this.label = abbrevLabel;
-			this.contextValue = "MemoWaitingForCompletionConfirmation";
+			this.contextValue = "MemoCompletionPending";
 
-			await treeView.suppressViewUpdate();
-			const timeout = await configMaid.get("actions.timeoutOfConfirmationOnCompletionOfMemo");
-			let time = timeout;
-			const updateTime = async (time: number) => {
-				this.description = `Confirm in ${Math.round(time / 1000)}`;
-				const gbVal = (255 * time) / timeout;
-				this.iconPath = new ThemeIcon("loading~spin", await Colors.interpolate([255, gbVal, gbVal]));
-				await treeView.viewProvider.refresh(this);
+			ExplorerView.suppressUpdate();
+			const timeout = ConfigMaid.get("actions.memoCompletionConfirmTimeout");
+			const timeSec = Math.trunc(timeout / 1e3);
+			let timeLeft = timeSec;
+			let time10 = 0;
+			const updateTimeout = () => {
+				this.description = `Confirm in ${timeLeft--}`;
+				const gbValue = (255e3 * timeLeft) / timeout;
+				this.iconPath = new ThemeIcon("loading~spin", VSColors.interpolate([255, gbValue, gbValue]));
+				ExplorerView.refresh(this);
 			};
-			await updateTime(timeout);
-			this.confirmInterval = setInterval(
-				async () => await updateTime((time -= 1000)),
-				timeout / Math.round(time / 1000),
-			);
-			this.confirmTimeout = setTimeout(async () => {
-				await reset(this);
-				MemoItem.currentCompletionConfirmationTarget = null;
-				MemoItem.currentCompletionConfirmationBackup = null;
+			updateTimeout();
+			this.updateTimeoutInterval = setInterval(updateTimeout, 1e3);
+			this.timerCorrection = setInterval(() => (timeLeft = timeSec - 10 * ++time10), 1e4);
+			this.confirmTimeout = setTimeout(() => {
+				if (MemoItem.currCompletionTarget === this) {
+					resetPendingItem(this);
+					MemoItem.currCompletionTarget = null;
+					MemoItem.currCompletionState = null;
+				}
 			}, timeout);
 
 			return false;
 		}
 	}
-}
 
-let resolved = false;
-const moduleUnresolvedError = new Error("module tree-items is not resolved");
-export async function resolver(): Promise<void> {
-	if (resolved) return;
-	resolved = true;
-
-	configMaid = await getConfigMaid();
-	await Aux.promise.all(
-		configMaid.listen("actions.askForConfirmationOnCompletionOfMemo"),
-		configMaid.listen("actions.timeoutOfConfirmationOnCompletionOfMemo"),
-		configMaid.listen("actions.alwaysOpenChangedFileOnCompletionOfMemo"),
-		configMaid.listen("actions.askForConfirmationOnCompletionOfMemos"),
-		configMaid.listen("actions.removeLineIfMemoIsOnSingleLine"),
-	);
+	//Init
+	ConfigMaid.listen("actions.askForConfirmOnMemoCompletion");
+	ConfigMaid.listen("actions.memoCompletionConfirmTimeout");
+	ConfigMaid.listen("actions.alwaysOpenFileOnMemoCompletion");
+	ConfigMaid.listen("actions.askForConfirmOnMemosCompletion");
+	ConfigMaid.listen("actions.removeLineIfMemoSpansLine");
 }

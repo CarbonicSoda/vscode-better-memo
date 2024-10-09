@@ -1,89 +1,78 @@
-import { ConfigurationChangeEvent, workspace, WorkspaceConfiguration } from "vscode";
-import { Aux } from "./auxiliary";
-import { Janitor, getJanitor } from "./janitor";
+import { ConfigurationChangeEvent, workspace } from "vscode";
+import { Janitor } from "./janitor";
 
-export type ListenList = {
-	[configName: string]: null | ((retrieved: any) => any);
-};
+export namespace ConfigMaid {
+	let userConfigs = workspace.getConfiguration("better-memo");
+	const configTransformMap: Map<string, (retrieved: any) => any> = new Map();
 
-export type ConfigMaid = typeof configMaid;
+	export type ListenList = {
+		[configName: string]: null | ((retrieved: any) => any);
+	};
 
-export async function getConfigMaid(): Promise<ConfigMaid> {
-	if (!resolved) throw moduleUnresolvedError;
-
-	return configMaid;
-}
-
-const configMaid: {
 	/**
 	 * @param configNameOrList configuration's name
 	 * or an object with config name as keys and ${callback?} as values
-	 * @param callback an optional method to transform retrieved user config
+	 * @param transform optional method to transform retrieved user config
 	 */
-	listen(configNameOrList: string | ListenList, callback?: (retrieved: any) => any): Promise<void>;
+	export function listen(configNameOrList: string | ListenList, transform: (retrieved: any) => any = (r) => r): void {
+		if (typeof configNameOrList === "object") {
+			for (const [configName, callback] of Object.entries(configNameOrList)) listen(configName, callback);
+			return;
+		}
+		configTransformMap.set(configNameOrList, transform);
+	}
 
 	/**
 	 * @param configName name of listened configuration to retrieve
 	 */
-	get(configName: string): Promise<any>;
+	export function get(configName: string): any {
+		if (!configTransformMap.has(configName)) throw new Error(`${configName} is not listened`);
+		return configTransformMap.get(configName)(userConfigs.get(configName));
+	}
 
 	/**
 	 * @param configs configurations to listen for change
 	 * @param callback function supplied with the new values in order of appearance in ${configs}
 	 */
-	onChange(configs: string | string[], callback: (...newValues: any[]) => void): Promise<void>;
-
-	configs: WorkspaceConfiguration;
-	configsMap: Map<string, (retrieved: any) => any>;
-
-	janitor?: Janitor;
-} = {
-	async listen(configNameOrList: string | ListenList, callback?: (retrieved: any) => any): Promise<void> {
-		callback = callback ?? (async (r: any) => await r);
-		if (typeof configNameOrList === "object") {
-			await Aux.async.map(
-				Object.entries(configNameOrList),
-				async ([configName, callback]) => await configMaid.listen(configName, callback),
-			);
-			return;
-		}
-		configMaid.configsMap.set(configNameOrList, callback);
-	},
-
-	async get(configName: string): Promise<any> {
-		if (!configMaid.configsMap.has(configName)) throw new Error(`${configName} is not listened`);
-		return await configMaid.configsMap.get(configName)(configMaid.configs.get(configName));
-	},
-
-	async onChange(configs: string | string[], callback: (...newValues: any[]) => void): Promise<void> {
+	export function onChange(
+		configs: string | string[],
+		callback: (...newValues: any[]) => void | Promise<void>,
+	): void {
 		const _configs = [configs].flat();
-		const onChangeConfiguration = async (ev: ConfigurationChangeEvent) => {
+		const onChangeConfig = async (ev: ConfigurationChangeEvent) => {
 			if (
 				!ev.affectsConfiguration("better-memo") ||
 				!_configs.some((config) => ev.affectsConfiguration(`better-memo.${config}`))
 			)
 				return;
-			configMaid.configs = workspace.getConfiguration("better-memo");
-			callback(...(await Aux.async.map(_configs, async (configName) => await configMaid.get(configName))));
+			userConfigs = workspace.getConfiguration("better-memo");
+			await callback(..._configs.map(get));
 		};
-		await configMaid.janitor.add(workspace.onDidChangeConfiguration(async (ev) => onChangeConfiguration(ev)));
-	},
+		Janitor.add(workspace.onDidChangeConfiguration(onChangeConfig));
+	}
 
-	configs: workspace.getConfiguration("better-memo"),
-	configsMap: new Map(),
-};
+	/**
+	 * Basically setInterval(),
+	 * but the delay is a config and would automatically update.
+	 * 
+	 * **No need to add this to Janitor if not for manual clearing
+	 * @returns intervalId for Janitor.clear() if of any use
+	 */
+	export function newInterval(
+		callback: () => any,
+		delayConfigName: string,
+		transform?: (retrieved: any) => any,
+	): number {
+		listen(delayConfigName, transform);
+		const intervalId = Janitor.add(setInterval(callback, get(delayConfigName)));
+		onChange(delayConfigName, (newDelay: number) => Janitor.override(intervalId, setInterval(callback, newDelay)));
+		return intervalId;
+	}
 
-let resolved = false;
-const moduleUnresolvedError = new Error("config-maid is not resolved");
-export async function resolver(): Promise<void> {
-	if (resolved) return;
-	resolved = true;
-
-	configMaid.janitor = await getJanitor();
-	await configMaid.janitor.add(
-		workspace.onDidChangeConfiguration(async (ev) => {
+	Janitor.add(
+		workspace.onDidChangeConfiguration((ev) => {
 			if (!ev.affectsConfiguration("better-memo")) return;
-			configMaid.configs = workspace.getConfiguration("better-memo");
+			userConfigs = workspace.getConfiguration("better-memo");
 		}),
 	);
 }
