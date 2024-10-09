@@ -33,7 +33,7 @@ export namespace TreeItems {
 
 		removeFromTree(): InnerItemType | undefined {
 			if (!this.parent) {
-				ExplorerView.provider.removeItems(<InnerItemType>(<unknown>this));
+				ExplorerView.removeItems(<InnerItemType>(<unknown>this));
 				return;
 			}
 			this.parent.removeChildren(<TreeItemType>(<unknown>this));

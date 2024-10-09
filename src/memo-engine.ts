@@ -210,8 +210,8 @@ export namespace MemoEngine {
 		};
 		const fileUris = await workspace.findFiles(watch, ignore);
 		const files = await Aux.async.map(fileUris, async (uri) => await getDoc(uri));
+		commands.executeCommand("setContext", "better-memo.noFiles", files.length === 0);
 		const docs = files.filter((doc) => langCommentFormat[doc?.languageId]);
-		commands.executeCommand("setContext", "better-memo.noFiles", docs.length === 0);
 
 		watchedDocInfoMap.clear();
 		for (const doc of docs) watchedDocInfoMap.set(doc, { version: doc.version, lang: doc.languageId });

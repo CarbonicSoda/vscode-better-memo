@@ -33,13 +33,6 @@ export namespace Aux.object {
 	}
 
 	/**
-	 * Array.indexOf() for objects
-	 */
-	export function indexOf(objects: Object[], object: Object): number {
-		return objects.map((obj) => JSON.stringify(obj)).indexOf(JSON.stringify(object));
-	}
-
-	/**
 	 * Groups objects according to object[grouper] values
 	 * @param objects iterable of objects
 	 * @param grouper key of objects used to group them
@@ -73,25 +66,6 @@ export namespace Aux.async {
 	export async function range<T>(n: number, callback: (i: number) => Promise<T>): Promise<Awaited<T>[]> {
 		return await map(array.range(n), callback);
 	}
-}
-
-export namespace Aux.promise {
-	/**
-	 * Implementation of Promise.props()
-	 * @param object object with properties to resolve
-	 */
-	export async function props<T>(object: {
-		[key: string | number | symbol]: T;
-	}): Promise<{ [key: string | number | symbol]: Awaited<T> }> {
-		const values = await Promise.all(Object.values(object));
-		const keys = Object.keys(object);
-		for (let i = 0; i < keys.length; i++) object[keys[i]] = values[i];
-		return <{ [key: string | number | symbol]: Awaited<T> }>object;
-	}
-
-	export const all = async (...promises: any[]) => await Promise.all(promises);
-
-	export const allSettled = async (...promises: any[]) => await Promise.allSettled(promises);
 }
 
 export namespace Aux.re {

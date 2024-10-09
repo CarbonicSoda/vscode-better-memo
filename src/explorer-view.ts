@@ -144,7 +144,7 @@ export namespace ExplorerView {
 			return innerItems;
 		}
 	}
-	export const provider = new Provider();
+	const provider = new Provider();
 	const explorer: TreeView<TreeItems.TreeItemType> = window.createTreeView("better-memo.memoExplorer", {
 		treeDataProvider: provider,
 		showCollapseAll: true,
@@ -212,6 +212,10 @@ export namespace ExplorerView {
 
 	export function refresh(item?: TreeItems.TreeItemType): void {
 		provider.refresh(item);
+	}
+
+	export function removeItems(...items: TreeItems.InnerItemType[]): void {
+		provider.removeItems(...items);
 	}
 
 	export function suppressUpdate(): void {
