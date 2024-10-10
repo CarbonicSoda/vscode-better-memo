@@ -278,18 +278,18 @@
 		"viewsWelcome": [
 			{
 				"view": "better-memo.memoExplorer",
-				"contents": "Memo Explorer is loading.\nIf this is taking too long, [inspect fetcher configurations](command:workbench.action.openSettings?[\"better-memo.fetcher\"]).",
-				"when": "!better-memo.explorerInitFinished && !treeView.better-memo.memoExplorer.toggleCollapseAll"
+				"contents": "You have not yet opened a folder.\n[Open Folder](command:workbench.action.files.openFolderViaWorkspace)\nOpening a folder will close all currently open editors. To keep them open, [add a folder](command:workbench.action.addRootFolder) instead.",
+				"when": "workspaceFolderCount == 0"
 			},
 			{
 				"view": "better-memo.memoExplorer",
-				"contents": "You have not yet opened a folder.\n[Open Folder](command:workbench.action.files.openFolderViaWorkspace)\nOpening a folder will close all currently open editors. To keep them open, [add a folder](command:workbench.action.addRootFolder) instead.",
-				"when": "better-memo.explorerInitFinished && better-memo.noFiles"
+				"contents": "Memo Explorer is loading.\nIf this is taking too long, [inspect fetcher configurations](command:workbench.action.openSettings?[\"better-memo.fetcher\"]).",
+				"when": "!better-memo.explorerInitFinished"
 			},
 			{
 				"view": "better-memo.memoExplorer",
 				"contents": "Oops, cannot spot any memos throughout the universe.\nConsider spicing up the place with some memos!\nIf this is not intended, [inspect fetcher configurations](command:workbench.action.openSettings?[\"better-memo.fetcher\"]).",
-				"when": "better-memo.explorerInitFinished && !better-memo.noFiles && better-memo.noMemos"
+				"when": "workspaceFolderCount != 0 && better-memo.explorerInitFinished && better-memo.noMemos"
 			}
 		],
 		"configuration": [
