@@ -103,7 +103,7 @@ export namespace ExplorerView {
 					const halfLeafLabel = halfLeafLabels[j];
 					if (isFileView) halfLeafItem.iconPath = new ThemeIcon("bookmark", tagColors[halfLeafLabel]);
 
-					let memos = (<MemoEngine.MemoEntry[]>halfLeaves[halfLeafLabel]).sort((a, b) => a.offset - b.offset);
+					let memos = <MemoEngine.MemoEntry[]>halfLeaves[halfLeafLabel];
 					const [important, normal]: MemoEngine.MemoEntry[][] = [[], []];
 					for (const memo of memos) {
 						if (memo.priority !== 0) {

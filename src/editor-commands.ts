@@ -11,35 +11,36 @@ export namespace EditorCommands {
 	function completeMemoOnLine(editor: TextEditor, editBuilder: TextEditorEdit): void {
 		const doc = editor.document;
 		if (!MemoEngine.isDocWatched(doc)) return;
+		const memos = MemoEngine.getMemosInDoc(editor.document);
+		if (!memos || memos.length === 0) return;
+		const lineMemos = Aux.object.group(memos, "line");
 
-		const active = editor.selection.active;
-		const offset = doc.offsetAt(active) - 1;
+		const newSelections = [];
+		for (const selection of editor.selections) {
+			const memosOnLine = lineMemos[selection.active.line];
+			if (!memosOnLine || memosOnLine.length === 0) {
+				newSelections.push(selection);
+				continue;
+			}
 
-		const memos = getSortedMemos(editor, { onlyCurrLine: true });
-		let memoIndex = Aux.algorithm.predecessorSearch(memos, offset, (memo) => memo.offset);
-		if (memoIndex === undefined) return;
-		if (memoIndex === -1) memoIndex = 0;
-		const targetMemo = memos[memoIndex];
+			const offset = doc.offsetAt(selection.active) - 1;
+			let i = Aux.algorithm.predecessorSearch(memosOnLine, offset, (memo) => memo.offset);
+			if (i === -1) i = 0;
+			const targetMemo = memosOnLine[i];
 
-		const start = doc.positionAt(targetMemo.offset);
-		editBuilder.delete(new Range(start, start.translate(0, targetMemo.rawLength)));
-		editor.selection = new Selection(start, start);
+			const start = doc.positionAt(targetMemo.offset);
+			editBuilder.delete(new Range(start, start.translate(0, targetMemo.rawLength)));
+			newSelections.push(new Selection(start, start));
+		}
+
+		editor.selections = newSelections;
 		doc.save();
 	}
 
 	// export async function navigateToLastMemo(editor: TextEditor) {
-	// 	// const doc = editor.document;
-	// 	// const active = editor.selection.active;
-	// 	// const offset = doc.offsetAt(active) - 1;
-	// 	// const { memos, offsets } = await getSortedMemos(editor);
+	// 	const doc = editor.document;
+	// 	const active = editor.selection.active;
+	// 	const offset = doc.offsetAt(active) - 1;
+	// 	const { memos, offsets } = await getSortedMemos(editor);
 	// }
-
-	function getSortedMemos(editor: TextEditor, options?: { onlyCurrLine?: boolean }): MemoEngine.MemoEntry[] {
-		let memos = MemoEngine.getMemosInDoc(editor.document);
-		if (options?.onlyCurrLine) {
-			const currLine = editor.selection.active.line;
-			memos = memos.filter((memo) => memo.line === currLine);
-		}
-		return memos.sort((a, b) => a.offset - b.offset);
-	}
 }
