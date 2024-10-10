@@ -29,6 +29,7 @@ export namespace ExplorerView {
 
 		async initProvider(): Promise<void> {
 			this.viewType = ConfigMaid.get("view.defaultView");
+			commands.executeCommand("setContext", "better-memo.explorerView", this.viewType);
 			await this.reloadItems();
 		}
 
