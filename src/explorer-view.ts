@@ -206,7 +206,7 @@ export namespace ExplorerView {
 		);
 
 		updateViewType(null, { noReload: true });
-		await EventEmitter.emitAndWait("initExplorerView", null);
+		await EventEmitter.emitAndWait("initExplorerView");
 		commands.executeCommand("setContext", "better-memo.explorerInitFinished", true);
 	}
 

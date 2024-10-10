@@ -77,7 +77,7 @@ export namespace MemoEngine {
 		);
 
 		await fetchMemos();
-		EventEmitter.emitAndWait("initEditorCommands", null);
+		EventEmitter.emitAndWait("initEditorCommands");
 	}
 
 	export function isDocWatched(doc: TextDocument): boolean {
@@ -304,7 +304,7 @@ export namespace MemoEngine {
 
 	async function formatMemosInDoc(doc: TextDocument): Promise<void> {
 		await scanDoc(doc, { ignoreLazyMode: true });
-		const memos = docMemosMap.get(doc);
+		const memos = getMemosInDoc(doc);
 		if (memos.length === 0) return;
 
 		const edit = new FileEdit.Edit();
