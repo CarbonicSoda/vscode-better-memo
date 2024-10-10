@@ -93,7 +93,6 @@ const browserConfig = {
 			}),
 		],
 	},
-	plugins: [new CleanWebpackPlugin()],
 	externals: {
 		vscode: "commonjs vscode",
 	},
