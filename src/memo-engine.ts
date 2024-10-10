@@ -1,12 +1,12 @@
 import { commands, TabGroupChangeEvent, TextDocument, ThemeColor, Uri, window, workspace } from "vscode";
 import { Aux } from "./utils/auxiliary";
 import { ConfigMaid } from "./utils/config-maid";
-import { EventEmitter } from "./utils/event-emitter";
 import { FileEdit } from "./utils/file-edit";
 import { Janitor } from "./utils/janitor";
 import { VSColors } from "./utils/vs-colors";
+import { ExplorerView } from "./explorer-view";
 
-import LangCommentFormat from "./json/lang-comment-format.json";
+import LangCommentFormat from "./json/comment-format.json";
 
 export namespace MemoEngine {
 	const langCommentFormat: {
@@ -57,7 +57,7 @@ export namespace MemoEngine {
 
 		ConfigMaid.onChange("general.customTags", () => {
 			customTagsChanged = true;
-			EventEmitter.emit("updateView");
+			ExplorerView.updateView();
 		});
 
 		ConfigMaid.newInterval(scanInterval, "fetcher.scanDelay");
@@ -77,7 +77,6 @@ export namespace MemoEngine {
 		);
 
 		await fetchMemos();
-		EventEmitter.emitAndWait("initEditorCommands");
 	}
 
 	export function isDocWatched(doc: TextDocument): boolean {
@@ -138,7 +137,7 @@ export namespace MemoEngine {
 		inLazyMode = false;
 		for (const doc of lazyModeScanStack) scanDoc(doc);
 		lazyModeScanStack.clear();
-		EventEmitter.emit("updateView");
+		ExplorerView.updateView();
 	}
 
 	export async function scanDoc(
@@ -195,7 +194,7 @@ export namespace MemoEngine {
 		});
 
 		docMemosMap.set(doc, memos);
-		if (options?.updateView) EventEmitter.emit("updateView");
+		if (options?.updateView) ExplorerView.updateView();
 	}
 
 	async function fetchDocs(): Promise<void> {
@@ -222,7 +221,7 @@ export namespace MemoEngine {
 	async function fetchMemos(options?: { updateView?: boolean }): Promise<void> {
 		await fetchDocs();
 		await Aux.async.map(watchedDocInfoMap.keys(), async (doc) => await scanDoc(doc));
-		if (options?.updateView) EventEmitter.emit("updateView");
+		if (options?.updateView) ExplorerView.updateView();
 	}
 
 	function getMemoMatchRE(doc: TextDocument): RegExp {

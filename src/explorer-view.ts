@@ -11,7 +11,6 @@ import {
 } from "vscode";
 import { Aux } from "./utils/auxiliary";
 import { ConfigMaid } from "./utils/config-maid";
-import { EventEmitter } from "./utils/event-emitter";
 import { Janitor } from "./utils/janitor";
 import { MemoEngine } from "./memo-engine";
 import { TreeItems } from "./tree-items";
@@ -28,8 +27,9 @@ export namespace ExplorerView {
 		readonly onDidChangeTreeData: vsEvent<void | undefined | TreeItems.TreeItemType> =
 			this.treeDataChangeEmitter.event;
 
-		constructor() {
-			EventEmitter.wait("initExplorerView", async () => await this.reloadItems());
+		async initProvider(): Promise<void> {
+			this.viewType = ConfigMaid.get("view.defaultView");
+			await this.reloadItems();
 		}
 
 		getTreeItem(element: TreeItems.TreeItemType): TreeItems.TreeItemType {
@@ -154,7 +154,6 @@ export namespace ExplorerView {
 	let updateSuppressed = false;
 
 	export async function initExplorer(): Promise<void> {
-		await MemoEngine.initEngine();
 		if (!explorer.visible) MemoEngine.enterLazyMode();
 
 		ConfigMaid.listen("view.defaultView");
@@ -167,15 +166,15 @@ export namespace ExplorerView {
 		Janitor.add(
 			explorer,
 
-			EventEmitter.subscribe("updateView", updateView),
 			window.onDidChangeActiveColorTheme(updateView),
 
-			explorer.onDidChangeVisibility(handleVisibilityChange),
+			explorer.onDidChangeVisibility(onVisibilityChange),
 
 			commands.registerCommand("better-memo.expandExplorer", expandExplorer),
 			commands.registerCommand("better-memo.switchToFileView", () => updateViewType("File")),
 			commands.registerCommand("better-memo.switchToTagView", () => updateViewType("Tag")),
 			commands.registerCommand("better-memo.completeAllMemos", completeAllMemos),
+
 			commands.registerCommand("better-memo.navigateToFile", (fileItem: TreeItems.FileItem) =>
 				fileItem.navigateTo(),
 			),
@@ -205,9 +204,12 @@ export namespace ExplorerView {
 			),
 		);
 
-		updateViewType(null, { noReload: true });
-		await EventEmitter.emitAndWait("initExplorerView");
+		await provider.initProvider();
 		commands.executeCommand("setContext", "better-memo.explorerInitFinished", true);
+	}
+
+	export async function updateView(): Promise<void> {
+		if (explorer.visible && !updateSuppressed) await provider.reloadItems();
 	}
 
 	export function refresh(item?: TreeItems.TreeItemType): void {
@@ -230,11 +232,10 @@ export namespace ExplorerView {
 		for (const item of provider.items) explorer.reveal(item, { select: false, expand: 2 });
 	}
 
-	function updateViewType(viewType?: "File" | "Tag", options?: { noReload?: boolean }): void {
-		provider.viewType = viewType = viewType ?? ConfigMaid.get("view.defaultView");
+	function updateViewType(viewType: "File" | "Tag"): void {
+		provider.viewType = viewType;
 		commands.executeCommand("setContext", "better-memo.explorerView", viewType);
-		if (options?.noReload || updateSuppressed) return;
-		provider.reloadItems();
+		updateView();
 	}
 
 	async function updateExpandState(): Promise<void> {
@@ -270,10 +271,6 @@ export namespace ExplorerView {
 		}
 	}
 
-	async function updateView(): Promise<void> {
-		if (explorer.visible && !updateSuppressed) await provider.reloadItems();
-	}
-
 	async function completeAllMemos(): Promise<void> {
 		suppressUpdate();
 		const memoCount = provider.memoCount;
@@ -300,7 +297,7 @@ export namespace ExplorerView {
 		unsuppressUpdate();
 	}
 
-	function handleVisibilityChange(ev: TreeViewVisibilityChangeEvent): void {
+	function onVisibilityChange(ev: TreeViewVisibilityChangeEvent): void {
 		if (ev.visible) {
 			MemoEngine.leaveLazyMode();
 			return;

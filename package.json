@@ -18,7 +18,7 @@
 		"email": "carbonsoda@outlook.com"
 	},
 	"engines": {
-		"vscode": "^1.75.0"
+		"vscode": "^1.80.0"
 	},
 	"keywords": [
 		"memo",
@@ -277,7 +277,7 @@
 			},
 			{
 				"view": "better-memo.memoExplorer",
-				"contents": "You have not yet opened any folders.\n[Open Folder](command:workbench.action.files.openFolderViaWorkspace)\nOpening a folder will close all currently open editors. To keep them open, [add a folder](command:workbench.action.addRootFolder) instead.",
+				"contents": "You have not yet opened a folder.\n[Open Folder](command:workbench.action.files.openFolderViaWorkspace)\nOpening a folder will close all currently open editors. To keep them open, [add a folder](command:workbench.action.addRootFolder) instead.",
 				"when": "better-memo.explorerInitFinished && better-memo.noFiles"
 			},
 			{

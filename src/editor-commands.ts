@@ -1,17 +1,14 @@
 import { commands, Range, Selection, TextEditor, TextEditorEdit } from "vscode";
 import { Aux } from "./utils/auxiliary";
 import { Janitor } from "./utils/janitor";
-import { EventEmitter } from "./utils/event-emitter";
 import { MemoEngine } from "./memo-engine";
 
-EventEmitter.wait("initEditorCommands", () => {
-	Janitor.add(
-		commands.registerTextEditorCommand("better-memo.completeMemoOnLine", EditorCommands.completeMemoOnLine),
-	);
-});
+export namespace EditorCommands {
+	export function initEditorCommands() {
+		Janitor.add(commands.registerTextEditorCommand("better-memo.completeMemoOnLine", completeMemoOnLine));
+	}
 
-namespace EditorCommands {
-	export function completeMemoOnLine(editor: TextEditor, editBuilder: TextEditorEdit): void {
+	function completeMemoOnLine(editor: TextEditor, editBuilder: TextEditorEdit): void {
 		const doc = editor.document;
 		if (!MemoEngine.isDocWatched(doc)) return;
 
