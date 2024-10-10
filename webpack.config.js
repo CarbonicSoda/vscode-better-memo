@@ -3,7 +3,8 @@
 /** @typedef {import('webpack').Configuration} WebpackConfig **/
 
 const path = require("path");
-const terserPlugin = require("terser-webpack-plugin");
+const TerserPlugin = require("terser-webpack-plugin");
+const { CleanWebpackPlugin } = require("clean-webpack-plugin");
 
 /** @type WebpackConfig */
 const config = {
@@ -38,7 +39,7 @@ const config = {
 	optimization: {
 		minimize: true,
 		minimizer: [
-			new terserPlugin({
+			new TerserPlugin({
 				terserOptions: {
 					compress: {
 						passes: 3,
@@ -47,18 +48,17 @@ const config = {
 			}),
 		],
 	},
+	plugins: [new CleanWebpackPlugin()],
 };
 
 /** @type WebpackConfig */
 const browserConfig = {
 	mode: "none",
 	target: "webworker",
-	entry: {
-		"web-extension": "./src/extension.ts",
-	},
+	entry: "./src/extension.ts",
 	output: {
-		filename: "[name].js",
-		path: path.join(__dirname, "./dist"),
+		filename: "web-extension.js",
+		path: path.resolve(__dirname, "./dist"),
 		libraryTarget: "commonjs",
 	},
 	resolve: {
@@ -84,7 +84,7 @@ const browserConfig = {
 	optimization: {
 		minimize: true,
 		minimizer: [
-			new terserPlugin({
+			new TerserPlugin({
 				terserOptions: {
 					compress: {
 						passes: 3,
@@ -93,6 +93,7 @@ const browserConfig = {
 			}),
 		],
 	},
+	plugins: [new CleanWebpackPlugin()],
 	externals: {
 		vscode: "commonjs vscode",
 	},
