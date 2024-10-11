@@ -22,28 +22,13 @@ export namespace Aux.array {
 }
 
 export namespace Aux.object {
-	export type KeyLike = string | number | symbol;
-
-	export const is = (obj1: Object, obj2: Object) => obj1 === obj2 || JSON.stringify(obj1) === JSON.stringify(obj2);
-
-	/**
-	 * Array.includes() for objects
-	 */
-	export function includes(objects: Object[], object: Object): boolean {
-		for (const obj of objects) if (is(obj, object)) return true;
-		return false;
-	}
-
 	/**
 	 * Groups objects according to object[grouper] values
 	 * @param objects iterable of objects
 	 * @param grouper key of objects used to group them
 	 * @returns different values of object[grouper] as keys and their corresponding objects[] as values
 	 */
-	export function group(
-		objects: { [key: string]: any }[],
-		grouper: string,
-	): { [group: string]: typeof objects } {
+	export function group(objects: { [key: string]: any }[], grouper: string): { [group: string]: typeof objects } {
 		const groups: { [group: string]: typeof objects } = {};
 		for (const object of objects) groups[object[grouper]] = [];
 		for (const object of objects) groups[object[grouper]].push(object);

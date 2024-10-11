@@ -60,17 +60,17 @@ export namespace TreeItems {
 		async markMemosAsCompleted(options?: { noConfirm?: boolean; _noExtraTasks?: boolean }): Promise<void> {
 			ExplorerView.suppressUpdate();
 
-			let memoEntries = [];
+			let memos = [];
 			if (this.contextValue === "File") {
 				const fileItem = <FileItem>(<unknown>this);
 				const doc = await workspace.openTextDocument(fileItem.path);
 				await MemoEngine.scanDoc(doc, { ignoreLazyMode: true });
-				memoEntries = MemoEngine.getMemosInDoc(doc);
+				memos = MemoEngine.getMemosInDoc(doc);
 			} else {
 				const tagItem = <TagItem>(<unknown>this);
 				let filePaths = tagItem.isPrimary
-					? tagItem.children.map((child) => (<FileItem>child).path)
-					: tagItem.children.map((memo) => (<MemoItem>memo).memoEntry.path);
+					? tagItem.children.map((fileItem) => (<FileItem>fileItem).path)
+					: tagItem.children.map((memoItem) => (<MemoItem>memoItem).memo.path);
 				filePaths = [...new Set(filePaths)];
 				const docs = [];
 				await Aux.async.map(filePaths, async (path) => {
@@ -78,7 +78,7 @@ export namespace TreeItems {
 					docs.push(doc);
 					await MemoEngine.scanDoc(doc, { ignoreLazyMode: true });
 				});
-				memoEntries = MemoEngine.getMemosWithTag(tagItem.tag);
+				memos = MemoEngine.getMemosWithTag(tagItem.tag);
 			}
 
 			if (!options?.noConfirm && ConfigMaid.get("actions.askForConfirmOnMemosCompletion")) {
@@ -87,7 +87,7 @@ export namespace TreeItems {
 				ExplorerView.refresh(this);
 
 				const completionDetails = `Are you sure you want to proceed?
-					This will mark all ${memoEntries.length} memo${Aux.string.plural(memoEntries)} ${
+					This will mark all ${memos.length} memo${Aux.string.plural(memos)} ${
 					this.contextValue === "File" ? "in" : "under"
 				} the ${this.contextValue.toLowerCase()} ${this.label} as completed.`;
 				const option = await window.showInformationMessage(
@@ -105,8 +105,7 @@ export namespace TreeItems {
 			}
 
 			const edit = new FileEdit.Edit();
-			await Aux.async.map(memoEntries, async (memo) => {
-				if (!MemoEngine.isMemoKnown(memo)) return;
+			await Aux.async.map(memos, async (memo) => {
 				const doc = await workspace.openTextDocument(memo.path);
 
 				const doRemoveLine =
@@ -120,7 +119,7 @@ export namespace TreeItems {
 			await edit.apply();
 
 			if (!options?._noExtraTasks) {
-				MemoEngine.forgetMemos(...memoEntries);
+				MemoEngine.forgetMemos(...memos);
 				ExplorerView.refresh(this.removeFromTree());
 			}
 			ExplorerView.unsuppressUpdate();
@@ -161,25 +160,20 @@ export namespace TreeItems {
 		timerCorrection?: NodeJS.Timeout;
 		confirmTimeout?: NodeJS.Timeout;
 
-		constructor(
-			public memoEntry: MemoEngine.MemoEntry,
-			tagColor: ThemeColor,
-			parent: InnerItemType,
-			maxPriority: number,
-		) {
-			const content = memoEntry.content === "" ? "Placeholder T^T" : memoEntry.content;
+		constructor(public memo: MemoEngine.Memo, tagColor: ThemeColor, parent: InnerItemType, maxPriority: number) {
+			const content = memo.content === "" ? "Placeholder T^T" : memo.content;
 			super(content, "none", parent);
-			this.description = `Ln ${memoEntry.line + 1}`;
+			this.description = `Ln ${memo.line + 1}`;
 			this.tooltip = new MarkdownString(
-				`${memoEntry.tag} ~ *${memoEntry.relativePath}* - Ln ${memoEntry.line + 1}\n***\n${content}`,
+				`${memo.tag} ~ *${memo.relativePath}* - Ln ${memo.line + 1}\n***\n${content}`,
 			);
 			this.contextValue = "Memo";
 			this.iconPath =
-				memoEntry.priority === 0
+				memo.priority === 0
 					? new ThemeIcon("circle-filled", tagColor)
 					: new ThemeIcon(
 							"circle-outline",
-							VSColors.interpolate([255, (1 - this.memoEntry.priority / maxPriority) * 255, 0]),
+							VSColors.interpolate([255, (1 - this.memo.priority / maxPriority) * 255, 0]),
 					  );
 			this.command = {
 				command: "better-memo.navigateToMemo",
@@ -190,7 +184,7 @@ export namespace TreeItems {
 		}
 
 		async navigateTo(): Promise<void> {
-			const memo = this.memoEntry;
+			const memo = this.memo;
 			const editor = await window.showTextDocument(Uri.file(memo.path));
 			const pos = editor.document.positionAt(memo.offset + memo.length);
 			editor.selection = new Selection(pos, pos);
@@ -201,11 +195,11 @@ export namespace TreeItems {
 			if (
 				!options?.noConfirm &&
 				ConfigMaid.get("actions.askForConfirmOnMemoCompletion") &&
-				!this.confirmCompletion({ words: 3, maxLength: 12 }) //BROKEN
+				!this.confirmCompletion({ words: 3, maxLength: 12 })
 			)
 				return;
 
-			const memo = this.memoEntry;
+			const memo = this.memo;
 			const doc = await workspace.openTextDocument(memo.path);
 
 			const doRemoveLine =

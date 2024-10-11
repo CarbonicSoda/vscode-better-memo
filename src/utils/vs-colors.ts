@@ -11,7 +11,10 @@ export namespace VSColors {
 	 *
 	 * The color would differ slightly within color themes of the same kind (dark/light/hc_dark/hc_light).
 	 * Under different theme kinds the result would differ significantly for higher contrast.
-	 * A demo of original & filtered colors could be seen at https://www.desmos.com/3d/wt60c3p2mk
+	 * A demo of original & filtered colors could be seen at https://www.desmos.com/3d/wt60c3p2mk.
+	 *
+	 * Colors are based upon default vscode color themes, so custom color themes might lead to deviations in color
+	 * or completely lacks contrast. If a color is found to be contrast-less in many themes, FILE AN ISSUE.
 	 *
 	 * @param rgbOrHex [R, G, B] or "#rrggbb", "#rgb" (case insensitive, # could be omitted)
 	 */

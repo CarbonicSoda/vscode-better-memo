@@ -103,8 +103,8 @@ export namespace ExplorerView {
 					const halfLeafLabel = halfLeafLabels[j];
 					if (isFileView) halfLeafItem.iconPath = new ThemeIcon("bookmark", tagColors[halfLeafLabel]);
 
-					let memos = <MemoEngine.MemoEntry[]>halfLeaves[halfLeafLabel];
-					const [important, normal]: MemoEngine.MemoEntry[][] = [[], []];
+					let memos = <MemoEngine.Memo[]>halfLeaves[halfLeafLabel];
+					const [important, normal]: MemoEngine.Memo[][] = [[], []];
 					for (const memo of memos) {
 						if (memo.priority !== 0) {
 							important.push(memo);
@@ -113,22 +113,23 @@ export namespace ExplorerView {
 						normal.push(memo);
 					}
 					memos = important.sort((a, b) => b.priority - a.priority).concat(normal);
+					childMemoCount += memos.length;
 
-					const tagColor = (<ThemeIcon>(isFileView ? halfLeafItem : innerItem).iconPath).color;
-					const maxPriority = Math.max(...memos.map((memo) => memo.priority));
-					const memoItems = memos.map(
-						(memo) => new TreeItems.MemoItem(memo, tagColor, halfLeafItem, maxPriority),
-					);
-					halfLeafItem.children = memoItems;
-					childMemoCount += memoItems.length;
-
-					halfLeafItem.description = `${memoItems.length} Memo${Aux.string.plural(memoItems)}`;
+					halfLeafItem.description = `${memos.length} Memo${Aux.string.plural(memos)}`;
 					halfLeafItem.tooltip = new MarkdownString(
 						`${isFileView ? "Tag: " : "File: *"}${halfLeafItem.label}${isFileView ? "" : "*"} - ${
-							memoItems.length
+							memos.length
 						} $(pencil)`,
 						true,
 					);
+
+					const tagColor = (<ThemeIcon>(isFileView ? halfLeafItem : innerItem).iconPath).color;
+					const maxPriority = Math.max(...memos.map((memo) => memo.priority));
+					const memoItems = await Aux.async.map(
+						memos,
+						async (memo) => new TreeItems.MemoItem(memo, tagColor, halfLeafItem, maxPriority),
+					);
+					halfLeafItem.children = memoItems;
 				});
 
 				innerItem.description = `${halfLeafItems.length} ${isFileView ? "Tag" : "File"}${Aux.string.plural(
@@ -166,9 +167,6 @@ export namespace ExplorerView {
 
 		Janitor.add(
 			explorer,
-
-			window.onDidChangeActiveColorTheme(updateView),
-
 			explorer.onDidChangeVisibility(onVisibilityChange),
 
 			commands.registerCommand("better-memo.expandExplorer", expandExplorer),

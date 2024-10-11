@@ -1,4 +1,12 @@
-import { commands, TabGroupChangeEvent, TextDocument, ThemeColor, Uri, window, workspace } from "vscode";
+import {
+	commands,
+	TabGroupChangeEvent,
+	TextDocument,
+	ThemeColor,
+	Uri,
+	window,
+	workspace,
+} from "vscode";
 import { Aux } from "./utils/auxiliary";
 import { ConfigMaid } from "./utils/config-maid";
 import { FileEdit } from "./utils/file-edit";
@@ -6,14 +14,26 @@ import { Janitor } from "./utils/janitor";
 import { VSColors } from "./utils/vs-colors";
 import { ExplorerView } from "./explorer-view";
 
-import LangCommentFormat from "./json/comment-format.json";
+import CommentDelimiters from "./json/comment-delimiters.json";
 
 export namespace MemoEngine {
-	const langCommentFormat: {
-		[lang: string]: { open: string; close?: string } | { open: string; close?: string }[];
-	} = LangCommentFormat;
+	const commentDelimiters: {
+		[langId: string]: { open: string; close?: string } | { open: string; close?: string }[];
+	} = CommentDelimiters;
 
-	export type MemoEntry = {
+	type MemoEntry = {
+		content: string;
+		tag: string;
+		priority: number;
+		line: number;
+		offset: number;
+		length: number;
+		path: string;
+		relativePath: string;
+		langId: keyof typeof commentDelimiters;
+		raw: string;
+	};
+	export class Memo {
 		readonly content: string;
 		readonly tag: string;
 		readonly priority: number;
@@ -22,25 +42,39 @@ export namespace MemoEngine {
 		readonly length: number;
 		readonly path: string;
 		readonly relativePath: string;
-		readonly langId: keyof typeof langCommentFormat;
+		readonly langId: keyof typeof commentDelimiters;
 		readonly raw: string;
-	};
 
-	const dupCloseChars = Object.values(langCommentFormat)
+		constructor(entry: MemoEntry) {
+			({
+				content: this.content,
+				tag: this.tag,
+				priority: this.priority,
+				line: this.line,
+				offset: this.offset,
+				length: this.length,
+				path: this.path,
+				relativePath: this.relativePath,
+				langId: this.langId,
+				raw: this.raw,
+			} = entry);
+		}
+	}
+
+	const tmp = Object.values(commentDelimiters)
 		.flat()
-		.map((format) => format.close)
-		.join("")
-		.split("");
-	const commentCloseChars = Aux.re.escape([...new Set(dupCloseChars)].join(""));
+		.flatMap((format) => format.close?.split(""));
+	const commentCloserChars = Aux.re.escape([...new Set(tmp)].join(""));
 
-	const validTagRE = RegExp(`^[^\\r\\n\t ${commentCloseChars}]+$`);
+	const validTagRE = RegExp(`^[^\\r\\n\t ${commentCloserChars}]+$`);
 	const validHexRE = /(?:^#?[0-9a-f]{6}$)|(?:^#?[0-9a-f]{3}$)/i;
 
 	const watchedDocInfoMap: Map<TextDocument, { version: number; lang: string }> = new Map();
-	const docMemosMap: Map<TextDocument, MemoEntry[]> = new Map();
+	const docMemosMap: Map<TextDocument, Memo[]> = new Map();
 
 	let customTagColors: { [tag: string]: ThemeColor } = {};
 	let customTagsChanged = true;
+	let prevColorThemeType = window.activeColorTheme.kind;
 
 	let prevFocusTab: string | undefined;
 
@@ -72,6 +106,12 @@ export namespace MemoEngine {
 				if (validateForScan(doc)) scanDoc(doc, { updateView: true });
 			}),
 			window.tabGroups.onDidChangeTabGroups(onTabChange),
+			window.onDidChangeActiveColorTheme((colorThemeType) => {
+				if (colorThemeType.kind === prevColorThemeType) return;
+				customTagsChanged = true;
+				prevColorThemeType = colorThemeType.kind;
+				ExplorerView.updateView();
+			}),
 
 			commands.registerCommand("better-memo.reloadExplorer", () => fetchMemos({ updateView: true })),
 		);
@@ -83,44 +123,48 @@ export namespace MemoEngine {
 		return watchedDocInfoMap.has(doc);
 	}
 
-	export function isMemoKnown(memo: MemoEntry): boolean {
-		return Aux.object.includes(getMemos(), memo);
+	export function isMemoKnown(memo: Memo): boolean {
+		return getMemos().includes(memo);
 	}
 
-	export function getMemos(): MemoEntry[] {
+	export function getMemos(): Memo[] {
 		const memos = [...docMemosMap.values()].flat();
 		commands.executeCommand("setContext", "better-memo.noMemos", memos.length === 0);
 		return memos;
 	}
 
-	export function getMemosInDoc(doc: TextDocument): MemoEntry[] {
+	export function getMemosInDoc(doc: TextDocument): Memo[] {
 		return docMemosMap.get(doc);
 	}
 
-	export function getMemosWithTag(tag: string): MemoEntry[] {
+	export function getMemosWithTag(tag: string): Memo[] {
 		const memos = getMemos();
 		return memos.filter((memo) => memo.tag === tag);
 	}
 
 	export async function getTagColors(): Promise<{ [tag: string]: ThemeColor }> {
-		const tags = getMemos().map((memo) => memo.tag);
 		if (customTagsChanged) {
 			customTagColors = await fetchCustomTagColors();
 			customTagsChanged = false;
 		}
 		const tagColors = customTagColors;
+		const tags = getMemos().map((memo) => memo.tag);
 		await Aux.async.map(tags, async (tag) => {
 			if (!tagColors[tag]) tagColors[tag] = VSColors.hashColor(tag);
 		});
 		return tagColors;
 	}
 
-	export function forgetMemos(...memos: MemoEntry[]): void {
+	export function getCommentDelimiters(doc: TextDocument): { open: string; close?: string } {
+		return [commentDelimiters[doc.languageId]].flat()[0];
+	}
+
+	export function forgetMemos(...memos: Memo[]): void {
 		for (const [doc, docMemos] of docMemosMap.entries()) {
-			const removed = docMemos.filter((memo) => !Aux.object.includes(memos, memo));
+			const removed = docMemos.filter((memo) => !memos.includes(memo));
 			docMemosMap.set(doc, removed);
 		}
-		getMemos();
+		getMemos(); //To immediately update noMemos context
 	}
 
 	export function forgetAllMemos(): void {
@@ -147,8 +191,8 @@ export namespace MemoEngine {
 		if (inLazyMode && !options?.ignoreLazyMode) {
 			lazyModeScanStack.add(doc);
 			const bufferDocs = [...lazyModeScanStack.values()];
-			const bufferLines = bufferDocs.map((doc) => doc.lineCount);
-			const backgroundModeScanBuffer = Aux.math.sum(...bufferLines);
+			const bufferLineCount = bufferDocs.map((doc) => doc.lineCount);
+			const backgroundModeScanBuffer = Aux.math.sum(...bufferLineCount);
 			if (backgroundModeScanBuffer < ConfigMaid.get("fetcher.lazyModeLineBufferMax")) return;
 
 			lazyModeScanStack.delete(doc);
@@ -157,7 +201,7 @@ export namespace MemoEngine {
 		const docContent = doc.getText();
 		const matchRE = getMemoMatchRE(doc);
 
-		let memos: MemoEntry[] = [];
+		let memos: Memo[] = [];
 		await Aux.async.map(docContent.matchAll(matchRE), async (match) => {
 			let tag: string;
 			let priority: number;
@@ -179,7 +223,7 @@ export namespace MemoEngine {
 				break;
 			}
 
-			memos.push({
+			const memoEntry = {
 				content: content,
 				tag: tag,
 				priority: priority,
@@ -190,7 +234,8 @@ export namespace MemoEngine {
 				relativePath: workspace.asRelativePath(doc.fileName),
 				langId: doc.languageId,
 				raw: match[0],
-			});
+			};
+			memos.push(new Memo(memoEntry));
 		});
 
 		docMemosMap.set(doc, memos);
@@ -209,7 +254,7 @@ export namespace MemoEngine {
 		};
 		const fileUris = await workspace.findFiles(watch, ignore);
 		const files = await Aux.async.map(fileUris, async (uri) => await getDoc(uri));
-		const docs = files.filter((doc) => langCommentFormat[doc?.languageId]);
+		const docs = files.filter((doc) => commentDelimiters[doc?.languageId]);
 
 		watchedDocInfoMap.clear();
 		for (const doc of docs) watchedDocInfoMap.set(doc, { version: doc.version, lang: doc.languageId });
@@ -223,17 +268,47 @@ export namespace MemoEngine {
 		if (options?.updateView) ExplorerView.updateView();
 	}
 
+	async function fetchCustomTagColors(): Promise<{ [tag: string]: ThemeColor }> {
+		const customTags: { [tag: string]: string } = ConfigMaid.get("general.customTags");
+		const validCustomTags: { [tag: string]: ThemeColor } = {};
+		await Aux.async.map(Object.entries(customTags), async ([tag, hex]) => {
+			[tag, hex] = [tag.trim().toUpperCase(), hex.trim()];
+			if (!validTagRE.test(tag) || !validHexRE.test(hex)) return;
+			validCustomTags[tag] = VSColors.interpolate(hex);
+		});
+		return validCustomTags;
+	}
+
 	function getMemoMatchRE(doc: TextDocument): RegExp {
-		const commentFormats = [langCommentFormat[doc.languageId]].flat();
-		const commentFormatREs = commentFormats.map((data, i) => {
-			const open = Aux.re.escape(data.open);
-			const close = Aux.re.escape(data.close ?? "");
-			return `(?<![${open}])${open}[\\t ]*mo[\\t ]+(?<tag${i}>[^\\r\\n\\t ${commentCloseChars}]+)[\\t ]*(?<priority${i}>!*)(?<content${i}>.*${
+		const delimiters = [commentDelimiters[doc.languageId]].flat();
+		const commentFormatREs = delimiters.map((del, i) => {
+			const open = Aux.re.escape(del.open);
+			const close = Aux.re.escape(del.close ?? "");
+			return `(?<![${open}])${open}[\\t ]*mo[\\t ]+(?<tag${i}>[^\\r\\n\\t ${commentCloserChars}]+)[\\t ]*(?<priority${i}>!*)(?<content${i}>.*${
 				close ? "?" : ""
 			})${close}`;
 		});
 		const matchPattern = Aux.re.union(...commentFormatREs);
 		return RegExp(matchPattern, "gim");
+	}
+
+	function getFormattedMemo(memo: Memo): string {
+		const commentFormat = [commentDelimiters[memo.langId]].flat()[0];
+		const padding = commentFormat.close ? " " : "";
+		return `${commentFormat.open}${padding}MO ${memo.tag}${memo.content ? " " : ""}${"!".repeat(memo.priority)}${
+			memo.content
+		}${padding}${commentFormat.close ?? ""}`;
+	}
+
+	async function formatMemosInDoc(doc: TextDocument): Promise<void> {
+		await scanDoc(doc, { ignoreLazyMode: true });
+		const memos = getMemosInDoc(doc);
+		if (memos.length === 0) return;
+
+		const edit = new FileEdit.Edit();
+		for (const memo of memos)
+			edit.replace(doc.uri, [memo.offset, memo.offset + memo.length], getFormattedMemo(memo));
+		await edit.apply();
 	}
 
 	function validateForScan(doc?: TextDocument): boolean {
@@ -279,35 +354,5 @@ export namespace MemoEngine {
 			await formatMemosInDoc(doc);
 			break;
 		}
-	}
-
-	async function fetchCustomTagColors(): Promise<{ [tag: string]: ThemeColor }> {
-		const customTags: { [tag: string]: string } = ConfigMaid.get("general.customTags");
-		const validCustomTags: { [tag: string]: ThemeColor } = {};
-		await Aux.async.map(Object.entries(customTags), async ([tag, hex]) => {
-			[tag, hex] = [tag.trim().toUpperCase(), hex.trim()];
-			if (!validTagRE.test(tag) || !validHexRE.test(hex)) return;
-			validCustomTags[tag] = VSColors.interpolate(hex);
-		});
-		return validCustomTags;
-	}
-
-	function getFormattedMemo(memo: MemoEntry): string {
-		const commentFormat = [langCommentFormat[memo.langId]].flat()[0];
-		const padding = commentFormat.close ? " " : "";
-		return `${commentFormat.open}${padding}MO ${memo.tag}${memo.content ? " " : ""}${"!".repeat(memo.priority)}${
-			memo.content
-		}${padding}${commentFormat.close ?? ""}`;
-	}
-
-	async function formatMemosInDoc(doc: TextDocument): Promise<void> {
-		await scanDoc(doc, { ignoreLazyMode: true });
-		const memos = getMemosInDoc(doc);
-		if (memos.length === 0) return;
-
-		const edit = new FileEdit.Edit();
-		for (const memo of memos)
-			edit.replace(doc.uri, [memo.offset, memo.offset + memo.length], getFormattedMemo(memo));
-		await edit.apply();
 	}
 }

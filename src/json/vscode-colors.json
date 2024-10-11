@@ -92,7 +92,6 @@
 		"gitDecoration.modifiedResourceForeground": [137, 85, 3],
 		"gitDecoration.renamedResourceForeground": [0, 113, 0],
 		"gitDecoration.submoduleResourceForeground": [18, 88, 167],
-		"inputValidation.errorBorder": [190, 17, 0],
 		"keybindingLabel.foreground": [85, 85, 85],
 		"list.errorForeground": [176, 16, 17],
 		"list.warningForeground": [133, 95, 0],

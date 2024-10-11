@@ -159,8 +159,8 @@
 				"category": "Better Memo"
 			},
 			{
-				"command": "better-memo.completeMemoOnLine",
-				"title": "Mark Memo on Line as Completed",
+				"command": "better-memo.completeMemoNextToSelection",
+				"title": "Mark Memo(s) Next to Selection(s) as Completed",
 				"enablement": "editorIsOpen",
 				"category": "Better Memo"
 			},
@@ -194,7 +194,7 @@
 				"key": "Ctrl+R"
 			},
 			{
-				"command": "better-memo.completeMemoOnLine",
+				"command": "better-memo.completeMemoNextToSelection",
 				"key": "Alt+Shift+M"
 			},
 			{
@@ -326,9 +326,9 @@
 							"type": "string"
 						},
 						"default": {
-							"TODO": "#fff86b",
-							"FIX": "#f21d1d",
-							"REFACTOR": "#83d6f2"
+							"TODO": "#090",
+							"FIX": "#C00",
+							"REFACTOR": "#6CE"
 						}
 					}
 				}
