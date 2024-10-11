@@ -9,12 +9,13 @@ export namespace VSColors {
 	/**
 	 * Returns the closest ThemeColor to RGB or HEX, interpolated with sRGB color space
 	 *
-	 * The color would differ slightly within color themes of the same kind (dark/light/hc_dark/hc_light).
-	 * Under different theme kinds the result would differ significantly for higher contrast.
+	 * The colors would differ slightly within color themes of the same kind (dark/light/hc_dark/hc_light).
+	 * Under different theme kinds the result would differ significantly, INTENDED for higher contrast.
 	 * A demo of original & filtered colors could be seen at https://www.desmos.com/3d/wt60c3p2mk.
 	 *
-	 * Colors are based upon default vscode color themes, so custom color themes might lead to deviations in color
-	 * or completely lacks contrast. If a color is found to be contrast-less in many themes, FILE AN ISSUE.
+	 * IMPORTANT!!!
+	 * Colors are based upon default vscode color themes, so custom color themes might cause colors to
+	 * completely lack contrast. If a color is found to be contrast-less in popular themes, FILE AN ISSUE.
 	 *
 	 * @param rgbOrHex [R, G, B] or "#rrggbb", "#rgb" (case insensitive, # could be omitted)
 	 */

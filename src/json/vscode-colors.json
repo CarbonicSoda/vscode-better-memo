@@ -44,7 +44,6 @@
 		"gitDecoration.renamedResourceForeground": [115, 201, 145],
 		"gitDecoration.submoduleResourceForeground": [141, 185, 226],
 		"inputOption.activeBorder": [36, 136, 219],
-		"inputValidation.warningBorder": [184, 149, 0],
 		"mergeEditor.conflict.unhandled.minimapOverViewRuler": [252, 186, 3],
 		"peekViewResult.lineForeground": [187, 187, 187],
 		"symbolIcon.classForeground": [238, 157, 40],
@@ -60,7 +59,6 @@
 		"testing.iconPassed.retired": [89, 149, 110]
 	},
 	"Light": {
-		"activityBar.background": [44, 44, 44],
 		"activityBarBadge.background": [0, 122, 204],
 		"activityBarTop.activeBorder": [66, 66, 66],
 		"activityBarTop.inactiveForeground": [113, 113, 113],
@@ -97,10 +95,8 @@
 		"list.warningForeground": [133, 95, 0],
 		"peekViewResult.fileForeground": [30, 30, 30],
 		"progressBar.background": [14, 112, 192],
-		"statusBar.noFolderBackground": [104, 33, 122],
 		"statusBarItem.errorBackground": [97, 23, 8],
 		"statusBarItem.offlineBackground": [108, 23, 23],
-		"statusBarItem.warningBackground": [114, 81, 2],
 		"terminal.ansiBlue": [4, 81, 165],
 		"terminal.ansiBrightMagenta": [188, 5, 188],
 		"terminal.ansiBrightRed": [205, 49, 49],
