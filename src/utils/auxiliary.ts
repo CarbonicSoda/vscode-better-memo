@@ -22,6 +22,8 @@ export namespace Aux.array {
 }
 
 export namespace Aux.object {
+	export type KeyLike = string | number | symbol;
+
 	export const is = (obj1: Object, obj2: Object) => obj1 === obj2 || JSON.stringify(obj1) === JSON.stringify(obj2);
 
 	/**
@@ -41,8 +43,8 @@ export namespace Aux.object {
 	export function group(
 		objects: { [key: string]: any }[],
 		grouper: string,
-	): { [group: string]: { [key: string]: any }[] } {
-		const groups: { [group: string]: { [key: string]: any }[] } = {};
+	): { [group: string]: typeof objects } {
+		const groups: { [group: string]: typeof objects } = {};
 		for (const object of objects) groups[object[grouper]] = [];
 		for (const object of objects) groups[object[grouper]].push(object);
 		return groups;

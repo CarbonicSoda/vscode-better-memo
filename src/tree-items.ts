@@ -114,7 +114,7 @@ export namespace TreeItems {
 					memo.line < doc.lineCount - 1 &&
 					doc.lineAt(memo.line).firstNonWhitespaceCharacterIndex === doc.positionAt(memo.offset).character;
 				const start = doc.positionAt(memo.offset);
-				const end = doRemoveLine ? new Position(memo.line + 1, 0) : start.translate(0, memo.rawLength);
+				const end = doRemoveLine ? new Position(memo.line + 1, 0) : start.translate(0, memo.length);
 				edit.delete(doc.uri, new Range(start, end));
 			});
 			await edit.apply();
@@ -192,7 +192,7 @@ export namespace TreeItems {
 		async navigateTo(): Promise<void> {
 			const memo = this.memoEntry;
 			const editor = await window.showTextDocument(Uri.file(memo.path));
-			const pos = editor.document.positionAt(memo.offset + memo.rawLength);
+			const pos = editor.document.positionAt(memo.offset + memo.length);
 			editor.selection = new Selection(pos, pos);
 			editor.revealRange(new Range(pos, pos));
 		}
@@ -213,7 +213,7 @@ export namespace TreeItems {
 				memo.line < doc.lineCount - 1 &&
 				doc.lineAt(memo.line).firstNonWhitespaceCharacterIndex === doc.positionAt(memo.offset).character;
 			const start = doRemoveLine ? doc.lineAt(memo.line).range.start : doc.positionAt(memo.offset);
-			const end = doRemoveLine ? new Position(memo.line + 1, 0) : start.translate(0, memo.rawLength);
+			const end = doRemoveLine ? new Position(memo.line + 1, 0) : start.translate(0, memo.length);
 
 			const edit = new FileEdit.Edit();
 			edit.delete(doc.uri, new Range(start, end));

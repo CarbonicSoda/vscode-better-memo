@@ -5,7 +5,11 @@ import { MemoEngine } from "./memo-engine";
 
 export namespace EditorCommands {
 	export function initEditorCommands() {
-		Janitor.add(commands.registerTextEditorCommand("better-memo.completeMemoOnLine", completeMemoOnLine));
+		Janitor.add(
+			commands.registerTextEditorCommand("better-memo.completeMemoOnLine", completeMemoOnLine),
+			commands.registerTextEditorCommand("better-memo.navigateToLastMemo", navigateToMemoFactory("Last")),
+			commands.registerTextEditorCommand("better-memo.navigateToNextMemo", navigateToMemoFactory("Next")),
+		);
 	}
 
 	function completeMemoOnLine(editor: TextEditor, editBuilder: TextEditorEdit): void {
@@ -13,9 +17,9 @@ export namespace EditorCommands {
 		if (!MemoEngine.isDocWatched(doc)) return;
 		const memos = MemoEngine.getMemosInDoc(editor.document);
 		if (!memos || memos.length === 0) return;
-		const lineMemos = Aux.object.group(memos, "line");
+		const lineMemos = <{ [line: number]: MemoEngine.MemoEntry[] }>Aux.object.group(memos, "line");
 
-		const completed: MemoEngine.MemoEntry[] = [];
+		const completed = [];
 		const newSelections = [];
 		for (const selection of editor.selections) {
 			const memosOnLine = lineMemos[selection.active.line];
@@ -27,11 +31,11 @@ export namespace EditorCommands {
 			const offset = doc.offsetAt(selection.active) - 1;
 			let i = Aux.algorithm.predecessorSearch(memosOnLine, offset, (memo) => memo.offset);
 			if (i === -1) i = 0;
-			const targetMemo = <MemoEngine.MemoEntry>memosOnLine[i];
+			const targetMemo = memosOnLine[i];
 			if (Aux.object.includes(completed, targetMemo)) continue;
 
 			const start = doc.positionAt(targetMemo.offset);
-			editBuilder.delete(new Range(start, start.translate(0, targetMemo.rawLength)));
+			editBuilder.delete(new Range(start, start.translate(0, targetMemo.length)));
 			completed.push(targetMemo);
 			newSelections.push(new Selection(start, start));
 		}
@@ -40,10 +44,27 @@ export namespace EditorCommands {
 		doc.save();
 	}
 
-	// export async function navigateToLastMemo(editor: TextEditor) {
-	// 	const doc = editor.document;
-	// 	const active = editor.selection.active;
-	// 	const offset = doc.offsetAt(active) - 1;
-	// 	const { memos, offsets } = await getSortedMemos(editor);
-	// }
+	function navigateToMemoFactory(target: "Last" | "Next") {
+		return (editor: TextEditor) => {
+			const doc = editor.document;
+			if (!MemoEngine.isDocWatched(doc)) return;
+			const memos = MemoEngine.getMemosInDoc(editor.document);
+			if (!memos || memos.length === 0) return;
+
+			const offset = doc.offsetAt(editor.selection.active) - 1;
+			let i = Aux.algorithm.predecessorSearch(memos, offset, (memo) => memo.offset);
+			let targetMemo;
+			if (target === "Last") {
+				if (i === 0) return;
+				targetMemo = memos[i - 1];
+			} else {
+				if (i === memos.length - 1) return;
+				targetMemo = memos[i + 1];
+			}
+
+			const pos = doc.positionAt(targetMemo.offset + targetMemo.length);
+			editor.selection = new Selection(pos, pos);
+			editor.revealRange(new Range(pos, pos));
+		};
+	}
 }

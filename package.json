@@ -135,7 +135,7 @@
 			{
 				"command": "better-memo.navigateToMemo",
 				"title": "Navigate to Memo",
-				"enablement": "view.better-memo.memoExplorer.visible",
+				"enablement": "focusedView == 'better-memo.memoExplorer'",
 				"category": "Better Memo"
 			},
 			{
@@ -163,6 +163,18 @@
 				"title": "Mark Memo on Line as Completed",
 				"enablement": "editorIsOpen",
 				"category": "Better Memo"
+			},
+			{
+				"command": "better-memo.navigateToLastMemo",
+				"title": "Navigate to Last Memo",
+				"enablement": "editorIsOpen",
+				"category": "Better Memo"
+			},
+			{
+				"command": "better-memo.navigateToNextMemo",
+				"title": "Navigate to Next Memo",
+				"enablement": "editorIsOpen",
+				"category": "Better Memo"
 			}
 		],
 		"keybindings": [
@@ -184,6 +196,14 @@
 			{
 				"command": "better-memo.completeMemoOnLine",
 				"key": "Alt+Shift+M"
+			},
+			{
+				"command": "better-memo.navigateToLastMemo",
+				"key": "Alt+M Alt+,"
+			},
+			{
+				"command": "better-memo.navigateToNextMemo",
+				"key": "Alt+M Alt+."
 			}
 		],
 		"viewsContainers": {

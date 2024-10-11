@@ -19,11 +19,11 @@ export namespace MemoEngine {
 		readonly priority: number;
 		readonly line: number;
 		readonly offset: number;
+		readonly length: number;
 		readonly path: string;
 		readonly relativePath: string;
 		readonly langId: keyof typeof langCommentFormat;
 		readonly raw: string;
-		readonly rawLength: number;
 	};
 
 	const dupCloseChars = Object.values(langCommentFormat)
@@ -185,11 +185,11 @@ export namespace MemoEngine {
 				priority: priority,
 				line: doc.positionAt(match.index).line,
 				offset: match.index,
+				length: match[0].length,
 				path: doc.fileName,
 				relativePath: workspace.asRelativePath(doc.fileName),
 				langId: doc.languageId,
 				raw: match[0],
-				rawLength: match[0].length,
 			});
 		});
 
@@ -307,7 +307,7 @@ export namespace MemoEngine {
 
 		const edit = new FileEdit.Edit();
 		for (const memo of memos)
-			edit.replace(doc.uri, [memo.offset, memo.offset + memo.rawLength], getFormattedMemo(memo));
+			edit.replace(doc.uri, [memo.offset, memo.offset + memo.length], getFormattedMemo(memo));
 		await edit.apply();
 	}
 }
