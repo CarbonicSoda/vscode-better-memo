@@ -15,6 +15,7 @@ export namespace EditorCommands {
 		if (!memos || memos.length === 0) return;
 		const lineMemos = Aux.object.group(memos, "line");
 
+		const completed: MemoEngine.MemoEntry[] = [];
 		const newSelections = [];
 		for (const selection of editor.selections) {
 			const memosOnLine = lineMemos[selection.active.line];
@@ -26,10 +27,12 @@ export namespace EditorCommands {
 			const offset = doc.offsetAt(selection.active) - 1;
 			let i = Aux.algorithm.predecessorSearch(memosOnLine, offset, (memo) => memo.offset);
 			if (i === -1) i = 0;
-			const targetMemo = memosOnLine[i];
+			const targetMemo = <MemoEngine.MemoEntry>memosOnLine[i];
+			if (Aux.object.includes(completed, targetMemo)) continue;
 
 			const start = doc.positionAt(targetMemo.offset);
 			editBuilder.delete(new Range(start, start.translate(0, targetMemo.rawLength)));
+			completed.push(targetMemo);
 			newSelections.push(new Selection(start, start));
 		}
 
