@@ -1,12 +1,12 @@
-import {
-	commands,
-	TabGroupChangeEvent,
-	TextDocument,
-	ThemeColor,
-	Uri,
-	window,
-	workspace,
-} from "vscode";
+/**
+ * Configs used in memo-engine.ts:
+ * fetcher.watch, fetcher.ignore
+ * fetcher.scanDelay, fetcher.forceScanDelay, fetcher.docsScanDelay
+ * fetcher.lazyModeLineBufferMax
+ * general.customTags
+ */
+
+import { commands, TabGroupChangeEvent, TextDocument, ThemeColor, Uri, window, workspace } from "vscode";
 import { Aux } from "./utils/auxiliary";
 import { ConfigMaid } from "./utils/config-maid";
 import { FileEdit } from "./utils/file-edit";
@@ -82,13 +82,7 @@ export namespace MemoEngine {
 	const lazyModeScanStack: Set<TextDocument> = new Set();
 
 	export async function initEngine(): Promise<void> {
-		ConfigMaid.listen("general.customTags");
-		ConfigMaid.listen({
-			"fetcher.watch": (watch: string[]) => `{${watch.join(",")}}`,
-			"fetcher.ignore": (ignore: string[]) => `{${ignore.join(",")}}`,
-		});
-		ConfigMaid.listen("fetcher.lazyModeLineBufferMax");
-
+		ConfigMaid.onChange(["fetcher.watch", "fetcher.ignore"], fetchDocs);
 		ConfigMaid.onChange("general.customTags", () => {
 			customTagsChanged = true;
 			ExplorerView.updateView();
@@ -96,7 +90,7 @@ export namespace MemoEngine {
 
 		ConfigMaid.newInterval(scanInterval, "fetcher.scanDelay");
 		ConfigMaid.newInterval(forceScanInterval, "fetcher.forceScanDelay");
-		ConfigMaid.newInterval(fetchDocs, "fetcher.workspaceScanDelay");
+		ConfigMaid.newInterval(fetchDocs, "fetcher.docsScanDelay");
 
 		Janitor.add(
 			workspace.onDidCreateFiles(fetchDocs),
@@ -142,14 +136,17 @@ export namespace MemoEngine {
 		return memos.filter((memo) => memo.tag === tag);
 	}
 
+	export function getTags(): string[] {
+		let tags = getMemos().map((memo) => memo.tag);
+		tags.concat(Object.keys(customTagColors));
+		tags = [...new Set(tags)];
+		return tags;
+	}
+
 	export async function getTagColors(): Promise<{ [tag: string]: ThemeColor }> {
-		if (customTagsChanged) {
-			customTagColors = await fetchCustomTagColors();
-			customTagsChanged = false;
-		}
+		await fetchCustomTagColors();
 		const tagColors = customTagColors;
-		const tags = getMemos().map((memo) => memo.tag);
-		await Aux.async.map(tags, async (tag) => {
+		await Aux.async.map(getTags(), async (tag) => {
 			if (!tagColors[tag]) tagColors[tag] = VSColors.hashColor(tag);
 		});
 		return tagColors;
@@ -164,7 +161,7 @@ export namespace MemoEngine {
 			const removed = docMemos.filter((memo) => !memos.includes(memo));
 			docMemosMap.set(doc, removed);
 		}
-		getMemos(); //To immediately update noMemos context
+		getMemos(); //immediately updates noMemos context
 	}
 
 	export function forgetAllMemos(): void {
@@ -243,8 +240,8 @@ export namespace MemoEngine {
 	}
 
 	async function fetchDocs(): Promise<void> {
-		const watch = ConfigMaid.get("fetcher.watch");
-		const ignore = ConfigMaid.get("fetcher.ignore");
+		const watch = `{${ConfigMaid.get("fetcher.watch").join(",")}}`;
+		const ignore = `{${ConfigMaid.get("fetcher.ignore").join(",")}}`;
 
 		const getDoc = async (uri: Uri) => {
 			try {
@@ -268,15 +265,17 @@ export namespace MemoEngine {
 		if (options?.updateView) ExplorerView.updateView();
 	}
 
-	async function fetchCustomTagColors(): Promise<{ [tag: string]: ThemeColor }> {
-		const customTags: { [tag: string]: string } = ConfigMaid.get("general.customTags");
-		const validCustomTags: { [tag: string]: ThemeColor } = {};
-		await Aux.async.map(Object.entries(customTags), async ([tag, hex]) => {
+	async function fetchCustomTagColors(): Promise<void> {
+		if (!customTagsChanged) return;
+		const userCustomTagColors: { [tag: string]: string } = ConfigMaid.get("general.customTags");
+		const validCustomTagColors: { [tag: string]: ThemeColor } = {};
+		await Aux.async.map(Object.entries(userCustomTagColors), async ([tag, hex]) => {
 			[tag, hex] = [tag.trim().toUpperCase(), hex.trim()];
 			if (!validTagRE.test(tag) || !validHexRE.test(hex)) return;
-			validCustomTags[tag] = VSColors.interpolate(hex);
+			validCustomTagColors[tag] = VSColors.interpolate(hex);
 		});
-		return validCustomTags;
+		customTagColors = validCustomTagColors;
+		customTagsChanged = false;
 	}
 
 	function getMemoMatchRE(doc: TextDocument): RegExp {

@@ -1,3 +1,11 @@
+/**
+ * Configs used in tree-items.ts:
+ * actions.askForConfirmOnMemoCompletion, actions.askForConfirmOnMemosCompletion
+ * actions.memoCompletionConfirmTimeout
+ * actions.removeLineIfMemoSpansLine
+ * actions.alwaysOpenFileOnMemoCompletion
+ */
+
 import {
 	MarkdownString,
 	Position,
@@ -298,11 +306,4 @@ export namespace TreeItems {
 			return false;
 		}
 	}
-
-	//Init
-	ConfigMaid.listen("actions.askForConfirmOnMemoCompletion");
-	ConfigMaid.listen("actions.memoCompletionConfirmTimeout");
-	ConfigMaid.listen("actions.alwaysOpenFileOnMemoCompletion");
-	ConfigMaid.listen("actions.askForConfirmOnMemosCompletion");
-	ConfigMaid.listen("actions.removeLineIfMemoSpansLine");
 }

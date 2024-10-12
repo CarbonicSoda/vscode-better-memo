@@ -1,3 +1,9 @@
+/**
+ * Configs used in explorer-view.ts:
+ * view.defaultView
+ * view.defaultExpandPrimaryItems, view.defaultExpandSecondaryItems
+ */
+
 import {
 	commands,
 	MarkdownString,
@@ -158,10 +164,6 @@ export namespace ExplorerView {
 	export async function initExplorer(): Promise<void> {
 		if (!explorer.visible) MemoEngine.enterLazyMode();
 
-		ConfigMaid.listen("view.defaultView");
-		ConfigMaid.listen("view.defaultExpandPrimaryItems");
-		ConfigMaid.listen("view.defaultExpandSecondaryItems");
-
 		ConfigMaid.onChange("view.defaultView", updateViewType);
 		ConfigMaid.onChange(["view.defaultExpandPrimaryItems", "view.defaultExpandSecondaryItems"], updateExpandState);
 
@@ -237,10 +239,7 @@ export namespace ExplorerView {
 		updateView();
 	}
 
-	async function updateExpandState(): Promise<void> {
-		const expandPrimaryItems = ConfigMaid.get("view.defaultExpandPrimaryItems");
-		const expandSecondaryItems = ConfigMaid.get("view.defaultExpandSecondaryItems");
-
+	async function updateExpandState(expandPrimaryItems: boolean, expandSecondaryItems: boolean): Promise<void> {
 		const afterReveal = async () => {
 			await commands.executeCommand("list.collapseAll");
 			if (expandSecondaryItems) {

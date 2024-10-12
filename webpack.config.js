@@ -48,7 +48,11 @@ const config = {
 			}),
 		],
 	},
-	plugins: [new CleanWebpackPlugin()],
+	plugins: [
+		new CleanWebpackPlugin({
+			verbose: true,
+		}),
+	],
 };
 
 /** @type WebpackConfig */

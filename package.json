@@ -159,6 +159,12 @@
 				"category": "Better Memo"
 			},
 			{
+				"command": "better-memo.newMemoOnLine",
+				"title": "New Memo on Line",
+				"enablement": "editorIsOpen",
+				"category": "Better Memo"
+			},
+			{
 				"command": "better-memo.completeMemoNextToSelection",
 				"title": "Mark Memo(s) Next to Selection(s) as Completed",
 				"enablement": "editorIsOpen",
@@ -194,16 +200,20 @@
 				"key": "Ctrl+R"
 			},
 			{
+				"command": "better-memo.newMemoOnLine",
+				"key": "Alt+M"
+			},
+			{
 				"command": "better-memo.completeMemoNextToSelection",
 				"key": "Alt+Shift+M"
 			},
 			{
 				"command": "better-memo.navigateToLastMemo",
-				"key": "Alt+M Alt+,"
+				"key": "Ctrl+Alt+M Ctrl+Alt+,"
 			},
 			{
 				"command": "better-memo.navigateToNextMemo",
-				"key": "Alt+M Alt+."
+				"key": "Ctrl+Alt+M Ctrl+Alt+."
 			}
 		],
 		"viewsContainers": {
@@ -394,6 +404,12 @@
 						"title": "Remove Line if Memo Spans Line",
 						"type": "boolean",
 						"default": true
+					},
+					"better-memo.actions.newMemoOnNewLine": {
+						"order": 401,
+						"title": "Always Insert New Memos on New Line",
+						"type": "boolean",
+						"default": true
 					}
 				}
 			},
@@ -439,7 +455,7 @@
 						"minimum": 500,
 						"maximum": 5000000
 					},
-					"better-memo.fetcher.workspaceScanDelay": {
+					"better-memo.fetcher.docsScanDelay": {
 						"order": 203,
 						"title": "Workspace Scan Delay",
 						"type": "integer",
