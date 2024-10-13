@@ -2,17 +2,16 @@
  * Configs used in memo-engine.ts:
  * fetcher.watch, fetcher.ignore
  * fetcher.scanDelay, fetcher.forceScanDelay, fetcher.docsScanDelay
- * fetcher.lazyModeLineBufferMax
  * general.customTags
  */
 
 import { commands, TabGroupChangeEvent, TextDocument, ThemeColor, Uri, window, workspace } from "vscode";
 import { Aux } from "./utils/auxiliary";
 import { ConfigMaid } from "./utils/config-maid";
+import { EventEmitter } from "./utils/event-emitter";
 import { FileEdit } from "./utils/file-edit";
 import { Janitor } from "./utils/janitor";
 import { VSColors } from "./utils/vs-colors";
-import { ExplorerView } from "./explorer-view";
 
 import CommentDelimiters from "./json/comment-delimiters.json";
 
@@ -78,16 +77,13 @@ export namespace MemoEngine {
 	let tagsChanged = true;
 	let prevColorThemeType = window.activeColorTheme.kind;
 
-	let prevFocusTab: string | undefined;
-
-	let inLazyMode = false;
-	const lazyModeScanStack: Set<TextDocument> = new Set();
+	let prevFocusedTab: string | undefined;
 
 	export async function initEngine(): Promise<void> {
 		ConfigMaid.onChange(["fetcher.watch", "fetcher.ignore"], fetchDocs);
 		ConfigMaid.onChange("general.customTags", () => {
 			customTagsChanged = true;
-			ExplorerView.updateView();
+			EventEmitter.emit("update");
 		});
 
 		ConfigMaid.newInterval(scanInterval, "fetcher.scanDelay");
@@ -99,17 +95,17 @@ export namespace MemoEngine {
 			workspace.onDidDeleteFiles(fetchDocs),
 
 			workspace.onDidSaveTextDocument((doc) => {
-				if (validateForScan(doc)) scanDoc(doc, { updateView: true });
+				if (validateForScan(doc)) scanDoc(doc, { emitUpdate: true });
 			}),
 			window.tabGroups.onDidChangeTabGroups(onTabChange),
 			window.onDidChangeActiveColorTheme((colorThemeType) => {
 				if (colorThemeType.kind === prevColorThemeType) return;
-				customTagsChanged = true;
 				prevColorThemeType = colorThemeType.kind;
-				ExplorerView.updateView();
+				customTagsChanged = true;
+				EventEmitter.emit("update");
 			}),
 
-			commands.registerCommand("better-memo.reloadExplorer", () => fetchMemos({ updateView: true })),
+			commands.registerCommand("better-memo.reloadExplorer", () => fetchMemos({ emitUpdate: true })),
 		);
 
 		await fetchMemos();
@@ -117,10 +113,6 @@ export namespace MemoEngine {
 
 	export function isDocWatched(doc: TextDocument): boolean {
 		return watchedDocInfoMap.has(doc);
-	}
-
-	export function isMemoKnown(memo: Memo): boolean {
-		return getMemos().includes(memo);
 	}
 
 	export function isTagValid(tag: string): boolean {
@@ -140,6 +132,15 @@ export namespace MemoEngine {
 	export function getMemosWithTag(tag: string): Memo[] {
 		const memos = getMemos();
 		return memos.filter((memo) => memo.tag === tag);
+	}
+
+	export function getMemoTemplate(langId: keyof typeof commentDelimiters): { head: string; tail: string } {
+		const commentFormat = [commentDelimiters[langId]].flat()[0];
+		const padding = commentFormat.close ? " " : "";
+		return {
+			head: `${commentFormat.open}${padding}MO `,
+			tail: `${padding}${commentFormat.close ?? ""}`,
+		};
 	}
 
 	export function getTags(options?: { sortOccurrence?: boolean }): string[] {
@@ -162,10 +163,6 @@ export namespace MemoEngine {
 		return tagColors;
 	}
 
-	export function getCommentDelimiters(doc: TextDocument): { open: string; close?: string }[] {
-		return [commentDelimiters[doc.languageId]].flat();
-	}
-
 	export function forgetMemos(...memos: Memo[]): void {
 		for (const [doc, docMemos] of docMemosMap.entries()) {
 			const removed = docMemos.filter((memo) => !memos.includes(memo));
@@ -179,32 +176,10 @@ export namespace MemoEngine {
 		commands.executeCommand("setContext", "better-memo.noMemos", true);
 	}
 
-	export function enterLazyMode(): void {
-		inLazyMode = true;
-		lazyModeScanStack.clear();
-	}
-
-	export function leaveLazyMode(): void {
-		inLazyMode = false;
-		for (const doc of lazyModeScanStack) scanDoc(doc);
-		lazyModeScanStack.clear();
-		ExplorerView.updateView();
-	}
-
 	export async function scanDoc(
 		doc: TextDocument,
-		options?: { updateView?: boolean; ignoreLazyMode?: boolean },
+		options?: { emitUpdate?: boolean; ignoreLazyMode?: boolean },
 	): Promise<void> {
-		if (inLazyMode && !options?.ignoreLazyMode) {
-			lazyModeScanStack.add(doc);
-			const bufferDocs = [...lazyModeScanStack.values()];
-			const bufferLineCount = bufferDocs.map((doc) => doc.lineCount);
-			const backgroundModeScanBuffer = Aux.math.sum(...bufferLineCount);
-			if (backgroundModeScanBuffer < ConfigMaid.get("fetcher.lazyModeLineBufferMax")) return;
-
-			lazyModeScanStack.delete(doc);
-		}
-
 		const docContent = doc.getText();
 		const matchRE = getMemoMatchRE(doc);
 
@@ -247,16 +222,7 @@ export namespace MemoEngine {
 
 		docMemosMap.set(doc, memos);
 		tagsChanged = true;
-		if (options?.updateView) ExplorerView.updateView();
-	}
-
-	export function getMemoTemplate(langId: keyof typeof commentDelimiters): { head: string; tail: string } {
-		const commentFormat = [commentDelimiters[langId]].flat()[0];
-		const padding = commentFormat.close ? " " : "";
-		return {
-			head: `${commentFormat.open}${padding}MO `,
-			tail: `${padding}${commentFormat.close ?? ""}`,
-		};
+		if (options?.emitUpdate) EventEmitter.emit("update");
 	}
 
 	async function fetchDocs(): Promise<void> {
@@ -279,10 +245,10 @@ export namespace MemoEngine {
 		for (const doc of watchedDocInfoMap.keys()) if (!isDocWatched(doc)) scanDoc(doc);
 	}
 
-	async function fetchMemos(options?: { updateView?: boolean }): Promise<void> {
+	async function fetchMemos(options?: { emitUpdate?: boolean }): Promise<void> {
 		await fetchDocs();
 		await Aux.async.map(watchedDocInfoMap.keys(), async (doc) => await scanDoc(doc));
-		if (options?.updateView) ExplorerView.updateView();
+		if (options?.emitUpdate) EventEmitter.emit("update");
 	}
 
 	async function fetchCustomTagColors(): Promise<void> {
@@ -310,7 +276,7 @@ export namespace MemoEngine {
 	}
 
 	function getMemoMatchRE(doc: TextDocument): RegExp {
-		const delimiters = getCommentDelimiters(doc);
+		const delimiters = [commentDelimiters[doc.languageId]].flat();
 		const commentFormatREs = delimiters.map((del, i) => {
 			const open = Aux.re.escape(del.open);
 			const close = Aux.re.escape(del.close ?? "");
@@ -352,13 +318,13 @@ export namespace MemoEngine {
 
 	function scanInterval(): void {
 		const doc = window.activeTextEditor?.document;
-		if (doc && validateForScan(doc)) scanDoc(doc, { updateView: true });
+		if (doc && validateForScan(doc)) scanDoc(doc, { emitUpdate: true });
 	}
 
 	function forceScanInterval(): void {
 		const doc = window.activeTextEditor?.document;
 		if (!doc || !isDocWatched(doc)) return;
-		scanDoc(doc, { updateView: true });
+		scanDoc(doc, { emitUpdate: true });
 	}
 
 	async function onTabChange(ev: TabGroupChangeEvent): Promise<void> {
@@ -366,10 +332,10 @@ export namespace MemoEngine {
 			if (!changedTab.isActive) continue;
 			const activeTab = changedTab.activeTab;
 			if (!activeTab) {
-				prevFocusTab = undefined;
+				prevFocusedTab = undefined;
 				break;
 			}
-			if (!activeTab.isActive || activeTab.label === prevFocusTab) continue;
+			if (!activeTab.isActive || activeTab.label === prevFocusedTab) continue;
 
 			let doc;
 			try {
@@ -379,7 +345,7 @@ export namespace MemoEngine {
 			}
 			if (!isDocWatched(doc)) continue;
 
-			prevFocusTab = activeTab.label;
+			prevFocusedTab = activeTab.label;
 			await formatMemosInDoc(doc);
 			break;
 		}

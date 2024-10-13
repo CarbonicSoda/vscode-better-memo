@@ -5,8 +5,8 @@
  */
 
 import {
-	Disposable,
 	commands,
+	Disposable,
 	EndOfLine,
 	Position,
 	Range,

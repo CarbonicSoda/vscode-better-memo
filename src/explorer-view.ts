@@ -10,13 +10,13 @@ import {
 	ThemeIcon,
 	TreeDataProvider,
 	TreeView,
-	TreeViewVisibilityChangeEvent,
 	Event as vsEvent,
 	EventEmitter as vsEventEmitter,
 	window,
 } from "vscode";
 import { Aux } from "./utils/auxiliary";
 import { ConfigMaid } from "./utils/config-maid";
+import { EventEmitter } from "./utils/event-emitter";
 import { Janitor } from "./utils/janitor";
 import { MemoEngine } from "./memo-engine";
 import { TreeItems } from "./tree-items";
@@ -160,18 +160,25 @@ export namespace ExplorerView {
 	});
 
 	let updateSuppressed = false;
+	let updateQueued = false;
 
 	export async function initExplorer(): Promise<void> {
-		if (!explorer.visible) MemoEngine.enterLazyMode();
-
 		ConfigMaid.onChange("view.defaultView", updateViewType);
 		ConfigMaid.onChange(["view.defaultExpandPrimaryItems", "view.defaultExpandSecondaryItems"], updateExpandState);
 
 		Janitor.add(
 			explorer,
-			explorer.onDidChangeVisibility(onVisibilityChange),
+			explorer.onDidChangeVisibility((ev) => {
+				if (!ev.visible || !updateQueued) return;
+				updateQueued = false;
+				updateView();
+			}),
 
-			commands.registerCommand("better-memo.expandExplorer", expandExplorer),
+			EventEmitter.subscribe("update", updateView),
+
+			commands.registerCommand("better-memo.expandExplorer", () => {
+				for (const item of provider.items) explorer.reveal(item, { select: false, expand: 2 });
+			}),
 			commands.registerCommand("better-memo.switchToFileView", () => updateViewType("File")),
 			commands.registerCommand("better-memo.switchToTagView", () => updateViewType("Tag")),
 			commands.registerCommand("better-memo.completeAllMemos", completeAllMemos),
@@ -211,6 +218,7 @@ export namespace ExplorerView {
 
 	export async function updateView(): Promise<void> {
 		if (explorer.visible && !updateSuppressed) await provider.reloadItems();
+		else updateQueued = true;
 	}
 
 	export function refresh(item?: TreeItems.TreeItemType): void {
@@ -227,10 +235,6 @@ export namespace ExplorerView {
 
 	export function unsuppressUpdate(): void {
 		updateSuppressed = false;
-	}
-
-	function expandExplorer(): void {
-		for (const item of provider.items) explorer.reveal(item, { select: false, expand: 2 });
 	}
 
 	function updateViewType(viewType: "File" | "Tag"): void {
@@ -293,13 +297,5 @@ export namespace ExplorerView {
 		provider.removeAllItems();
 		refresh();
 		unsuppressUpdate();
-	}
-
-	function onVisibilityChange(ev: TreeViewVisibilityChangeEvent): void {
-		if (ev.visible) {
-			MemoEngine.leaveLazyMode();
-			return;
-		}
-		MemoEngine.enterLazyMode();
 	}
 }

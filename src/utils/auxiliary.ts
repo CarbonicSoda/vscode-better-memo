@@ -1,21 +1,8 @@
 export namespace Aux.math {
-	/**
-	 * Returns a random integer within the ranges
-	 * @returns integer within [min, max)
-	 */
-	export const randInt = (min: number, max: number) => Math.trunc(Math.random() * (max - min) + min);
-
 	export const sum = (...numbers: number[]) => numbers.reduce((sum, n) => sum + n);
 }
 
 export namespace Aux.array {
-	/**
-	 * Implementation of Python's range()
-	 */
-	export function range(n: number): Iterable<number> {
-		return Array(n).keys();
-	}
-
 	export function removeFrom<T>(array: T[], ...items: T[]): T[] {
 		return array.filter((item) => !items.some((_item) => _item === item));
 	}
@@ -51,7 +38,7 @@ export namespace Aux.async {
 	 * Sugar for the async for loop Promise.all((await range(n)).map(async (i) => {...}))
 	 */
 	export async function range<T>(n: number, callback: (i: number) => Promise<T>): Promise<Awaited<T>[]> {
-		return await map(array.range(n), callback);
+		return await map(Array(n).keys(), callback);
 	}
 }
 

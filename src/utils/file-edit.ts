@@ -18,14 +18,6 @@ export namespace FileEdit {
 			this.replace(uri, range, "");
 		}
 
-		insert(uri: Uri, offset: number, text: string): void {
-			this.replace(uri, [offset, offset], text);
-		}
-
-		reset(): void {
-			this.uriEditsMap.clear();
-		}
-
 		async apply(options?: {
 			alwaysOpenFile?: boolean;
 			throwError?: boolean;

@@ -23,8 +23,8 @@ import { Aux } from "./utils/auxiliary";
 import { ConfigMaid } from "./utils/config-maid";
 import { FileEdit } from "./utils/file-edit";
 import { VSColors } from "./utils/vs-colors";
-import { ExplorerView } from "./explorer-view";
 import { MemoEngine } from "./memo-engine";
+import { ExplorerView } from "./explorer-view";
 
 export namespace TreeItems {
 	export type TreeItemType = ExplorerItem | FileItem | TagItem | MemoItem;

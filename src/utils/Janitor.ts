@@ -1,11 +1,11 @@
 export namespace Janitor {
-	const managed: (DisposableLike | NodeJS.Timeout)[][] = [];
-	let instancesID = 0;
-
 	export type DisposableLike = {
 		[any: string]: any;
 		dispose(...args: any): any;
 	};
+
+	const managed: (DisposableLike | NodeJS.Timeout)[][] = [];
+	let instancesID = 0;
 
 	/**
 	 * @param DisposableOrTimeout instances to manage
