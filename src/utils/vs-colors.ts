@@ -1,5 +1,4 @@
 import { ColorThemeKind, ThemeColor, window } from "vscode";
-import { Aux } from "./auxiliary";
 
 import VSCodeColors from "../json/vscode-colors.json";
 
@@ -36,29 +35,14 @@ export namespace VSColors {
 	}
 
 	/**
-	 * Gets random RGB and then interpolates to get ThemeColor
-	 */
-	export function randomColor(): ThemeColor {
-		const rgb = [Aux.math.randInt(0, 256), Aux.math.randInt(0, 256), Aux.math.randInt(0, 256)];
-		return interpolate(<RGB3>rgb);
-	}
-
-	/**
-	 * Returns a ThemeColor for the string which will not change over sessions or devices, like a hash function
+	 * Returns a ThemeColor for the string which will not change over sessions or devices
+	 * 
+	 * NOTE: Since colors are limited to the higher-constrast sRGB half-cube,
+	 * colors hashed to the other half-cube might be interpolated to very similar colors
 	 */
 	export function hashColor(hashString: string): ThemeColor {
 		const rgb = sRGBHash(hashString);
 		return interpolate(rgb);
-	}
-
-	/**
-	 * Converts HEX to RGB
-	 * @param hex "#rrggbb", "#rgb" (case insensitive, # could be omitted)
-	 */
-	export function HEX2RGB(hex: string): RGB3 {
-		hex = hex.replace("#", "");
-		if (hex.length === 3) hex = hex[0].repeat(2) + hex[1].repeat(2) + hex[2].repeat(2);
-		return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
 	}
 
 	/**
@@ -67,10 +51,20 @@ export namespace VSColors {
 	 * Hash function from https://github.com/RolandR/ColorHash,
 	 * modified to make permutations of characters be treated differently
 	 */
-	export function sRGBHash(hashString: string): RGB3 {
+	function sRGBHash(hashString: string): RGB3 {
 		let sum = 0;
 		for (let i = 0; i < hashString.length; i++) sum += hashString.charCodeAt(i) * (i + 1);
 		const getVal = (param: number) => Math.trunc(Number(`0.${String(Math.sin(sum + param)).slice(6)}`) * 256);
 		return [getVal(1), getVal(2), getVal(3)];
+	}
+
+	/**
+	 * Converts HEX to RGB
+	 * @param hex "#rrggbb", "#rgb" (case insensitive, # could be omitted)
+	 */
+	function HEX2RGB(hex: string): RGB3 {
+		hex = hex.replace("#", "");
+		if (hex.length === 3) hex = hex[0].repeat(2) + hex[1].repeat(2) + hex[2].repeat(2);
+		return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
 	}
 }

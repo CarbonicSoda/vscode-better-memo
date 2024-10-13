@@ -4,7 +4,18 @@
  * actions.removeLineIfMemoSpansLine
  */
 
-import { commands, EndOfLine, Position, Range, Selection, SnippetString, TextEditor, TextEditorEdit } from "vscode";
+import {
+	Disposable,
+	commands,
+	EndOfLine,
+	Position,
+	Range,
+	Selection,
+	TextEditor,
+	TextEditorEdit,
+	ThemeIcon,
+	window,
+} from "vscode";
 import { Aux } from "./utils/auxiliary";
 import { ConfigMaid } from "./utils/config-maid";
 import { Janitor } from "./utils/janitor";
@@ -20,25 +31,72 @@ export namespace EditorCommands {
 		);
 	}
 
-	function newMemoOnLine(editor: TextEditor): void {
+	async function newMemoOnLine(editor: TextEditor): Promise<void> {
 		const doc = editor.document;
-		const { open, close } = MemoEngine.getCommentDelimiters(doc);
+		if (!MemoEngine.isDocWatched(doc)) return;
+
+		// const tagColors = await MemoEngine.getTagColors();
+		// UNTIL VSCODE ADDS SUPPORT FOR CUSTOM ITEM COLORS
+		const tags = MemoEngine.getTags({ sortOccurrence: true }).map((tag) => ({
+			label: tag,
+			iconPath: new ThemeIcon("bookmark"),
+			// iconPath: new ThemeIcon("bookmark", tagColors[tag]),
+			// UNTIL VSCODE ADDS SUPPORT FOR CUSTOM ITEM COLORS
+		}));
+		const pick = window.createQuickPick();
+		pick.items = tags;
+
+		let pickedTag: string | undefined;
+		const disposables: Disposable[] = [];
+		let disposeQuickPick = () => {};
+		pick.onDidChangeValue(
+			(tag) => {
+				tag = tag.trim().toUpperCase();
+				pick.items = MemoEngine.isTagValid(tag)
+					? tags.concat({ label: tag, iconPath: new ThemeIcon("bookmark") })
+					: tags;
+			},
+			null,
+			disposables,
+		);
+		pick.onDidAccept(
+			() => {
+				pickedTag = pick.selectedItems[0].label;
+				disposeQuickPick();
+			},
+			null,
+			disposables,
+		);
+		pick.onDidHide(disposeQuickPick, null, disposables);
+		await new Promise<void>((res) => {
+			disposeQuickPick = () => {
+				pick.dispose();
+				for (const disposable of disposables) disposable.dispose();
+				res();
+			};
+			pick.show();
+		});
+		if (!pickedTag) return;
+
 		const line = doc.lineAt(editor.selection.active);
-		const forceNewLine = !close && MemoEngine.getMemosInDoc(doc).some((memo) => memo.line === line.lineNumber);
+		const { head, tail } = MemoEngine.getMemoTemplate(doc.languageId);
+		const forceNewLine = !tail && MemoEngine.getMemosInDoc(doc).some((memo) => memo.line === line.lineNumber);
 		const insertOnNewLine = ConfigMaid.get("actions.newMemoOnNewLine") || forceNewLine;
+		const insertPadding = !insertOnNewLine && !tail && !line.isEmptyOrWhitespace && !line.text.endsWith(" ");
 
-		const insertPadding = !insertOnNewLine && !close && !line.isEmptyOrWhitespace;
-		const opener = `${insertPadding ? " " : ""}${open}${close ? " " : ""}MO `;
-		const memo = new SnippetString(opener);
-		const tags = MemoEngine.getTags();
-		if (tags.length !== 0) memo.appendChoice(tags);
-		if (close) memo.appendText(` ${close}`);
-		if (insertOnNewLine) memo.appendText(doc.eol === EndOfLine.LF ? "\n" : "\r\n");
+		const before = `${insertPadding ? " " : ""}${head}${pickedTag} `;
+		let after = tail;
+		if (insertOnNewLine) {
+			after +=
+				(doc.eol === EndOfLine.LF ? "\n" : "\r\n") + line.text.slice(0, line.firstNonWhitespaceCharacterIndex);
+		}
 
-		const pos = insertOnNewLine
+		const insertPos = insertOnNewLine
 			? line.range.start.translate(0, line.firstNonWhitespaceCharacterIndex)
 			: line.range.end;
-		editor.insertSnippet(memo, pos);
+		await editor.edit((editBuilder) => editBuilder.insert(insertPos, before + after));
+		const pos = insertPos.translate(0, before.length);
+		editor.selections = [new Selection(pos, pos)];
 	}
 
 	function completeMemoNextToSelection(editor: TextEditor, editBuilder: TextEditorEdit): void {
