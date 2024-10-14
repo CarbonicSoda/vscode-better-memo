@@ -65,24 +65,21 @@ export namespace MemoEngine {
 		.flatMap((format) => format.close?.split(""));
 	const commentCloserChars = Aux.re.escape([...new Set(tmp)].join(""));
 
-	const validTagRE = RegExp(`^[^\\r\\n\t ${commentCloserChars}]+$`);
-	const validHexRE = /(?:^#?[0-9a-f]{6}$)|(?:^#?[0-9a-f]{3}$)/i;
-
 	const watchedDocInfoMap: Map<TextDocument, { version: number; lang: string }> = new Map();
 	const docMemosMap: Map<TextDocument, Memo[]> = new Map();
 
 	let customTagColors: { [tag: string]: ThemeColor } = {};
-	let customTagsChanged = true;
+	let customTagsUpdate = true;
 	let tagColors: { [tag: string]: ThemeColor } = {};
-	let tagsChanged = true;
+	let tagsUpdate = true;
 	let prevColorThemeType = window.activeColorTheme.kind;
 
-	let prevFocusedTab: string | undefined;
+	let prevFocusedDoc: string | undefined;
 
 	export async function initEngine(): Promise<void> {
 		ConfigMaid.onChange(["fetcher.watch", "fetcher.ignore"], fetchDocs);
 		ConfigMaid.onChange("general.customTags", () => {
-			customTagsChanged = true;
+			customTagsUpdate = true;
 			EventEmitter.emit("update");
 		});
 
@@ -91,6 +88,8 @@ export namespace MemoEngine {
 		ConfigMaid.newInterval(fetchDocs, "fetcher.docsScanDelay");
 
 		Janitor.add(
+			EventEmitter.subscribe("scan", (doc: TextDocument) => scanDoc(doc, { emitUpdate: true })),
+
 			workspace.onDidCreateFiles(fetchDocs),
 			workspace.onDidDeleteFiles(fetchDocs),
 
@@ -101,7 +100,7 @@ export namespace MemoEngine {
 			window.onDidChangeActiveColorTheme((colorThemeType) => {
 				if (colorThemeType.kind === prevColorThemeType) return;
 				prevColorThemeType = colorThemeType.kind;
-				customTagsChanged = true;
+				customTagsUpdate = true;
 				EventEmitter.emit("update");
 			}),
 
@@ -116,7 +115,7 @@ export namespace MemoEngine {
 	}
 
 	export function isTagValid(tag: string): boolean {
-		return validTagRE.test(tag);
+		return RegExp(`^[^\\r\\n\t ${commentCloserChars}]+$`).test(tag);
 	}
 
 	export function getMemos(): Memo[] {
@@ -144,8 +143,9 @@ export namespace MemoEngine {
 	}
 
 	export function getTags(options?: { sortOccurrence?: boolean }): string[] {
-		let tags = getMemos().map((memo) => memo.tag);
-		tags.concat(Object.keys(customTagColors));
+		let tags = getMemos()
+			.map((memo) => memo.tag)
+			.concat(Object.keys(customTagColors));
 		if (options?.sortOccurrence) {
 			const occur: { [tag: string]: number } = {};
 			for (const tag of tags) {
@@ -188,17 +188,17 @@ export namespace MemoEngine {
 			let tag: string;
 			let priority: number;
 			let content: string;
-			for (const [groupName, value] of Object.entries(match.groups)) {
+			for (const [group, value] of Object.entries(match.groups)) {
 				if (value === undefined) continue;
-				if (groupName.startsWith("tag")) {
+				if (group.startsWith("tag")) {
 					tag = value.toUpperCase();
 					continue;
 				}
-				if (groupName.startsWith("priority")) {
+				if (group.startsWith("priority")) {
 					priority = value.length;
 					continue;
 				}
-				if (groupName.startsWith("content")) {
+				if (group.startsWith("content")) {
 					content = value.trimEnd();
 					continue;
 				}
@@ -221,8 +221,10 @@ export namespace MemoEngine {
 		});
 
 		docMemosMap.set(doc, memos);
-		tagsChanged = true;
-		if (options?.emitUpdate) EventEmitter.emit("update");
+		if (options?.emitUpdate) {
+			tagsUpdate = true;
+			EventEmitter.emit("update");
+		}
 	}
 
 	async function fetchDocs(): Promise<void> {
@@ -251,28 +253,31 @@ export namespace MemoEngine {
 		if (options?.emitUpdate) EventEmitter.emit("update");
 	}
 
+	async function fetchTagColors(): Promise<void> {
+		if (!tagsUpdate) return;
+		await fetchCustomTagColors();
+		const newTagColors: { [tag: string]: ThemeColor } = {};
+		await Aux.async.map(
+			getTags(),
+			async (tag) => (newTagColors[tag] = customTagColors[tag] ?? VSColors.hashColor(tag)),
+		);
+		tagColors = newTagColors;
+		tagsUpdate = false;
+	}
+
 	async function fetchCustomTagColors(): Promise<void> {
-		if (!customTagsChanged) return;
+		if (!customTagsUpdate) return;
+
 		const userCustomTagColors: { [tag: string]: string } = ConfigMaid.get("general.customTags");
 		const validCustomTagColors: { [tag: string]: ThemeColor } = {};
+		const validHEXRE = /(?:^#?[0-9a-f]{6}$)|(?:^#?[0-9a-f]{3}$)/i;
 		await Aux.async.map(Object.entries(userCustomTagColors), async ([tag, hex]) => {
 			[tag, hex] = [tag.trim().toUpperCase(), hex.trim()];
-			if (!isTagValid(tag) || !validHexRE.test(hex)) return;
+			if (!isTagValid(tag) || !validHEXRE.test(hex)) return;
 			validCustomTagColors[tag] = VSColors.interpolate(hex);
 		});
 		customTagColors = validCustomTagColors;
-		customTagsChanged = false;
-	}
-
-	async function fetchTagColors(): Promise<void> {
-		if (!tagsChanged) return;
-		await fetchCustomTagColors();
-		const newTagColors = customTagColors;
-		await Aux.async.map(getTags(), async (tag) => {
-			if (!newTagColors[tag]) newTagColors[tag] = VSColors.hashColor(tag);
-		});
-		tagColors = newTagColors;
-		tagsChanged = false;
+		customTagsUpdate = false;
 	}
 
 	function getMemoMatchRE(doc: TextDocument): RegExp {
@@ -332,10 +337,10 @@ export namespace MemoEngine {
 			if (!changedTab.isActive) continue;
 			const activeTab = changedTab.activeTab;
 			if (!activeTab) {
-				prevFocusedTab = undefined;
+				prevFocusedDoc = undefined;
 				break;
 			}
-			if (!activeTab.isActive || activeTab.label === prevFocusedTab) continue;
+			if (!activeTab.isActive || activeTab.label === prevFocusedDoc) continue;
 
 			let doc;
 			try {
@@ -345,7 +350,7 @@ export namespace MemoEngine {
 			}
 			if (!isDocWatched(doc)) continue;
 
-			prevFocusedTab = activeTab.label;
+			prevFocusedDoc = activeTab.label;
 			await formatMemosInDoc(doc);
 			break;
 		}

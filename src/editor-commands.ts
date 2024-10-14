@@ -18,6 +18,7 @@ import {
 } from "vscode";
 import { Aux } from "./utils/auxiliary";
 import { ConfigMaid } from "./utils/config-maid";
+import { EventEmitter } from "./utils/event-emitter";
 import { Janitor } from "./utils/janitor";
 import { MemoEngine } from "./memo-engine";
 
@@ -52,6 +53,7 @@ export namespace EditorCommands {
 		pick.onDidChangeValue(
 			(tag) => {
 				tag = tag.trim().toUpperCase();
+				if (pick.items.map((item) => item.label).includes(tag)) return;
 				pick.items = MemoEngine.isTagValid(tag)
 					? tags.concat({ label: tag, iconPath: new ThemeIcon("bookmark") })
 					: tags;
@@ -97,6 +99,7 @@ export namespace EditorCommands {
 		await editor.edit((editBuilder) => editBuilder.insert(insertPos, before + after));
 		const pos = insertPos.translate(0, before.length);
 		editor.selections = [new Selection(pos, pos)];
+		EventEmitter.emit("scan", doc);
 	}
 
 	function completeMemoNextToSelection(editor: TextEditor, editBuilder: TextEditorEdit): void {

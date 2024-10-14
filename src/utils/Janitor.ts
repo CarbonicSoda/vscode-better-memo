@@ -31,7 +31,7 @@ export namespace Janitor {
 	 * @param id unique id of managed instance
 	 */
 	export function clear(id: number): void {
-		if (managed[id]?.length === 0) return;
+		if (!managed[id] || managed[id].length === 0) return;
 		for (const instance of managed[id]) {
 			if ((<{ dispose?: (...args: any) => any }>instance).dispose) {
 				(<{ dispose: (...args: any) => any }>instance).dispose();

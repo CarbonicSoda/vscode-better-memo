@@ -464,6 +464,18 @@
 						"maximum": 10000000
 					}
 				}
+			},
+			{
+				"title": "Other",
+				"order": 5,
+				"properties": {
+					"better-memo.other.enableEditorDecorations": {
+						"order": 101,
+						"title": "Enable Editor Decorations",
+						"type": "boolean",
+						"default": true
+					}
+				}
 			}
 		]
 	}

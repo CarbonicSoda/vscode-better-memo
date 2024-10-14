@@ -60,7 +60,6 @@
 	},
 	"Light": {
 		"activityBarBadge.background": [0, 122, 204],
-		"activityBarTop.activeBorder": [66, 66, 66],
 		"activityBarTop.inactiveForeground": [113, 113, 113],
 		"badge.foreground": [51, 51, 51],
 		"banner.background": [0, 67, 134],
