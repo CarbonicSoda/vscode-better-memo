@@ -21,7 +21,13 @@ import { Janitor } from "./utils/janitor";
 import { MemoEngine } from "./memo-engine";
 import { TreeItems } from "./tree-items";
 
+/**
+ * Provides Memo Explorer view on primary sidebar, main presentation module
+ */
 export namespace ExplorerView {
+	/**
+	 * Memo Explorer tree data provider
+	 */
 	class Provider implements TreeDataProvider<TreeItems.TreeItemType> {
 		viewType: "File" | "Tag";
 		items: TreeItems.InnerItemType[] = [];
@@ -30,14 +36,18 @@ export namespace ExplorerView {
 		private treeDataChangeEmitter: vsEventEmitter<void | undefined | TreeItems.TreeItemType> = new vsEventEmitter<
 			void | undefined | TreeItems.TreeItemType
 		>();
-		readonly onDidChangeTreeData: vsEvent<void | undefined | TreeItems.TreeItemType> =
-			this.treeDataChangeEmitter.event;
+		onDidChangeTreeData: vsEvent<void | undefined | TreeItems.TreeItemType> = this.treeDataChangeEmitter.event;
 
+		/**
+		 * Init provider and loads tree items
+		 */
 		async initProvider(): Promise<void> {
 			this.viewType = ConfigMaid.get("view.defaultView");
 			commands.executeCommand("setContext", "better-memo.explorerView", this.viewType);
 			await this.reloadItems();
 		}
+
+		//Interface implementation methods
 
 		getTreeItem(element: TreeItems.TreeItemType): TreeItems.TreeItemType {
 			return element;
@@ -52,23 +62,42 @@ export namespace ExplorerView {
 			return this.items;
 		}
 
+		//End of interface implementation methods
+
+		/**
+		 * Removes `items` from provider
+		 */
 		removeItems(...items: TreeItems.InnerItemType[]): void {
 			this.items = Aux.array.removeFrom(this.items, ...items);
 		}
 
+		/**
+		 * Removes all items from provider
+		 */
 		removeAllItems(): void {
 			this.items = [];
 		}
 
+		/**
+		 * Updates provider items (does not reload items)
+		 * @param item item to be updated, if not given the whole tree is refreshed
+		 */
 		refresh(item?: TreeItems.TreeItemType): void {
 			this.treeDataChangeEmitter.fire(item);
 		}
 
+		/**
+		 * Reloads provider with updated items from {@link MemoEngine}
+		 */
 		async reloadItems(): Promise<void> {
 			this.items = await this.getItems();
 			this.treeDataChangeEmitter.fire();
 		}
 
+		/**
+		 * Retrieves updated items from {@link MemoEngine} and builds explorer items
+		 * @returns built inner items (primary-hierarchy)
+		 */
 		private async getItems(): Promise<TreeItems.InnerItemType[]> {
 			const isFileView = this.viewType === "File";
 			const expandPrimaryGroup = ConfigMaid.get("view.defaultExpandPrimaryItems");
@@ -162,6 +191,9 @@ export namespace ExplorerView {
 	let updateSuppressed = false;
 	let updateQueued = false;
 
+	/**
+	 * Inits Memo Explorer provider, view and event listeners
+	 */
 	export async function initExplorer(): Promise<void> {
 		ConfigMaid.onChange("view.defaultView", updateViewType);
 		ConfigMaid.onChange(["view.defaultExpandPrimaryItems", "view.defaultExpandSecondaryItems"], updateExpandState);
@@ -216,33 +248,57 @@ export namespace ExplorerView {
 		commands.executeCommand("setContext", "better-memo.explorerInitFinished", true);
 	}
 
+	/**
+	 * Reloads explorer with updated items from {@link MemoEngine},
+	 * delays update if explorer is hidden or if update is suppressed
+	 */
 	export async function updateView(): Promise<void> {
 		if (explorer.visible && !updateSuppressed) await provider.reloadItems();
 		else updateQueued = true;
 	}
 
+	/**
+	 * Updates provider items (does not reload items)
+	 * @param item item to be updated, if not given the whole tree is refreshed
+	 */
 	export function refresh(item?: TreeItems.TreeItemType): void {
 		provider.refresh(item);
 	}
 
+	/**
+	 * Removes `items` from treeview
+	 */
 	export function removeItems(...items: TreeItems.InnerItemType[]): void {
 		provider.removeItems(...items);
 	}
 
+	/**
+	 * Suppresses view update (does not affect view refresh)
+	 */
 	export function suppressUpdate(): void {
 		updateSuppressed = true;
 	}
 
+	/**
+	 * Unsuppresses view update
+	 */
 	export function unsuppressUpdate(): void {
 		updateSuppressed = false;
 	}
 
+	/**
+	 * Updates view's view type (primary-secondary items hierarchy)
+	 * @param viewType "File" - primary items is workspace documents; "Tag" - primary items is Memo tags
+	 */
 	function updateViewType(viewType: "File" | "Tag"): void {
 		provider.viewType = viewType;
 		commands.executeCommand("setContext", "better-memo.explorerView", viewType);
 		updateView();
 	}
 
+	/**
+	 * Updates primary & secondary item's expand/collapse state
+	 */
 	async function updateExpandState(expandPrimaryItems: boolean, expandSecondaryItems: boolean): Promise<void> {
 		const afterReveal = async () => {
 			await commands.executeCommand("list.collapseAll");
@@ -273,6 +329,9 @@ export namespace ExplorerView {
 		}
 	}
 
+	/**
+	 * View action to mark all known Memos to be completed
+	 */
 	async function completeAllMemos(): Promise<void> {
 		suppressUpdate();
 		const memoCount = provider.memoCount;

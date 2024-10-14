@@ -15,12 +15,14 @@ import { VSColors } from "./utils/vs-colors";
 
 import CommentDelimiters from "./json/comment-delimiters.json";
 
+/**
+ * Core engine for fetching documents, memos, and other non-presentation related data module
+ */
 export namespace MemoEngine {
-	const commentDelimiters: {
-		[langId: string]: { open: string; close?: string } | { open: string; close?: string }[];
-	} = CommentDelimiters;
-
-	type MemoEntry = {
+	/**
+	 * Object data entry of a Memo
+	 */
+	export type Memo = {
 		content: string;
 		tag: string;
 		priority: number;
@@ -32,33 +34,10 @@ export namespace MemoEngine {
 		langId: keyof typeof commentDelimiters;
 		raw: string;
 	};
-	export class Memo {
-		readonly content: string;
-		readonly tag: string;
-		readonly priority: number;
-		readonly line: number;
-		readonly offset: number;
-		readonly length: number;
-		readonly path: string;
-		readonly relativePath: string;
-		readonly langId: keyof typeof commentDelimiters;
-		readonly raw: string;
 
-		constructor(entry: MemoEntry) {
-			({
-				content: this.content,
-				tag: this.tag,
-				priority: this.priority,
-				line: this.line,
-				offset: this.offset,
-				length: this.length,
-				path: this.path,
-				relativePath: this.relativePath,
-				langId: this.langId,
-				raw: this.raw,
-			} = entry);
-		}
-	}
+	const commentDelimiters: {
+		[langId: string]: { open: string; close?: string } | { open: string; close?: string }[];
+	} = CommentDelimiters;
 
 	const tmp = Object.values(commentDelimiters)
 		.flat()
@@ -76,6 +55,9 @@ export namespace MemoEngine {
 
 	let prevFocusedDoc: string | undefined;
 
+	/**
+	 * Inits fetcher engine, event listeners and intervals
+	 */
 	export async function initEngine(): Promise<void> {
 		ConfigMaid.onChange(["fetcher.watch", "fetcher.ignore"], fetchDocs);
 		ConfigMaid.onChange("general.customTags", () => {
@@ -110,29 +92,47 @@ export namespace MemoEngine {
 		await fetchMemos();
 	}
 
+	/**
+	 * @returns if `doc` is watched by the fetcher engine
+	 */
 	export function isDocWatched(doc: TextDocument): boolean {
 		return watchedDocInfoMap.has(doc);
 	}
 
+	/**
+	 * @returns is `tag` is of valid form for a Memo
+	 */
 	export function isTagValid(tag: string): boolean {
 		return RegExp(`^[^\\r\\n\t ${commentCloserChars}]+$`).test(tag);
 	}
 
+	/**
+	 * @returns all currently known Memos (also updates better-memo.noMemos context as side-effect)
+	 */
 	export function getMemos(): Memo[] {
 		const memos = [...docMemosMap.values()].flat();
 		commands.executeCommand("setContext", "better-memo.noMemos", memos.length === 0);
 		return memos;
 	}
 
+	/**
+	 * @returns all currently known Memos in `doc`
+	 */
 	export function getMemosInDoc(doc: TextDocument): Memo[] {
 		return docMemosMap.get(doc);
 	}
 
+	/**
+	 * @returns all currently known Memos with tag `tag`
+	 */
 	export function getMemosWithTag(tag: string): Memo[] {
 		const memos = getMemos();
 		return memos.filter((memo) => memo.tag === tag);
 	}
 
+	/**
+	 * @returns Memo template for `langId`, Memos is like `${head}..tag..content..${tail}`
+	 */
 	export function getMemoTemplate(langId: keyof typeof commentDelimiters): { head: string; tail: string } {
 		const commentFormat = [commentDelimiters[langId]].flat()[0];
 		const padding = commentFormat.close ? " " : "";
@@ -142,6 +142,10 @@ export namespace MemoEngine {
 		};
 	}
 
+	/**
+	 * - options.sortOccurrence: Sorts tags by occurrence (desc);
+	 * @returns all currently known tags, together with user-defined custom tag-colors' tags
+	 */
 	export function getTags(options?: { sortOccurrence?: boolean }): string[] {
 		let tags = getMemos()
 			.map((memo) => memo.tag)
@@ -158,28 +162,38 @@ export namespace MemoEngine {
 		return tags;
 	}
 
+	/**
+	 * @returns tags mapped to hashed {@link ThemeColor}s
+	 */
 	export async function getTagColors(): Promise<{ [tag: string]: ThemeColor }> {
 		await fetchTagColors();
 		return tagColors;
 	}
 
+	/**
+	 * Force the engine to forget `memos` (might be back after a scan)
+	 */
 	export function forgetMemos(...memos: Memo[]): void {
 		for (const [doc, docMemos] of docMemosMap.entries()) {
-			const removed = docMemos.filter((memo) => !memos.includes(memo));
+			const removed = Aux.array.removeFrom(docMemos, ...memos);
 			docMemosMap.set(doc, removed);
 		}
 		getMemos(); //immediately updates noMemos context
 	}
 
+	/**
+	 * Force the engine to forget all currently known Memos (might be back after a scan)
+	 */
 	export function forgetAllMemos(): void {
 		docMemosMap.clear();
 		commands.executeCommand("setContext", "better-memo.noMemos", true);
 	}
 
-	export async function scanDoc(
-		doc: TextDocument,
-		options?: { emitUpdate?: boolean; ignoreLazyMode?: boolean },
-	): Promise<void> {
+	/**
+	 * Scans `doc` for contained Memos
+	 * - options.emitUpdate: Emits update signal to view/editorDecors etc;
+	 */
+	export async function scanDoc(doc: TextDocument, options?: { emitUpdate?: boolean }): Promise<void> {
 		const docContent = doc.getText();
 		const matchRE = getMemoMatchRE(doc);
 
@@ -217,7 +231,7 @@ export namespace MemoEngine {
 				langId: doc.languageId,
 				raw: match[0],
 			};
-			memos.push(new Memo(memoEntry));
+			memos.push(memoEntry);
 		});
 
 		docMemosMap.set(doc, memos);
@@ -227,6 +241,9 @@ export namespace MemoEngine {
 		}
 	}
 
+	/**
+	 * Fetches supported text documents from current workspace to watch
+	 */
 	async function fetchDocs(): Promise<void> {
 		const watch = `{${ConfigMaid.get("fetcher.watch").join(",")}}`;
 		const ignore = `{${ConfigMaid.get("fetcher.ignore").join(",")}}`;
@@ -247,24 +264,31 @@ export namespace MemoEngine {
 		for (const doc of watchedDocInfoMap.keys()) if (!isDocWatched(doc)) scanDoc(doc);
 	}
 
+	/**
+	 * Runs {@link fetchDocs()} and then runs {@link scanDoc()} for every retrieved document
+	 * - options.emitUpdate: Emits update signal to view/editorDecors etc;
+	 */
 	async function fetchMemos(options?: { emitUpdate?: boolean }): Promise<void> {
 		await fetchDocs();
 		await Aux.async.map(watchedDocInfoMap.keys(), async (doc) => await scanDoc(doc));
 		if (options?.emitUpdate) EventEmitter.emit("update");
 	}
 
+	/**
+	 * Fetches tags-ThemeColors map and stores in {@link tagColors}
+	 */
 	async function fetchTagColors(): Promise<void> {
 		if (!tagsUpdate) return;
 		await fetchCustomTagColors();
 		const newTagColors: { [tag: string]: ThemeColor } = {};
-		await Aux.async.map(
-			getTags(),
-			async (tag) => (newTagColors[tag] = customTagColors[tag] ?? VSColors.hashColor(tag)),
-		);
+		await Aux.async.map(getTags(), async (tag) => (newTagColors[tag] = customTagColors[tag] ?? VSColors.hash(tag)));
 		tagColors = newTagColors;
 		tagsUpdate = false;
 	}
 
+	/**
+	 * Fetches customTags-ThemeColors map and stores in {@link customTagColors}
+	 */
 	async function fetchCustomTagColors(): Promise<void> {
 		if (!customTagsUpdate) return;
 
@@ -280,6 +304,9 @@ export namespace MemoEngine {
 		customTagsUpdate = false;
 	}
 
+	/**
+	 * @returns `RegExp` for matching Memos in `doc`
+	 */
 	function getMemoMatchRE(doc: TextDocument): RegExp {
 		const delimiters = [commentDelimiters[doc.languageId]].flat();
 		const commentFormatREs = delimiters.map((del, i) => {
@@ -293,6 +320,9 @@ export namespace MemoEngine {
 		return RegExp(matchPattern, "gim");
 	}
 
+	/**
+	 * @returns formatted pretty-looking version of `memo`.raw
+	 */
 	function getFormattedMemo(memo: Memo): string {
 		const template = getMemoTemplate(memo.langId);
 		return `${template.head}${memo.tag}${memo.content ? " " : ""}${"!".repeat(memo.priority)}${memo.content}${
@@ -300,8 +330,11 @@ export namespace MemoEngine {
 		}`;
 	}
 
+	/**
+	 * Formats all Memos in `doc` with {@link getFormattedMemo()}
+	 */
 	async function formatMemosInDoc(doc: TextDocument): Promise<void> {
-		await scanDoc(doc, { ignoreLazyMode: true });
+		await scanDoc(doc);
 		const memos = getMemosInDoc(doc);
 		if (memos.length === 0) return;
 
@@ -311,6 +344,9 @@ export namespace MemoEngine {
 		await edit.apply();
 	}
 
+	/**
+	 * Validates `doc` for a scan (if not forced)
+	 */
 	function validateForScan(doc?: TextDocument): boolean {
 		const docInfo = watchedDocInfoMap.get(doc);
 		if (!docInfo) return false;
@@ -321,17 +357,28 @@ export namespace MemoEngine {
 		return versionChanged || langChanged;
 	}
 
+	/**
+	 * Normal scanning interval, is not forced and doc is validated for a scan,
+	 * the scan only scans the current active document
+	 */
 	function scanInterval(): void {
 		const doc = window.activeTextEditor?.document;
 		if (doc && validateForScan(doc)) scanDoc(doc, { emitUpdate: true });
 	}
 
+	/**
+	 * Force scanning interval, to prevent cases where {@link scanInterval()} mal-functioned,
+	 * the scan only scans the current active document
+	 */
 	function forceScanInterval(): void {
 		const doc = window.activeTextEditor?.document;
 		if (!doc || !isDocWatched(doc)) return;
 		scanDoc(doc, { emitUpdate: true });
 	}
 
+	/**
+	 * Handles tab change and formats document's Memos accordingly
+	 */
 	async function onTabChange(ev: TabGroupChangeEvent): Promise<void> {
 		for (const changedTab of ev.changed) {
 			if (!changedTab.isActive) continue;

@@ -1,31 +1,52 @@
+/**
+ * Arithmetic related functions
+ */
 export namespace Aux.math {
+	/**
+	 * @returns sum of `numbers`
+	 */
 	export const sum = (...numbers: number[]) => numbers.reduce((sum, n) => sum + n);
 }
 
+/**
+ * Array related functions
+ */
 export namespace Aux.array {
+	/**
+	 * @returns copy of `array` with `items` removed (all duplicates of `items` are also removed)
+	 */
 	export function removeFrom<T>(array: T[], ...items: T[]): T[] {
-		return array.filter((item) => !items.some((_item) => _item === item));
+		return array.filter((item) => !items.includes(item));
 	}
 }
 
+/**
+ * Object related functions
+ */
 export namespace Aux.object {
 	/**
-	 * Groups objects according to object[grouper] values
-	 * @param objects iterable of objects
-	 * @param grouper key of objects used to group them
-	 * @returns different values of object[grouper] as keys and their corresponding objects[] as values
+	 * Weakened implementation of Object.groupBy()
+	 *
+	 * @param grouper key of `objects` used for grouping
+	 * @returns different values of object[`grouper`] as keys and corresponding objects as values
 	 */
-	export function group(objects: { [key: string]: any }[], grouper: string): { [group: string]: typeof objects } {
-		const groups: { [group: string]: typeof objects } = {};
+	export function group(
+		objects: { [key: string]: any }[],
+		grouper: keyof (typeof objects)[number],
+	): { [group: string]: typeof objects } {
+		const groups: { [group: keyof (typeof objects)[number]]: typeof objects } = {};
 		for (const object of objects) groups[object[grouper]] = [];
 		for (const object of objects) groups[object[grouper]].push(object);
 		return groups;
 	}
 }
 
+/**
+ * Asynchronous operation functions
+ */
 export namespace Aux.async {
 	/**
-	 * Sugar for the async for loop Promise.all(iterable.map(async (ele) => {...}))
+	 * Sugar for Promise.all(`iterable`.map(`async (ele) => {...}`))
 	 */
 	export async function map<T, C>(
 		iterable: Iterable<T>,
@@ -35,43 +56,52 @@ export namespace Aux.async {
 	}
 
 	/**
-	 * Sugar for the async for loop Promise.all((await range(n)).map(async (i) => {...}))
+	 * Sugar for Promise.all((await range(`n`)).map(`async (i) => {...}`))
 	 */
 	export async function range<T>(n: number, callback: (i: number) => Promise<T>): Promise<Awaited<T>[]> {
 		return await map(Array(n).keys(), callback);
 	}
 }
 
+/**
+ * RegExp related functions
+ */
 export namespace Aux.re {
 	/**
-	 * Makes a raw string valid for RegExp() without conflicts
-	 * @param str raw RE string to escape
-	 * @returns escaped RE for RegExp()
+	 * Makes a raw string valid for `RegExp()` without conflicts
 	 * @example "[(1+1)-2]*3" becomes "\[\(1\+1\)\-2\]\*3"
 	 */
 	export const escape = (str: string) => str.replace(/[[\]*+?{}.()^$|/\\-]/g, "\\$&");
 
 	/**
-	 * Concats several regular expressions into a union RegExp
+	 * Concats several regular expressions into a union `RegExp`: (?:...)|(?:...)|...
 	 */
 	export const union = (...regExps: string[]) => RegExp(`(?:${regExps.join(")|(?:")})`);
 }
 
+/**
+ * String related functions
+ */
 export namespace Aux.string {
 	/**
-	 * @param countable number or iterable
+	 * @param countable number or object with `.length` property
 	 * @returns "s" if countable is plural or else ""
 	 */
 	export const plural = (countable: number | any[]) =>
 		((<{ length?: number }>countable).length ?? countable) === 1 ? "" : "s";
 }
 
+/**
+ * Useful algorithms
+ */
 export namespace Aux.algorithm {
 	/**
-	 * Returns index of the latest element in array <= candid.
-	 * If sorted[0] > candid, returns -1.
-	 * If sorted.length === 0, returns undefined.
-	 * @param transform optional function that returns a number for comparing if T is not number
+	 * @returns index of the latest element in `sorted` <= `candid`
+	 *
+	 * - If `sorted`[0] > `candid`, returns -1;
+	 * - If `sorted`.length === 0, returns undefined;
+	 *
+	 * @param transform optional function that returns a number for comparison if T is not number
 	 */
 	export function predecessorSearch<T>(
 		sorted: T[],

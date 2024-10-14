@@ -1,27 +1,52 @@
 import { writeFileSync } from "fs";
 import { commands, env, Position, Range, TextDocument, UIKind, Uri, window, workspace, WorkspaceEdit } from "vscode";
 
+/**
+ * Handles complicated logic of hybrid file editing with Node.fs and {@link workspace.fs},
+ * this is due to how vscode requires editors to be open when using {@link workspace.fs}
+ */
 export namespace FileEdit {
+	/**
+	 * Specifies a text range [`start`, `end`) to get modified
+	 */
 	export type EditRange = [start: number | Position, end: number | Position];
+	/**
+	 * Maps {@link EditRange}s to replacement string
+	 */
 	export type EditEntries = { range: EditRange; edit: string }[];
 
+	/**
+	 * Defines a new edit collection that would be applied at once
+	 *
+	 * Text ranges' delta would be calculated internally,
+	 * using original doc's range is sufficient
+	 */
 	export class Edit {
 		private uriEditsMap: Map<Uri, EditEntries> = new Map();
 
+		/**
+		 * Replaces text in `range`, `range`.end is not included
+		 */
 		replace(uri: Uri, range: EditRange | Range, text: string): void {
 			if (range instanceof Range) range = [range.start, range.end];
 			if (!this.uriEditsMap.has(uri)) this.uriEditsMap.set(uri, []);
 			this.uriEditsMap.get(uri).push({ range: <EditRange>range, edit: text });
 		}
 
+		/**
+		 * Deletes text in `range`, `range`.end is not included
+		 */
 		delete(uri: Uri, range: EditRange | Range): void {
 			this.replace(uri, range, "");
 		}
 
-		async apply(options?: {
-			alwaysOpenFile?: boolean;
-			throwError?: boolean;
-		}): Promise<void> {
+		/**
+		 * Applies all previously stacked edits in order hybridly
+		 *
+		 * - options.alwaysOpenFile: Always open the modified files and use {@link workspace.fs};
+		 * - options.throwError: Throw errors when modifying files;
+		 */
+		async apply(options?: { alwaysOpenFile?: boolean; throwError?: boolean }): Promise<void> {
 			for (const [uri, fileEdits] of this.uriEditsMap.entries()) {
 				try {
 					await this.editFile(fileEdits, uri, options?.alwaysOpenFile);
@@ -31,11 +56,10 @@ export namespace FileEdit {
 			}
 		}
 
-		private async editFile(
-			edits: EditEntries,
-			uri: Uri,
-			alwaysOpenFile?: boolean,
-		): Promise<void> {
+		/**
+		 * Applies `edits` to the document with `uri` hybridly
+		 */
+		private async editFile(edits: EditEntries, uri: Uri, alwaysOpenFile?: boolean): Promise<void> {
 			const doc = await workspace.openTextDocument(uri);
 			if (!alwaysOpenFile && !doc.isDirty && env.uiKind !== UIKind.Web) {
 				this.editFileWithFs(edits, doc);
@@ -60,6 +84,9 @@ export namespace FileEdit {
 			}
 		}
 
+		/**
+		 * Applies `edits` to the `doc` with Node.fs
+		 */
 		private editFileWithFs(edits: EditEntries, doc: TextDocument): void {
 			let text = doc.getText();
 			let delta = 0;

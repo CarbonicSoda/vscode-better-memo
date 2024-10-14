@@ -1,4 +1,10 @@
+/**
+ * Centrally manages disposable(-like)s and timeouts/intervals
+ */
 export namespace Janitor {
+	/**
+	 * Type with `dispose()` function signature
+	 */
 	export type DisposableLike = {
 		[any: string]: any;
 		dispose(...args: any): any;
@@ -9,7 +15,7 @@ export namespace Janitor {
 
 	/**
 	 * @param DisposableOrTimeout instances to manage
-	 * @returns unique id for managed instance
+	 * @returns unique id for `DisposableOrTimeout`
 	 */
 	export function add(...DisposableOrTimeout: (DisposableLike | NodeJS.Timeout)[]): number {
 		managed.push(DisposableOrTimeout);
@@ -17,9 +23,7 @@ export namespace Janitor {
 	}
 
 	/**
-	 * Clears the original managed instance and replaces with a new one
-	 * @param id unique id of managed instance to override
-	 * @param DisposableOrTimeout instances to manage instead
+	 * Disposes/Clears the original managed instances with `id` and replaces it with `DisposableOrTimeout[]`
 	 */
 	export function override(id: number, ...DisposableOrTimeout: (DisposableLike | NodeJS.Timeout)[]): void {
 		if (managed[id].length === 0) throw new Error(`No managed instance to override with id ${id}`);
@@ -28,7 +32,7 @@ export namespace Janitor {
 	}
 
 	/**
-	 * @param id unique id of managed instance
+	 * Disposes/Clears the managed instances with `id`
 	 */
 	export function clear(id: number): void {
 		if (!managed[id] || managed[id].length === 0) return;
@@ -43,7 +47,7 @@ export namespace Janitor {
 	}
 
 	/**
-	 * Clears all managed instances
+	 * Disposes/Clears all currently managed instances
 	 */
 	export function cleanUp(): void {
 		for (let i = 0; i < instancesID; i++) clear(i);

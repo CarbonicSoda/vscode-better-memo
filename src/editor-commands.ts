@@ -22,7 +22,13 @@ import { EventEmitter } from "./utils/event-emitter";
 import { Janitor } from "./utils/janitor";
 import { MemoEngine } from "./memo-engine";
 
+/**
+ * Registry of `TextEditorCommand`s available in watched text documents
+ */
 export namespace EditorCommands {
+	/**
+	 * Registers all `TextEditorCommand`s
+	 */
 	export function initEditorCommands(): void {
 		Janitor.add(
 			commands.registerTextEditorCommand("better-memo.newMemoOnLine", newMemoOnLine),
@@ -32,6 +38,9 @@ export namespace EditorCommands {
 		);
 	}
 
+	/**
+	 * Asks for a tag and inserts a new Memo on the current line
+	 */
 	async function newMemoOnLine(editor: TextEditor): Promise<void> {
 		const doc = editor.document;
 		if (!MemoEngine.isDocWatched(doc)) return;
@@ -102,6 +111,9 @@ export namespace EditorCommands {
 		EventEmitter.emit("scan", doc);
 	}
 
+	/**
+	 * Marks Memos next to editor selections as completed
+	 */
 	function completeMemoNextToSelection(editor: TextEditor, editBuilder: TextEditorEdit): void {
 		const doc = editor.document;
 		if (!MemoEngine.isDocWatched(doc)) return;
@@ -135,6 +147,9 @@ export namespace EditorCommands {
 		doc.save();
 	}
 
+	/**
+	 * Function factory: navigates to the last (next) Memo in the editor, from current selection
+	 */
 	function navigateToMemoFactory(target: "Last" | "Next"): (editor: TextEditor) => void {
 		return (editor: TextEditor) => {
 			const doc = editor.document;
@@ -154,7 +169,7 @@ export namespace EditorCommands {
 			}
 
 			const pos = doc.positionAt(targetMemo.offset + targetMemo.length);
-			editor.selection = new Selection(pos, pos);
+			editor.selections = [new Selection(pos, pos)];
 			editor.revealRange(new Range(pos, pos));
 		};
 	}

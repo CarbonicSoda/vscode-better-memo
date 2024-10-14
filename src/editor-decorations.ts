@@ -10,7 +10,13 @@ import { EventEmitter } from "./utils/event-emitter";
 import { Janitor } from "./utils/janitor";
 import { MemoEngine } from "./memo-engine";
 
+/**
+ * Provides editor decorations
+ */
 export namespace EditorDecorations {
+	/**
+	 * Maps tags to their corresponding color-decoration-types
+	 */
 	type TagColorDecors = { [tag: string]: TextEditorDecorationType };
 
 	const fontWeightDecor = window.createTextEditorDecorationType({
@@ -21,6 +27,9 @@ export namespace EditorDecorations {
 	let prevDecorTypes: TextEditorDecorationType[] = [];
 	let decorsEnabled = ConfigMaid.get("other.enableEditorDecorations");
 
+	/**
+	 * Inits all editor decorations and event listening
+	 */
 	export function initEditorDecorations(): void {
 		ConfigMaid.onChange("other.enableEditorDecorations", (enable) => (decorsEnabled = enable));
 
@@ -45,6 +54,9 @@ export namespace EditorDecorations {
 		);
 	}
 
+	/**
+	 * Applies `tagColorDecors` and {@link fontWeightDecor} to `editor`
+	 */
 	function applyDecors(editor: TextEditor, tagColorDecors: TagColorDecors): void {
 		prevDecorTypes = Object.values(tagColorDecors);
 
@@ -72,6 +84,17 @@ export namespace EditorDecorations {
 		decoratedEditors.add(editor);
 	}
 
+	/**
+	 * Removes previous decors from `editor`
+	 */
+	function removePrevDecors(editor: TextEditor): void {
+		for (const decorType of Object.values(prevDecorTypes)) editor.setDecorations(decorType, []);
+		editor.setDecorations(fontWeightDecor, []);
+	}
+
+	/**
+	 * @returns tags mapped to their corresponding color-decor-types
+	 */
 	async function getTagDecors(): Promise<TagColorDecors> {
 		const tagColors = await MemoEngine.getTagColors();
 		const tagDecors: TagColorDecors = {};
@@ -81,10 +104,5 @@ export namespace EditorDecorations {
 			});
 		}
 		return tagDecors;
-	}
-
-	function removePrevDecors(editor: TextEditor): void {
-		for (const decorType of Object.values(prevDecorTypes)) editor.setDecorations(decorType, []);
-		editor.setDecorations(fontWeightDecor, []);
 	}
 }

@@ -26,10 +26,22 @@ import { VSColors } from "./utils/vs-colors";
 import { MemoEngine } from "./memo-engine";
 import { ExplorerView } from "./explorer-view";
 
+/**
+ * Treeview item types and classes for {@link ExplorerView}
+ */
 export namespace TreeItems {
+	/**
+	 * All {@link ExplorerView} tree item types
+	 */
 	export type TreeItemType = ExplorerItem | FileItem | TagItem | MemoItem;
+	/**
+	 * Inner item types (graph-theory tree concept), basically non-leaf (non-{@link MemoItem}) items
+	 */
 	export type InnerItemType = FileItem | TagItem;
 
+	/**
+	 * Base class for {@link ExplorerView} tree items
+	 */
 	class ExplorerItem extends TreeItem {
 		constructor(label: string, expand: boolean | "none", public parent?: InnerItemType) {
 			let collapsibleState: TreeItemCollapsibleState;
@@ -39,6 +51,10 @@ export namespace TreeItems {
 			super(label, collapsibleState);
 		}
 
+		/**
+		 * Removes item from treeview, recursively removes parent if parent have lost all children
+		 * @returns the upmost parent not removed from tree (still has children), `undefined` if root
+		 */
 		removeFromTree(): InnerItemType | undefined {
 			if (!this.parent) {
 				ExplorerView.removeItems(<InnerItemType>(<unknown>this));
@@ -50,6 +66,9 @@ export namespace TreeItems {
 		}
 	}
 
+	/**
+	 * Base class for {@link ExplorerView} inner items
+	 */
 	class InnerItem extends ExplorerItem {
 		static pendingCompletionIcon = new ThemeIcon("loading~spin");
 
@@ -61,10 +80,17 @@ export namespace TreeItems {
 			this.isPrimary = !parent;
 		}
 
+		/**
+		 * Removes `children` from `this.children`
+		 */
 		removeChildren(...children: TreeItemType[]): void {
 			this.children = Aux.array.removeFrom(this.children, ...children);
 		}
 
+		/**
+		 * View action to mark all memos under `this` as completed and refreshes treeview
+		 * - options.noConfirm: Don't ask for confirmation, ignoring user config;
+		 */
 		async markMemosAsCompleted(options?: { noConfirm?: boolean; _noExtraTasks?: boolean }): Promise<void> {
 			ExplorerView.suppressUpdate();
 
@@ -72,7 +98,7 @@ export namespace TreeItems {
 			if (this.contextValue === "File") {
 				const fileItem = <FileItem>(<unknown>this);
 				const doc = await workspace.openTextDocument(fileItem.path);
-				await MemoEngine.scanDoc(doc, { ignoreLazyMode: true });
+				await MemoEngine.scanDoc(doc);
 				memos = MemoEngine.getMemosInDoc(doc);
 			} else {
 				const tagItem = <TagItem>(<unknown>this);
@@ -84,7 +110,7 @@ export namespace TreeItems {
 				await Aux.async.map(filePaths, async (path) => {
 					const doc = await workspace.openTextDocument(path);
 					docs.push(doc);
-					await MemoEngine.scanDoc(doc, { ignoreLazyMode: true });
+					await MemoEngine.scanDoc(doc);
 				});
 				memos = MemoEngine.getMemosWithTag(tagItem.tag);
 			}
@@ -134,6 +160,9 @@ export namespace TreeItems {
 		}
 	}
 
+	/**
+	 * Class extending {@link InnerItem} representing a watched file's item
+	 */
 	export class FileItem extends InnerItem {
 		constructor(readonly path: string, expand: boolean, parent?: TagItem) {
 			super("File", workspace.asRelativePath(path), expand, parent);
@@ -141,6 +170,9 @@ export namespace TreeItems {
 			this.iconPath = ThemeIcon.File;
 		}
 
+		/**
+		 * View action to navigate to the document under `this`
+		 */
 		async navigateTo(): Promise<void> {
 			const editor = await window.showTextDocument(this.resourceUri);
 			const pos = editor.document.lineAt(0).range.end;
@@ -149,12 +181,18 @@ export namespace TreeItems {
 		}
 	}
 
+	/**
+	 * Class extending {@link InnerItem} representing a Memo tag's item
+	 */
 	export class TagItem extends InnerItem {
 		constructor(readonly tag: string, expand: boolean, parent?: FileItem) {
 			super("Tag", tag, expand, parent);
 		}
 	}
 
+	/**
+	 * Class extending {@link ExplorerItem} representing a Memo's item
+	 */
 	export class MemoItem extends ExplorerItem {
 		static currCompletionTarget?: MemoItem;
 		static currCompletionState?: {
@@ -191,6 +229,9 @@ export namespace TreeItems {
 			};
 		}
 
+		/**
+		 * View action to navigate to the Memo's position in doc
+		 */
 		async navigateTo(): Promise<void> {
 			const memo = this.memo;
 			const editor = await window.showTextDocument(Uri.file(memo.path));
@@ -199,6 +240,10 @@ export namespace TreeItems {
 			editor.revealRange(new Range(pos, pos));
 		}
 
+		/**
+		 * View action to trigger Memo completion (or completion confirmation)
+		 * - options.noConfirm: Ignore user config and remove Memo directly;
+		 */
 		async markAsCompleted(options?: { noConfirm?: boolean }): Promise<void> {
 			if (
 				!options?.noConfirm &&
@@ -232,6 +277,11 @@ export namespace TreeItems {
 			}
 		}
 
+		/**
+		 * Memo completion confirmation handle
+		 * - labelOptions.words: Number of words to be included in label;
+		 * - labelOptions.maxLength: Maximum length of label, if exceeded appends "...";
+		 */
 		private confirmCompletion(labelOptions: { words?: number; maxLength: number }): boolean {
 			const setPendingItem = (item: MemoItem) => {
 				MemoItem.currCompletionTarget = item;
@@ -274,7 +324,7 @@ export namespace TreeItems {
 
 			let abbrevLabel = `${this.label
 				.toString()
-				.split(/\s/, labelOptions.words ?? 1)
+				.split(/\s+/, labelOptions.words ?? 1)
 				.join(" ")}`;
 			if (abbrevLabel.length > labelOptions.maxLength)
 				abbrevLabel = `${abbrevLabel.slice(0, labelOptions.maxLength)}...`;

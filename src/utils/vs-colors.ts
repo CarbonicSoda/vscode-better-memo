@@ -2,24 +2,33 @@ import { ColorThemeKind, ThemeColor, window } from "vscode";
 
 import VSCodeColors from "../json/vscode-colors.json";
 
+/**
+ * Functions to return {@link ThemeColor} from sRGB or string-hash
+ */
 export namespace VSColors {
-	export type RGB3 = [r: number, g: number, b: number];
+	/**
+	 * RGB entry
+	 */
+	export type RGB3 = [R: number, G: number, B: number];
 
 	/**
-	 * Returns the closest ThemeColor to RGB or HEX, interpolated with sRGB color space
+	 * @returns the closest {@link ThemeColor} to `rgbOrHex`, interpolated in sRGB color space
 	 *
-	 * The colors would differ slightly within color themes of the same kind (dark/light/hc_dark/hc_light).
-	 * Under different theme kinds the result would differ significantly, INTENDED for higher contrast.
-	 * A demo of original & filtered colors could be seen at https://www.desmos.com/3d/wt60c3p2mk.
+	 * The colors would differ slightly within color themes of the same {@link ColorThemeKind} `(dark/light/hc_dark/hc_light)`,
+	 * under different theme kinds the result would differ significantly, **INTENDED** for higher contrast
 	 *
-	 * IMPORTANT!!!
+	 * A demo of original & filtered colors could be seen at https://www.desmos.com/3d/wt60c3p2mk,
+	 * do note that the "filtered" colors also include some now removed colors, details below
+	 *
 	 * Colors are based upon default vscode color themes, so custom color themes might cause colors to
-	 * completely lack contrast. If a color is found to be contrast-less in popular themes, FILE AN ISSUE.
+	 * completely lack contrast. If a color is found to be contrast-less in popular themes, **FILE AN ISSUE**,
+	 * I have removed several colors found contrast-less in my fave theme `Catppuccin Latte`, which is a light theme,
+	 * so light themes have less colors, and contrast-less colors in other themes might be overlooked LOL
 	 *
-	 * @param rgbOrHex [R, G, B] or "#rrggbb", "#rgb" (case insensitive, # could be omitted)
+	 * @param RGBorHEX `RGB3`: [R, G, B], `"#rrggbb"` or `"#rgb"` (case insensitive, "#" could be omitted)
 	 */
-	export function interpolate(rgbOrHex: RGB3 | string): ThemeColor {
-		const rgb = typeof rgbOrHex === "string" ? HEX2RGB(rgbOrHex) : rgbOrHex;
+	export function interpolate(RGBorHEX: RGB3 | string): ThemeColor {
+		const rgb = typeof RGBorHEX === "string" ? HEXtoRGB(RGBorHEX) : RGBorHEX;
 		const colorThemeKind = ColorThemeKind[window.activeColorTheme.kind];
 		let bestDist = 999999;
 		let best = "";
@@ -35,23 +44,24 @@ export namespace VSColors {
 	}
 
 	/**
-	 * Returns a ThemeColor for the string which will not change over sessions or devices
-	 * 
-	 * NOTE: Since colors are limited to the higher-constrast sRGB half-cube,
-	 * colors hashed to the other half-cube might be interpolated to very similar colors
+	 * @returns a {@link ThemeColor} for `hashString` which will not change over sessions or devices
+	 *
+	 * Since colors are limited to the higher-constrast sRGB half-cube,
+	 * colors hashed to the other half-cube might be interpolated to very similar colors,
+	 * and I'm too dumb ~~lazy~~ to fix that
 	 */
-	export function hashColor(hashString: string): ThemeColor {
-		const rgb = sRGBHash(hashString);
+	export function hash(hashString: string): ThemeColor {
+		const rgb = sRGBhash(hashString);
 		return interpolate(rgb);
 	}
 
 	/**
-	 * Returns a definite rgb for the string, just like a hash function
+	 * @returns a definite rgb for `hashString`, like a hash function
 	 *
-	 * Hash function from https://github.com/RolandR/ColorHash,
-	 * modified to make permutations of characters be treated differently
+	 * Hash function is from https://github.com/RolandR/ColorHash
+	 * modified to make permutations of characters to give different colors
 	 */
-	function sRGBHash(hashString: string): RGB3 {
+	function sRGBhash(hashString: string): RGB3 {
 		let sum = 0;
 		for (let i = 0; i < hashString.length; i++) sum += hashString.charCodeAt(i) * (i + 1);
 		const getVal = (param: number) => Math.trunc(Number(`0.${String(Math.sin(sum + param)).slice(6)}`) * 256);
@@ -59,10 +69,10 @@ export namespace VSColors {
 	}
 
 	/**
-	 * Converts HEX to RGB
-	 * @param hex "#rrggbb", "#rgb" (case insensitive, # could be omitted)
+	 * Converts `hex` to `RGB3`
+	 * @param hex `"#rrggbb"` or `"#rgb"` (case insensitive, "#" could be omitted)
 	 */
-	function HEX2RGB(hex: string): RGB3 {
+	function HEXtoRGB(hex: string): RGB3 {
 		hex = hex.replace("#", "");
 		if (hex.length === 3) hex = hex[0].repeat(2) + hex[1].repeat(2) + hex[2].repeat(2);
 		return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];

@@ -1,7 +1,16 @@
+/**
+ * One-way inner/cross-module emmiter mainly used for decoupling
+ */
 export namespace EventEmitter {
+	/**
+	 * Class that could be disposed to stop event listening
+	 */
 	export class Disposable {
 		constructor(readonly event: string, readonly id: number) {}
 
+		/**
+		 * Unsubscribes from `this.event`
+		 */
 		dispose(): void {
 			const removed = eventCallbacksMap.get(this.event).filter((_, i) => i !== this.id);
 			eventCallbacksMap.set(this.event, removed);
@@ -11,8 +20,7 @@ export namespace EventEmitter {
 	const eventCallbacksMap: Map<string, ((...args: any) => any)[]> = new Map();
 
 	/**
-	 * @param event event to subscribe to
-	 * @param callback callback function evoked on event dispatch
+	 * @param callback callback function evoked on `event`'s dispatch
 	 */
 	export function subscribe(event: string, callback: (...args: any) => any): Disposable {
 		if (!eventCallbacksMap.has(event)) eventCallbacksMap.set(event, []);
@@ -21,8 +29,7 @@ export namespace EventEmitter {
 	}
 
 	/**
-	 * @param event event to dispatch
-	 * @param args arguments to pass to callback functions
+	 * @param args arguments to pass to subscribed callback functions
 	 */
 	export function emit(event: string, ...args: any): void {
 		for (const callback of eventCallbacksMap.get(event) ?? []) callback(...args);
