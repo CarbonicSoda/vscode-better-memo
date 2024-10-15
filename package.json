@@ -335,6 +335,7 @@
 						"additionalProperties": {
 							"type": "string"
 						},
+						"markdownDescription": "Defines custom colors for specified tags.\nAccepted formats are **#FFFFFF** & **#FFF**, case insensitive and **#** could be omitted.\n\nSpecified tags will always be in the *New Memo on Line* tag picker.",
 						"default": {
 							"TODO": "#090",
 							"FIX": "#C00",
@@ -355,18 +356,25 @@
 							"File",
 							"Tag"
 						],
+						"enumDescriptions": [
+							"Use files as main groups.",
+							"Use Memo tags as main groups."
+						],
+						"description": "Determines how items are grouped in Memo Explorer by default.",
 						"default": "File"
 					},
-					"better-memo.view.defaultExpandPrimaryItems": {
+					"better-memo.view.defaultExpandPrimaryGroups": {
 						"order": 201,
-						"title": "Expand Primary Items by Default",
+						"title": "Expand Primary Groups by Default",
 						"type": "boolean",
+						"description": "Expand Memo Explorer primary groups by default.",
 						"default": true
 					},
-					"better-memo.view.defaultExpandSecondaryItems": {
+					"better-memo.view.defaultExpandSecondaryGroups": {
 						"order": 202,
-						"title": "Expand Secondary Items by Default",
+						"title": "Expand Secondary Groups by Default",
 						"type": "boolean",
+						"description": "Expand Memo Explorer secondary groups by default.",
 						"default": true
 					}
 				}
@@ -379,36 +387,42 @@
 						"order": 101,
 						"title": "Ask for Confirmation on Completion of Memo",
 						"type": "boolean",
+						"description": "Wait for confirmation before completing a single Memo.",
 						"default": false
 					},
 					"better-memo.actions.memoCompletionConfirmTimeout": {
 						"order": 102,
 						"title": "Timeout of Confirmation on Completion of Memo",
 						"type": "integer",
+						"markdownDescription": "The timeout before aborting a pending completion, only applies if `#better-memo.actions.askForConfirmOnMemoCompletion#` is set to **true**.",
 						"default": 3000
 					},
 					"better-memo.actions.alwaysOpenFileOnMemoCompletion": {
 						"order": 103,
 						"title": "Always Open File on Completion of Memo",
 						"type": "boolean",
+						"description": "Always open the file after completing a single Memo.",
 						"default": true
 					},
 					"better-memo.actions.askForConfirmOnMemosCompletion": {
 						"order": 201,
 						"title": "Ask for Confirmation on Completion of Memos",
 						"type": "boolean",
+						"description": "Wait for confirmation before completing Memos under the parent item.",
 						"default": true
 					},
 					"better-memo.actions.removeLineIfMemoSpansLine": {
 						"order": 301,
 						"title": "Remove Line if Memo Spans Line",
 						"type": "boolean",
+						"description": "Remove line containing completed Memo if the line becomes blank.",
 						"default": true
 					},
 					"better-memo.actions.newMemoOnNewLine": {
 						"order": 401,
 						"title": "Always Insert New Memos on New Line",
 						"type": "boolean",
+						"markdownDescription": "Always insert new Memos on the line above the current line when using the *New Memo on Line* command.",
 						"default": true
 					}
 				}
@@ -424,6 +438,7 @@
 						"items": {
 							"type": "string"
 						},
+						"markdownDescription": "Configures Memo fetcher file watch glob pattern, for format see [glob pattern reference](https://aka.ms/vscode-glob-patterns/).",
 						"default": [
 							"**/*"
 						]
@@ -435,6 +450,7 @@
 						"items": {
 							"type": "string"
 						},
+						"markdownDescription": "Configures Memo fetcher file ignore glob pattern, for format see [glob pattern reference](https://aka.ms/vscode-glob-patterns/).",
 						"default": [
 							"**/node_modules"
 						]
@@ -443,25 +459,28 @@
 						"order": 201,
 						"title": "Scan Delay",
 						"type": "integer",
-						"default": 1000,
 						"minimum": 100,
-						"maximum": 1000000
+						"maximum": 1000000,
+						"description": "Configures the delay between casual document scans. Casual scans only scans the currently active document and will not run if document is not changed etc.",
+						"default": 1000
 					},
 					"better-memo.fetcher.forceScanDelay": {
 						"order": 202,
 						"title": "Force Scan Delay",
 						"type": "integer",
-						"default": 5000,
 						"minimum": 500,
-						"maximum": 5000000
+						"maximum": 5000000,
+						"description": "Configures the delay between forced document scans. Forced scans will scan the currently active document without checks, to prevent cases where casual scans failed.",
+						"default": 5000
 					},
 					"better-memo.fetcher.docsScanDelay": {
 						"order": 203,
 						"title": "Workspace Scan Delay",
 						"type": "integer",
-						"default": 10000,
 						"minimum": 1000,
-						"maximum": 10000000
+						"maximum": 10000000,
+						"description": "Configures the delay between workspace document scans. The scan scans for unwatched documents in the workspace. Though typically documents would be taken care of by event listeners, this prevents potential failures.",
+						"default": 10000
 					}
 				}
 			},
@@ -473,6 +492,7 @@
 						"order": 101,
 						"title": "Enable Editor Decorations",
 						"type": "boolean",
+						"description": "Enable document decorations such as giving Memos higher font-weight, and coloring tags with their corresponding colors.",
 						"default": true
 					}
 				}

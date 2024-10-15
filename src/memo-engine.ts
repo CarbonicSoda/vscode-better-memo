@@ -359,7 +359,7 @@ export namespace MemoEngine {
 
 	/**
 	 * Normal scanning interval, is not forced and doc is validated for a scan,
-	 * the scan only scans the current active document
+	 * the scan only scans the currently active document
 	 */
 	function scanInterval(): void {
 		const doc = window.activeTextEditor?.document;
@@ -368,7 +368,7 @@ export namespace MemoEngine {
 
 	/**
 	 * Force scanning interval, to prevent cases where {@link scanInterval()} mal-functioned,
-	 * the scan only scans the current active document
+	 * the scan only scans the currently active document
 	 */
 	function forceScanInterval(): void {
 		const doc = window.activeTextEditor?.document;

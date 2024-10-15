@@ -1,7 +1,7 @@
 /**
  * Configs used in explorer-view.ts:
  * view.defaultView
- * view.defaultExpandPrimaryItems, view.defaultExpandSecondaryItems
+ * view.defaultExpandPrimaryGroups, view.defaultExpandSecondaryGroups
  */
 
 import {
@@ -100,8 +100,8 @@ export namespace ExplorerView {
 		 */
 		private async getItems(): Promise<TreeItems.InnerItemType[]> {
 			const isFileView = this.viewType === "File";
-			const expandPrimaryGroup = ConfigMaid.get("view.defaultExpandPrimaryItems");
-			const expandSecondaryGroup = ConfigMaid.get("view.defaultExpandSecondaryItems");
+			const expandPrimaryGroup = ConfigMaid.get("view.defaultExpandPrimaryGroups");
+			const expandSecondaryGroup = ConfigMaid.get("view.defaultExpandSecondaryGroups");
 
 			const memos = MemoEngine.getMemos();
 			this.memoCount = memos.length;
@@ -196,7 +196,7 @@ export namespace ExplorerView {
 	 */
 	export async function initExplorer(): Promise<void> {
 		ConfigMaid.onChange("view.defaultView", updateViewType);
-		ConfigMaid.onChange(["view.defaultExpandPrimaryItems", "view.defaultExpandSecondaryItems"], updateExpandState);
+		ConfigMaid.onChange(["view.defaultExpandPrimaryGroups", "view.defaultExpandSecondaryGroups"], updateExpandState);
 
 		Janitor.add(
 			explorer,
