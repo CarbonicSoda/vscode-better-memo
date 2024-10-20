@@ -61,6 +61,7 @@ export namespace EditorDecorations {
 		prevDecorTypes = Object.values(tagColorDecors);
 
 		const doc = editor.document;
+		if (!MemoEngine.isDocWatched(doc)) return;
 		const memos = MemoEngine.getMemosInDoc(doc);
 
 		const tagGroups = <{ [tag: string]: MemoEngine.Memo[] }>Aux.object.group(memos, "tag");

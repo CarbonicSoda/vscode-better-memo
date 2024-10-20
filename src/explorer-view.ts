@@ -265,7 +265,7 @@ export namespace ExplorerView {
 		commands.executeCommand("setContext", "better-memo.explorerInitFinished", true);
 
 		const editor = window.activeTextEditor;
-		if (editor) onChangeEditorSelection(editor);
+		if (editor?.selection) onChangeEditorSelection(editor);
 	}
 
 	/**
@@ -385,14 +385,20 @@ export namespace ExplorerView {
 		if (!explorer.visible) return;
 
 		const doc = editor.document;
-		const offset = doc.offsetAt(editor.selection.active);
+		if (!MemoEngine.isDocWatched(doc)) return;
+
 		const memoItems = provider.getMemoItems();
 		const docMemoItems = memoItems.filter((memoItem) => memoItem.memo.fileName === doc.fileName);
-		const i = Aux.algorithm.predecessorSearch(
+		if (docMemoItems.length === 0) return;
+
+		let offset = doc.offsetAt(editor.selection.active);
+		if (MemoEngine.getMemoTemplate(doc.languageId).tail) offset--;
+		let i = Aux.algorithm.predecessorSearch(
 			docMemoItems.sort((m1, m2) => m1.memo.offset - m2.memo.offset),
 			offset,
 			(memoItem) => memoItem.memo.offset,
 		);
+		if (i === -1) i = 0;
 		explorer.reveal(docMemoItems[i]);
 	}
 }
