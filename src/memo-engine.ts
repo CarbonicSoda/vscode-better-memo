@@ -29,7 +29,7 @@ export namespace MemoEngine {
 		line: number;
 		offset: number;
 		length: number;
-		path: string;
+		fileName: string;
 		relativePath: string;
 		langId: keyof typeof commentDelimiters;
 		raw: string;
@@ -226,7 +226,7 @@ export namespace MemoEngine {
 				line: doc.positionAt(match.index).line,
 				offset: match.index,
 				length: match[0].length,
-				path: doc.fileName,
+				fileName: doc.fileName,
 				relativePath: workspace.asRelativePath(doc.fileName),
 				langId: doc.languageId,
 				raw: match[0],

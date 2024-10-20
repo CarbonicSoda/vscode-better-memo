@@ -9,7 +9,7 @@ import { EditorDecorations } from "./editor-decorations";
  */
 export async function activate(): Promise<void> {
 	await MemoEngine.initEngine();
-	ExplorerView.initExplorer();
+	ExplorerView.initExplorerView();
 	EditorCommands.initEditorCommands();
 	EditorDecorations.initEditorDecorations();
 }

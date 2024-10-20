@@ -7,6 +7,7 @@
 import {
 	commands,
 	MarkdownString,
+	TextEditor,
 	ThemeIcon,
 	TreeDataProvider,
 	TreeView,
@@ -65,6 +66,17 @@ export namespace ExplorerView {
 		//End of interface implementation methods
 
 		/**
+		 * @returns all MemoItems in Memo Explorer
+		 */
+		getMemoItems(): TreeItems.MemoItem[] {
+			return <TreeItems.MemoItem[]>(
+				this.items
+					.flatMap((primary) => primary.children)
+					.flatMap((secondary) => (<TreeItems.InnerItemType>secondary).children)
+			);
+		}
+
+		/**
 		 * Removes `items` from provider
 		 */
 		removeItems(...items: TreeItems.InnerItemType[]): void {
@@ -108,7 +120,7 @@ export namespace ExplorerView {
 			if (memos.length === 0) return [];
 
 			const tagColors = await MemoEngine.getTagColors();
-			const inner = Aux.object.group(memos, isFileView ? "path" : "tag");
+			const inner = Aux.object.group(memos, isFileView ? "fileName" : "tag");
 			const innerLabels = Object.keys(inner).sort();
 			const innerItems = innerLabels.map(
 				(label) => new (isFileView ? TreeItems.FileItem : TreeItems.TagItem)(label, expandPrimaryGroup),
@@ -119,7 +131,7 @@ export namespace ExplorerView {
 				const innerItem = innerItems[i];
 				if (!isFileView) innerItem.iconPath = new ThemeIcon("bookmark", tagColors[innerLabel]);
 
-				const halfLeaves = Aux.object.group(inner[innerLabel], isFileView ? "tag" : "path");
+				const halfLeaves = Aux.object.group(inner[innerLabel], isFileView ? "tag" : "fileName");
 				const halfLeafLabels = Object.keys(halfLeaves).sort();
 				const halfLeafItems: TreeItems.InnerItemType[] = isFileView
 					? halfLeafLabels.map(
@@ -194,9 +206,12 @@ export namespace ExplorerView {
 	/**
 	 * Inits Memo Explorer provider, view and event listeners
 	 */
-	export async function initExplorer(): Promise<void> {
+	export async function initExplorerView(): Promise<void> {
 		ConfigMaid.onChange("view.defaultView", updateViewType);
-		ConfigMaid.onChange(["view.defaultExpandPrimaryGroups", "view.defaultExpandSecondaryGroups"], updateExpandState);
+		ConfigMaid.onChange(
+			["view.defaultExpandPrimaryGroups", "view.defaultExpandSecondaryGroups"],
+			updateExpandState,
+		);
 
 		Janitor.add(
 			explorer,
@@ -207,6 +222,8 @@ export namespace ExplorerView {
 			}),
 
 			EventEmitter.subscribe("update", updateView),
+
+			window.onDidChangeTextEditorSelection((ev) => onChangeEditorSelection(ev.textEditor)),
 
 			commands.registerCommand("better-memo.expandExplorer", () => {
 				for (const item of provider.items) explorer.reveal(item, { select: false, expand: 2 });
@@ -246,6 +263,9 @@ export namespace ExplorerView {
 
 		await provider.initProvider();
 		commands.executeCommand("setContext", "better-memo.explorerInitFinished", true);
+
+		const editor = window.activeTextEditor;
+		if (editor) onChangeEditorSelection(editor);
 	}
 
 	/**
@@ -356,5 +376,23 @@ export namespace ExplorerView {
 		provider.removeAllItems();
 		refresh();
 		unsuppressUpdate();
+	}
+
+	/**
+	 * Selects the MemoItem right before editor selection in Memo Explorer
+	 */
+	function onChangeEditorSelection(editor: TextEditor): void {
+		if (!explorer.visible) return;
+
+		const doc = editor.document;
+		const offset = doc.offsetAt(editor.selection.active);
+		const memoItems = provider.getMemoItems();
+		const docMemoItems = memoItems.filter((memoItem) => memoItem.memo.fileName === doc.fileName);
+		const i = Aux.algorithm.predecessorSearch(
+			docMemoItems.sort((m1, m2) => m1.memo.offset - m2.memo.offset),
+			offset,
+			(memoItem) => memoItem.memo.offset,
+		);
+		explorer.reveal(docMemoItems[i]);
 	}
 }

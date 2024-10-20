@@ -104,7 +104,7 @@ export namespace TreeItems {
 				const tagItem = <TagItem>(<unknown>this);
 				let filePaths = tagItem.isPrimary
 					? tagItem.children.map((fileItem) => (<FileItem>fileItem).path)
-					: tagItem.children.map((memoItem) => (<MemoItem>memoItem).memo.path);
+					: tagItem.children.map((memoItem) => (<MemoItem>memoItem).memo.fileName);
 				filePaths = [...new Set(filePaths)];
 				const docs = [];
 				await Aux.async.map(filePaths, async (path) => {
@@ -140,7 +140,7 @@ export namespace TreeItems {
 
 			const edit = new FileEdit.Edit();
 			await Aux.async.map(memos, async (memo) => {
-				const doc = await workspace.openTextDocument(memo.path);
+				const doc = await workspace.openTextDocument(memo.fileName);
 
 				const doRemoveLine =
 					ConfigMaid.get("actions.removeLineIfMemoSpansLine") &&
@@ -234,7 +234,7 @@ export namespace TreeItems {
 		 */
 		async navigateTo(): Promise<void> {
 			const memo = this.memo;
-			const editor = await window.showTextDocument(Uri.file(memo.path));
+			const editor = await window.showTextDocument(Uri.file(memo.fileName));
 			const pos = editor.document.positionAt(memo.offset + memo.length);
 			editor.selection = new Selection(pos, pos);
 			editor.revealRange(new Range(pos, pos));
@@ -253,7 +253,7 @@ export namespace TreeItems {
 				return;
 
 			const memo = this.memo;
-			const doc = await workspace.openTextDocument(memo.path);
+			const doc = await workspace.openTextDocument(memo.fileName);
 
 			const doRemoveLine =
 				ConfigMaid.get("actions.removeLineIfMemoSpansLine") &&
