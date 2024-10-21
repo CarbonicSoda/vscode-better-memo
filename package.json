@@ -2,7 +2,7 @@
 	"name": "better-memo",
 	"displayName": "Better Memo",
 	"description": "Automatic Comment Curation for Developers",
-	"version": "0.0.2",
+	"version": "1.0.0",
 	"publisher": "carbonsoda",
 	"author": {
 		"name": "David W."

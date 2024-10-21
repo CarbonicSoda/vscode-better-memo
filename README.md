@@ -1,9 +1,9 @@
-<h3 align="center" style="margin-bottom: -10px">
+<h3 align="center" style="margin-bottom: -15px">
 	<img src="https://raw.githubusercontent.com/CarbonicSoda/vscode-better-memo/master/media/icon.png" width="100" alt="Better Memo icon">
 	<p></p>
 	Better Memo for VSCode
 </h3>
-<h5 align="center">Automatic Comment Curation for Developers</h6>
+<h4 align="center">Automatic Comment Curation for Developers</h6>
 
 ---
 
