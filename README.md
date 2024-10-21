@@ -1,9 +1,9 @@
-<h3 align="center">
+<h3 align="center" style="margin-bottom: -10px">
 	<img src="https://raw.githubusercontent.com/CarbonicSoda/vscode-better-memo/master/media/icon.png" width="100" alt="Better Memo icon">
 	<p></p>
 	Better Memo for VSCode
 </h3>
-<h6 align="center">Automatic Comment Curation for Developers</h6>
+<h5 align="center">Automatic Comment Curation for Developers</h6>
 
 ---
 
@@ -127,7 +127,7 @@ _Memo Item_:
 
 _Better Memo_ provides several commands to help users work more efficiently in editors.
 
--   (**`Alt+M`**) New _Memo_ on Line ([details](#new-memo-command));
+-   (**`Alt+M`**) New _Memo_ on Line (*[details](#new-memo-command)*);
 -   (**`Alt+Shift+M`**) Complete _Memo_(s) Next to Selection(s);
 
 -   (**`Ctrl+Alt+M Ctrl+Alt+<`**) Navigate to Last _Memo_;
