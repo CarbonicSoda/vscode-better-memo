@@ -314,7 +314,7 @@
 			{
 				"view": "better-memo.memoExplorer",
 				"contents": "Memo Explorer is loading.\nIf this is taking too long, [inspect fetcher configurations](command:workbench.action.openSettings?[\"better-memo.fetcher\"]).",
-				"when": "!better-memo.explorerInitFinished"
+				"when": "workspaceFolderCount != 0 && !better-memo.explorerInitFinished"
 			},
 			{
 				"view": "better-memo.memoExplorer",
