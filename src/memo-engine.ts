@@ -251,8 +251,7 @@ export namespace MemoEngine {
 		const getDoc = async (uri: Uri) => {
 			try {
 				return await workspace.openTextDocument(uri);
-			} finally {
-			}
+			} catch {}
 		};
 		const fileUris = await workspace.findFiles(watch, ignore);
 		const files = await Aux.async.map(fileUris, async (uri) => await getDoc(uri));

@@ -345,8 +345,7 @@ export namespace ExplorerView {
 		try {
 			await explorer.reveal(provider.items[0], { select: false, focus: true });
 			await afterReveal();
-		} finally {
-		}
+		} catch {}
 	}
 
 	/**
