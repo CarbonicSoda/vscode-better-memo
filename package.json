@@ -2,7 +2,7 @@
 	"name": "better-memo",
 	"displayName": "Better Memo",
 	"description": "Automatic Comment Curation for Developers",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"publisher": "carbonsoda",
 	"author": {
 		"name": "David W."
@@ -319,7 +319,7 @@
 			},
 			{
 				"view": "better-memo.memoExplorer",
-				"contents": "Oops, cannot spot any memos throughout the universe.\nConsider spicing up the place with some memos!\nIf this is not intended, [inspect fetcher configurations](command:workbench.action.openSettings?[\"better-memo.fetcher\"]).",
+				"contents": "Oops, cannot spot any memos throughout the universe.\nConsider spicing up the place with some memos!\nIf this is not intended, \n[Reload Explorer](command:better-memo.reloadExplorer)\nor [inspect fetcher configurations](command:workbench.action.openSettings?[\"better-memo.fetcher\"]).",
 				"when": "workspaceFolderCount != 0 && better-memo.explorerInitFinished && better-memo.noMemos"
 			}
 		],
@@ -480,8 +480,8 @@
 						"type": "integer",
 						"minimum": 1000,
 						"maximum": 10000000,
-						"description": "Configures the delay between workspace document scans. The scan scans for unwatched documents in the workspace. Though typically documents would be taken care of by event listeners, this prevents potential failures.",
-						"default": 10000
+						"description": "Configures the delay between workspace document scans. The scan scans for unwatched documents in the workspace and scans them. Though typically documents would be taken care of by event listeners, this prevents potential failures.",
+						"default": 30000
 					}
 				}
 			},

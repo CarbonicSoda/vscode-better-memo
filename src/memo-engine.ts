@@ -242,7 +242,8 @@ export namespace MemoEngine {
 	}
 
 	/**
-	 * Fetches supported text documents from current workspace to watch
+	 * Fetches supported text documents from current workspace to watch,
+	 * also executing a force scan on documents
 	 */
 	async function fetchDocs(): Promise<void> {
 		const watch = `{${ConfigMaid.get("fetcher.watch").join(",")}}`;
@@ -260,7 +261,7 @@ export namespace MemoEngine {
 		watchedDocInfoMap.clear();
 		for (const doc of docs) watchedDocInfoMap.set(doc, { version: doc.version, lang: doc.languageId });
 		for (const doc of docMemosMap.keys()) if (!isDocWatched(doc)) docMemosMap.delete(doc);
-		for (const doc of watchedDocInfoMap.keys()) if (!isDocWatched(doc)) scanDoc(doc);
+		for (const doc of watchedDocInfoMap.keys()) scanDoc(doc);
 	}
 
 	/**
