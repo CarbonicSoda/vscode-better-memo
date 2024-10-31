@@ -2,7 +2,7 @@
 	"name": "better-memo",
 	"displayName": "Better Memo",
 	"description": "Automatic Comment Curation for Developers",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"publisher": "carbonsoda",
 	"author": {
 		"name": "David W."
@@ -453,7 +453,9 @@
 						},
 						"markdownDescription": "Configures Memo fetcher file ignore glob pattern, for format see [glob pattern reference](https://aka.ms/vscode-glob-patterns/).",
 						"default": [
-							"**/node_modules"
+							"**/node_modules",
+							"**/out",
+							"**/dist"
 						]
 					},
 					"better-memo.fetcher.scanDelay": {

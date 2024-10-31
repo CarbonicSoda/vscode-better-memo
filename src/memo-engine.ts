@@ -59,7 +59,7 @@ export namespace MemoEngine {
 	 * Inits fetcher engine, event listeners and intervals
 	 */
 	export async function initEngine(): Promise<void> {
-		ConfigMaid.onChange(["fetcher.watch", "fetcher.ignore"], fetchDocs);
+		ConfigMaid.onChange(["fetcher.watch", "fetcher.ignore"], () => fetchDocs({ emitUpdate: true }));
 		ConfigMaid.onChange("general.customTags", () => {
 			customTagsUpdate = true;
 			EventEmitter.emit("update");
@@ -72,8 +72,8 @@ export namespace MemoEngine {
 		Janitor.add(
 			EventEmitter.subscribe("scan", (doc: TextDocument) => scanDoc(doc, { emitUpdate: true })),
 
-			workspace.onDidCreateFiles(fetchDocs),
-			workspace.onDidDeleteFiles(fetchDocs),
+			workspace.onDidCreateFiles(() => fetchDocs({ emitUpdate: true })),
+			workspace.onDidDeleteFiles(() => fetchDocs({ emitUpdate: true })),
 
 			workspace.onDidSaveTextDocument((doc) => {
 				if (validateForScan(doc)) scanDoc(doc, { emitUpdate: true });
@@ -244,8 +244,9 @@ export namespace MemoEngine {
 	/**
 	 * Fetches supported text documents from current workspace to watch,
 	 * also executing a force scan on documents
+	 * - options.emitUpdate: Emits update signal to view/editorDecors etc;
 	 */
-	async function fetchDocs(): Promise<void> {
+	async function fetchDocs(options?: { emitUpdate?: boolean }): Promise<void> {
 		const watch = `{${ConfigMaid.get("fetcher.watch").join(",")}}`;
 		const ignore = `{${ConfigMaid.get("fetcher.ignore").join(",")}}`;
 
@@ -261,7 +262,8 @@ export namespace MemoEngine {
 		watchedDocInfoMap.clear();
 		for (const doc of docs) watchedDocInfoMap.set(doc, { version: doc.version, lang: doc.languageId });
 		for (const doc of docMemosMap.keys()) if (!isDocWatched(doc)) docMemosMap.delete(doc);
-		for (const doc of watchedDocInfoMap.keys()) scanDoc(doc);
+		await Aux.async.map(watchedDocInfoMap.keys(), async (doc) => scanDoc(doc));
+		if (options?.emitUpdate) EventEmitter.emit("update");
 	}
 
 	/**
