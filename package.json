@@ -340,7 +340,8 @@
 						"default": {
 							"TODO": "#090",
 							"FIX": "#C00",
-							"REFACTOR": "#6CE"
+							"REFACTOR": "#6CE",
+							"DEV": "#72F"
 						}
 					}
 				}
