@@ -207,7 +207,7 @@ export namespace TreeItems {
 		confirmTimeout?: NodeJS.Timeout;
 
 		constructor(public memo: MemoEngine.Memo, tagColor: ThemeColor, parent: InnerItemType, maxPriority: number) {
-			const content = memo.content === "" ? "Placeholder T^T" : memo.content;
+			const content = memo.content === "" ? "Placeholder" : memo.content;
 			super(content, "none", parent);
 			this.description = `Ln ${memo.line + 1}`;
 			this.tooltip = new MarkdownString(
