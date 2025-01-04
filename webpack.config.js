@@ -15,7 +15,7 @@ const config = {
 		libraryTarget: "commonjs2",
 		devtoolModuleFilenameTemplate: "../[resource-path]",
 	},
-	devtool: "source-map",
+	// devtool: "source-map",
 	externals: {
 		vscode: "commonjs vscode",
 	},
@@ -97,7 +97,7 @@ const browserConfig = {
 	performance: {
 		hints: false,
 	},
-	devtool: "source-map",
+	// devtool: "source-map",
 };
 
 module.exports = [config, browserConfig];
