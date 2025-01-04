@@ -1,4 +1,4 @@
-<h3 align="center" style="margin-bottom: -15px">
+<h3 align="center" style="margin-bottom: -20px">
 	<img src="https://raw.githubusercontent.com/CarbonicSoda/vscode-better-memo/master/media/icon.png" width="100" alt="Better Memo icon">
 	<p></p>
 	Better Memo for VSCode
@@ -121,19 +121,20 @@ _Memo Item_:
 
 > The behavior of _Better Memo_ when you try to mark _Memo_(s) as completed could be configured in the **`better-memo.actions`** settings section.
 
-> **`Mark Memo(s) as Completed`** from the right-click context-menu will *always* ignore the *`Ask For Confirmation ...`* settings.
+> **`Mark Memo(s) as Completed`** from the right-click context-menu will _always_ ignore the _`Ask For Confirmation ...`_ settings.
 
 ### Editor Commands
 
 _Better Memo_ provides several commands to help users work more efficiently in editors.
 
--   (**`Alt+M`**) New _Memo_ on Line (*[details](#new-memo-command)*);
+-   (**`Alt+M`**) New _Memo_ on Line (_[details](#new-memo-command)_);
 -   (**`Alt+Shift+M`**) Complete _Memo_(s) Next to Selection(s);
 
 -   (**`Ctrl+Alt+M Ctrl+Alt+<`**) Navigate to Last _Memo_;
 -   (**`Ctrl+Alt+M Ctrl+Alt+>`**) Navigate to Next _Memo_;
 
 ---
+
 <p>
 
-*&emsp;The palest ink is better than the most retentive memory.*
+_&emsp;The palest ink is better than the most retentive memory._
