@@ -3,7 +3,7 @@
 	<p></p>
 	Better Memo for VSCode
 </h3>
-<h4 align="center">Automatic Comment Curation for Developers</h6>
+<h4 align="center">Automatic Comment Curation for Developers</h4>
 
 ---
 
