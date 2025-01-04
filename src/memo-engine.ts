@@ -198,26 +198,10 @@ export namespace MemoEngine {
 		const matchRE = getMemoMatchRE(doc);
 
 		let memos: Memo[] = [];
-		await Aux.async.map(docContent.matchAll(matchRE), async (match) => {
-			let tag: string;
-			let priority: number;
-			let content: string;
-			for (const [group, value] of Object.entries(match.groups)) {
-				if (value === undefined) continue;
-				if (group.startsWith("tag")) {
-					tag = value.toUpperCase();
-					continue;
-				}
-				if (group.startsWith("priority")) {
-					priority = value.length;
-					continue;
-				}
-				if (group.startsWith("content")) {
-					content = value.trimEnd();
-					continue;
-				}
-				break;
-			}
+		for (const match of docContent.matchAll(matchRE)) {
+			const tag = match.groups.tag.toUpperCase();
+			const priority = match.groups.priority.length;
+			const content = match.groups.content.trimEnd();
 
 			const memoEntry = {
 				content: content,
@@ -232,7 +216,7 @@ export namespace MemoEngine {
 				raw: match[0],
 			};
 			memos.push(memoEntry);
-		});
+		}
 
 		docMemosMap.set(doc, memos);
 		if (options?.emitUpdate) {
@@ -311,10 +295,10 @@ export namespace MemoEngine {
 	 */
 	function getMemoMatchRE(doc: TextDocument): RegExp {
 		const delimiters = [commentDelimiters[doc.languageId]].flat();
-		const commentFormatREs = delimiters.map((del, i) => {
+		const commentFormatREs = delimiters.map((del) => {
 			const open = Aux.re.escape(del.open);
 			const close = Aux.re.escape(del.close ?? "");
-			return `(?<![${open}])${open}[\\t ]*mo[\\t ]+(?<tag${i}>[^\\r\\n\\t ${commentCloserChars}]+)[\\t ]*(?<priority${i}>!*)(?<content${i}>.*${
+			return `(?<![${open}])${open}[\\t ]*mo[\\t ]+(?<tag>[^\\r\\n\\t ${commentCloserChars}]+)[\\t ]*(?<priority>!*)(?<content>.*${
 				close ? "?" : ""
 			})${close}`;
 		});
