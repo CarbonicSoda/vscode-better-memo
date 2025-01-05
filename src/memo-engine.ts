@@ -67,7 +67,7 @@ export namespace MemoEngine {
 
 		ConfigMaid.newInterval(scanInterval, "fetcher.scanDelay");
 		ConfigMaid.newInterval(forceScanInterval, "fetcher.forceScanDelay");
-		ConfigMaid.newInterval(fetchDocs, "fetcher.docsScanDelay");
+		ConfigMaid.newInterval(() => fetchDocs({ emitUpdate: true }), "fetcher.docsScanDelay");
 
 		Janitor.add(
 			EventEmitter.subscribe("scan", (doc: TextDocument) => scanDoc(doc, { emitUpdate: true })),
