@@ -216,18 +216,14 @@ export namespace ExplorerView {
 		Janitor.add(
 			explorer,
 			explorer.onDidChangeVisibility((ev) => {
-				if (ev.visible && !updateQueued) {
-					provider.refresh();
+				if (ev.visible) {
+					setTimeout(() => provider.refresh(), 1000);
 					return;
 				}
 				if (!updateQueued) return;
 				updateQueued = false;
 				updateView();
 			}),
-
-			setInterval(() => {
-				if (explorer.visible) provider.refresh();
-			}, 3000),
 
 			EventEmitter.subscribe("update", updateView),
 

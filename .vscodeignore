@@ -3,4 +3,4 @@ src
 .gitignore
 eslint.config.mjs
 tsconfig.json
-**/*.js.map
+**/*.map
