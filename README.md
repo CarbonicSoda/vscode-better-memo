@@ -20,14 +20,14 @@
 
 #### Syntax of Memos
 
-Comments are only curated by Better Memo if they start with `MO` (_case insensitive_).
+Comments are only curated by Better Memo if they start with `MO` (_case-insensitive_).
 
 For example, the following (_line 2_) is a valid Memo in JS:
 
 ![Memo Example](https://github.com/CarbonicSoda/vscode-better-memo/blob/master/media/usage-guide/memo-example.png?raw=true)
 
 -   `MO` tells Better Memo to manage this comment;
--   `FIX` is a tag for comment organization (_case insensitive_);
+-   `FIX` is a tag for comment organization (_case-insensitive_);
 -   `breaks if *a === b*` is the comment content;
 
 > Better Memo supports comments in all languages.  
@@ -47,7 +47,7 @@ Typing a Memo by hand can be tedious and inefficient. Instead, you can follow th
 1. Place your cursor on a line.
 2. Press `Alt+M`.
 3. Select/Enter the desired Memo tag in the Quick Pick menu.  
-(you can type in a tag that doesn't exist in the menu and it will be automatically inserted into the Quick Pick)
+   (you can type in a tag that doesn't exist in the menu, and it will be automatically inserted into the Quick Pick)
 4. And... _voilà_! The Memo is instantly inserted, and you can now type in the content.
 
 > Insertion behavior could be configured in the `better-memo.actions` settings section.

@@ -72,6 +72,10 @@ export namespace MemoEngine {
 		Janitor.add(
 			EventEmitter.subscribe("scan", (doc: TextDocument) => scanDoc(doc, { emitUpdate: true })),
 
+			workspace.onDidChangeWorkspaceFolders(() => {
+				setTimeout(() => fetchDocs({ emitUpdate: true }), 1000);
+			}),
+
 			workspace.onDidCreateFiles(() => fetchDocs({ emitUpdate: true })),
 			workspace.onDidDeleteFiles(() => fetchDocs({ emitUpdate: true })),
 
