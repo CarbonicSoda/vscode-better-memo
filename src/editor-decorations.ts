@@ -33,25 +33,30 @@ export namespace EditorDecorations {
 	export function initEditorDecorations(): void {
 		ConfigMaid.onChange("other.enableEditorDecorations", (enable) => (decorsEnabled = enable));
 
-		const decorEditors = async (editors: readonly TextEditor[]) => {
-			if (!decorsEnabled) return;
-			if (editors.length === 0) return;
-
-			const tagColorDecors = await getTagDecors();
-			for (const editor of editors) applyDecors(editor, tagColorDecors);
-		};
-		decorEditors(window.visibleTextEditors);
 		Janitor.add(
 			window.onDidChangeVisibleTextEditors(decorEditors),
 			EventEmitter.subscribe("update", async () => {
 				if (!decorsEnabled) return;
-
 				const active = window.activeTextEditor;
 				if (!active) return;
+
 				removePrevDecors(active);
 				applyDecors(active, await getTagDecors());
 			}),
 		);
+
+		decorEditors(window.visibleTextEditors);
+	}
+
+	/**
+	 * Decorates `editors`
+	 */
+	async function decorEditors(editors: readonly TextEditor[]): Promise<void> {
+		if (!decorsEnabled) return;
+		if (editors.length === 0) return;
+
+		const tagColorDecors = await getTagDecors();
+		for (const editor of editors) applyDecors(editor, tagColorDecors);
 	}
 
 	/**
