@@ -48,7 +48,7 @@ export namespace ExplorerView {
 			await this.reloadItems();
 		}
 
-		//Interface implementation methods
+		//#region Interface implementation methods
 
 		getTreeItem(element: TreeItems.TreeItemType): TreeItems.TreeItemType {
 			return element;
@@ -63,7 +63,7 @@ export namespace ExplorerView {
 			return this.items;
 		}
 
-		//End of interface implementation methods
+		//#endregion End of interface implementation methods
 
 		/**
 		 * @returns all MemoItems in Memo Explorer
