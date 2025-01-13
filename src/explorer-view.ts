@@ -54,7 +54,7 @@ export namespace ExplorerView {
 			return element;
 		}
 
-		getParent(element: TreeItems.TreeItemType): TreeItems.InnerItemType {
+		getParent(element: TreeItems.TreeItemType): TreeItems.InnerItemType | undefined {
 			return element.parent;
 		}
 
