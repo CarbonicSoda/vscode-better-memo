@@ -450,7 +450,8 @@
 						"markdownDescription": "Configures Memo fetcher file watch glob pattern, for format see [glob pattern reference](https://aka.ms/vscode-glob-patterns/).",
 						"default": [
 							"**/*"
-						]
+						],
+						"uniqueItems": true
 					},
 					"better-memo.fetcher.ignore": {
 						"order": 102,
@@ -464,7 +465,8 @@
 							"**/node_modules",
 							"**/out",
 							"**/dist"
-						]
+						],
+						"uniqueItems": true
 					},
 					"better-memo.fetcher.scanDelay": {
 						"order": 201,
