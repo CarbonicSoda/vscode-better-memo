@@ -24,8 +24,9 @@ export namespace ConfigMaid {
 			if (
 				!ev.affectsConfiguration("better-memo") ||
 				!_configs.some((config) => ev.affectsConfiguration(`better-memo.${config}`))
-			)
+			) {
 				return;
+			}
 			userConfigs = workspace.getConfiguration("better-memo");
 			callback(..._configs.map(get));
 		});

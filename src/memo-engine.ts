@@ -329,8 +329,9 @@ export namespace MemoEngine {
 		if (memos.length === 0) return;
 
 		const edit = new FileEdit.Edit();
-		for (const memo of memos)
+		for (const memo of memos) {
 			edit.replace(doc.uri, [memo.offset, memo.offset + memo.length], getFormattedMemo(memo));
+		}
 		await edit.apply();
 	}
 

@@ -69,7 +69,7 @@ export namespace FileEdit {
 			await window.showTextDocument(doc);
 			await commands.executeCommand("workbench.action.files.saveWithoutFormatting", doc);
 			const wsEdit = new WorkspaceEdit();
-			for (const [_, { range, edit }] of edits.entries()) {
+			for (const [, { range, edit }] of edits.entries()) {
 				let [start, end] = range;
 				if (typeof start === "number") start = doc.positionAt(start);
 				if (typeof end === "number") end = doc.positionAt(end);

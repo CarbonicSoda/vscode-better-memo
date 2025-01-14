@@ -87,8 +87,9 @@ export namespace Aux.string {
 	 * @param countable number or object with `.length` property
 	 * @returns "s" if countable is plural or else ""
 	 */
-	export const plural = (countable: number | any[]) =>
-		((<{ length?: number }>countable).length ?? countable) === 1 ? "" : "s";
+	export const plural = (countable: number | any[]) => {
+		return ((<{ length?: number }>countable).length ?? countable) === 1 ? "" : "s";
+	};
 }
 
 /**

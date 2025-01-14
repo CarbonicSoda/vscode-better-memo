@@ -249,8 +249,9 @@ export namespace TreeItems {
 				!options?.noConfirm &&
 				ConfigMaid.get("actions.askForConfirmOnMemoCompletion") &&
 				!this.confirmCompletion({ words: 3, maxLength: 12 })
-			)
+			) {
 				return;
+			}
 
 			const memo = this.memo;
 			const doc = await workspace.openTextDocument(memo.fileName);
@@ -326,8 +327,9 @@ export namespace TreeItems {
 				.toString()
 				.split(/\s+/, labelOptions.words ?? 1)
 				.join(" ")}`;
-			if (abbrevLabel.length > labelOptions.maxLength)
+			if (abbrevLabel.length > labelOptions.maxLength) {
 				abbrevLabel = `${abbrevLabel.slice(0, labelOptions.maxLength)}...`;
+			}
 			this.label = abbrevLabel;
 			this.contextValue = "MemoCompletionPending";
 
