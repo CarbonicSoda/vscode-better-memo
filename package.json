@@ -475,7 +475,7 @@
 						"minimum": 100,
 						"maximum": 1000000,
 						"description": "Configures the delay between casual document scans. Casual scans only scans the currently active document and will not run if document is not changed etc.",
-						"default": 1000
+						"default": 2000
 					},
 					"better-memo.fetcher.forceScanDelay": {
 						"order": 202,
@@ -484,7 +484,7 @@
 						"minimum": 500,
 						"maximum": 5000000,
 						"description": "Configures the delay between forced document scans. Forced scans will scan the currently active document without checks, to prevent cases where casual scans failed.",
-						"default": 5000
+						"default": 10000
 					},
 					"better-memo.fetcher.docsScanDelay": {
 						"order": 203,
@@ -493,7 +493,7 @@
 						"minimum": 1000,
 						"maximum": 10000000,
 						"description": "Configures the delay between workspace document scans. The scan scans for unwatched documents in the workspace and scans them. Though typically documents would be taken care of by event listeners, this prevents potential failures.",
-						"default": 30000
+						"default": 60000
 					}
 				}
 			},
