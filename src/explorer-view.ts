@@ -201,7 +201,6 @@ export namespace ExplorerView {
 	});
 
 	let updateSuppressed = false;
-	let updateQueued = false;
 
 	/**
 	 * Inits Memo Explorer provider, view and event listeners
@@ -215,15 +214,6 @@ export namespace ExplorerView {
 
 		Janitor.add(
 			explorer,
-			explorer.onDidChangeVisibility((ev) => {
-				if (ev.visible) {
-					setTimeout(() => provider.refresh(), 1000);
-					return;
-				}
-				if (!updateQueued) return;
-				updateQueued = false;
-				updateView();
-			}),
 
 			EventEmitter.subscribe("update", updateView),
 
@@ -277,8 +267,7 @@ export namespace ExplorerView {
 	 * delays update if explorer is hidden or if update is suppressed
 	 */
 	export async function updateView(): Promise<void> {
-		if (explorer.visible && !updateSuppressed) await provider.reloadItems();
-		else updateQueued = true;
+		if (!updateSuppressed) await provider.reloadItems();
 	}
 
 	/**

@@ -3,6 +3,11 @@
  */
 export namespace Janitor {
 	/**
+	 * Alias for number returned from Janitor for better context
+	 */
+	export type Id = number;
+
+	/**
 	 * Type with `dispose()` function signature
 	 */
 	export type DisposableLike = {
@@ -17,7 +22,7 @@ export namespace Janitor {
 	 * @param DisposableOrTimeout instances to manage
 	 * @returns unique id for `DisposableOrTimeout`
 	 */
-	export function add(...DisposableOrTimeout: (DisposableLike | NodeJS.Timeout)[]): number {
+	export function add(...DisposableOrTimeout: (DisposableLike | NodeJS.Timeout)[]): Id {
 		managed.push(DisposableOrTimeout);
 		return instancesID++;
 	}
@@ -25,7 +30,7 @@ export namespace Janitor {
 	/**
 	 * Disposes/Clears the original managed instances with `id` and replaces it with `DisposableOrTimeout[]`
 	 */
-	export function override(id: number, ...DisposableOrTimeout: (DisposableLike | NodeJS.Timeout)[]): void {
+	export function override(id: Id, ...DisposableOrTimeout: (DisposableLike | NodeJS.Timeout)[]): void {
 		if (managed[id].length === 0) throw new Error(`No managed instance to override with id ${id}`);
 		clear(id);
 		managed[id] = DisposableOrTimeout;
@@ -34,7 +39,7 @@ export namespace Janitor {
 	/**
 	 * Disposes/Clears the managed instances with `id`
 	 */
-	export function clear(id: number): void {
+	export function clear(id: Id): void {
 		if (!managed[id] || managed[id].length === 0) return;
 		for (const instance of managed[id]) {
 			if ((<{ dispose?: (...args: any) => any }>instance).dispose) {
