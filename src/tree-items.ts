@@ -73,11 +73,9 @@ export namespace TreeItems {
 		static pendingCompletionIcon = new ThemeIcon("loading~spin");
 
 		children: TreeItemType[] = [];
-		isPrimary: boolean;
 
 		constructor(public contextValue: "File" | "Tag", label: string, expand: boolean, parent?: InnerItemType) {
 			super(label, expand, parent);
-			this.isPrimary = !parent;
 		}
 
 		/**
@@ -102,10 +100,7 @@ export namespace TreeItems {
 				memos = MemoEngine.getMemosInDoc(doc);
 			} else {
 				const tagItem = <TagItem>(<unknown>this);
-				let filePaths = tagItem.isPrimary
-					? tagItem.children.map((fileItem) => (<FileItem>fileItem).path)
-					: tagItem.children.map((memoItem) => (<MemoItem>memoItem).memo.fileName);
-				filePaths = [...new Set(filePaths)];
+				const filePaths = tagItem.children.map((fileItem) => (<FileItem>fileItem).path);
 				const docs = [];
 				await Aux.async.map(filePaths, async (path) => {
 					const doc = await workspace.openTextDocument(path);
