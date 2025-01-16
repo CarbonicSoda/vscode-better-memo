@@ -65,9 +65,9 @@ export namespace MemoEngine {
 			EventEmitter.emit("update");
 		});
 
-		ConfigMaid.newInterval(scanInterval, "fetcher.scanDelay");
-		ConfigMaid.newInterval(forceScanInterval, "fetcher.forceScanDelay");
-		ConfigMaid.newInterval(() => fetchDocs({ emitUpdate: true }), "fetcher.docsScanDelay");
+		ConfigMaid.schedule(scheduledScan, "fetcher.scanDelay");
+		ConfigMaid.schedule(scheduledForceScan, "fetcher.forceScanDelay");
+		ConfigMaid.schedule(() => fetchDocs({ emitUpdate: true }), "fetcher.docsScanDelay");
 
 		Janitor.add(
 			EventEmitter.subscribe("scan", (doc: TextDocument) => scanDoc(doc, { emitUpdate: true })),
@@ -349,19 +349,19 @@ export namespace MemoEngine {
 	}
 
 	/**
-	 * Normal scanning interval, is not forced and doc is validated for a scan,
+	 * Normal scanning schedule, is not forced and doc is validated for a scan,
 	 * the scan only scans the currently active document
 	 */
-	function scanInterval(): void {
+	function scheduledScan(): void {
 		const doc = window.activeTextEditor?.document;
 		if (doc && validateForScan(doc)) scanDoc(doc, { emitUpdate: true });
 	}
 
 	/**
-	 * Force scanning interval, to prevent cases where {@link scanInterval()} mal-functioned,
+	 * Force scanning schedule, to prevent cases where {@link scheduledScan()} mal-functioned,
 	 * the scan only scans the currently active document
 	 */
-	function forceScanInterval(): void {
+	function scheduledForceScan(): void {
 		const doc = window.activeTextEditor?.document;
 		if (!doc || !isDocWatched(doc)) return;
 		scanDoc(doc, { emitUpdate: true });
