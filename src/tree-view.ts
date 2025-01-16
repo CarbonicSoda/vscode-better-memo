@@ -219,8 +219,10 @@ export namespace ExplorerView {
 
 			window.onDidChangeTextEditorSelection((ev) => onChangeEditorSelection(ev.textEditor)),
 
-			commands.registerCommand("better-memo.expandExplorer", () => {
-				for (const item of provider.items) explorer.reveal(item, { select: false, expand: 2 });
+			commands.registerCommand("better-memo.expandExplorer", async () => {
+				if (provider.items.length === 0) return;
+				for (const item of provider.items) await explorer.reveal(item, { select: false, expand: 2 });
+				explorer.reveal(provider.items[0], { select: false });
 			}),
 			commands.registerCommand("better-memo.switchToFileView", () => updateViewType("File")),
 			commands.registerCommand("better-memo.switchToTagView", () => updateViewType("Tag")),
@@ -329,10 +331,7 @@ export namespace ExplorerView {
 				await explorer.reveal(item, { select: false, focus: true });
 				await commands.executeCommand("list.collapse");
 			}
-			await explorer.reveal(provider.items[0], {
-				select: false,
-				focus: true,
-			});
+			await explorer.reveal(provider.items[0], { select: false });
 		};
 
 		try {

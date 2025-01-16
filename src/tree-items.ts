@@ -24,7 +24,7 @@ import { ConfigMaid } from "./utils/config-maid";
 import { FileEdit } from "./utils/file-edit";
 import { VSColors } from "./utils/vs-colors";
 import { MemoEngine } from "./memo-engine";
-import { ExplorerView } from "./explorer-view";
+import { ExplorerView } from "./tree-view";
 
 /**
  * Treeview item types and classes for {@link ExplorerView}

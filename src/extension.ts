@@ -1,6 +1,6 @@
 import { Janitor } from "./utils/janitor";
 import { MemoEngine } from "./memo-engine";
-import { ExplorerView } from "./explorer-view";
+import { ExplorerView } from "./tree-view";
 import { EditorCommands } from "./editor-commands";
 import { EditorDecorations } from "./editor-decorations";
 
