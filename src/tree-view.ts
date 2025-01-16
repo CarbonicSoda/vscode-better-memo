@@ -196,11 +196,15 @@ export namespace ExplorerView {
 	const provider = new Provider();
 	const explorer: TreeView<TreeItems.TreeItemType> = window.createTreeView("better-memo.memoExplorer", {
 		treeDataProvider: provider,
-		showCollapseAll: true,
 		canSelectMany: false,
 	});
 
 	let updateSuppressed = false;
+	let foldState =
+		Number(ConfigMaid.get("view.defaultExpandPrimaryGroups")) +
+		Number(
+			ConfigMaid.get("view.defaultExpandPrimaryGroups") && ConfigMaid.get("view.defaultExpandSecondaryGroups"),
+		);
 
 	/**
 	 * Inits Memo Explorer provider, view and event listeners
@@ -209,7 +213,10 @@ export namespace ExplorerView {
 		ConfigMaid.onChange("view.defaultView", updateViewType);
 		ConfigMaid.onChange(
 			["view.defaultExpandPrimaryGroups", "view.defaultExpandSecondaryGroups"],
-			updateExpandState,
+			(primary, secondary) => {
+				updateExpandState(primary, secondary);
+				foldState = Number(primary) + Number(primary && secondary);
+			},
 		);
 
 		Janitor.add(
@@ -219,11 +226,7 @@ export namespace ExplorerView {
 
 			window.onDidChangeTextEditorSelection((ev) => onChangeEditorSelection(ev.textEditor)),
 
-			commands.registerCommand("better-memo.expandExplorer", async () => {
-				if (provider.items.length === 0) return;
-				for (const item of provider.items) await explorer.reveal(item, { select: false, expand: 2 });
-				explorer.reveal(provider.items[0], { select: false });
-			}),
+			commands.registerCommand("better-memo.toggleExplorerFold", toggleExplorerFold),
 			commands.registerCommand("better-memo.switchToFileView", () => updateViewType("File")),
 			commands.registerCommand("better-memo.switchToTagView", () => updateViewType("Tag")),
 			commands.registerCommand("better-memo.completeAllMemos", completeAllMemos),
@@ -325,19 +328,27 @@ export namespace ExplorerView {
 			}
 			for (const item of provider.items) {
 				if (expandPrimaryItems) {
-					explorer.reveal(item, { select: false, expand: true });
+					await explorer.reveal(item, { select: false, expand: true });
 					continue;
 				}
 				await explorer.reveal(item, { select: false, focus: true });
 				await commands.executeCommand("list.collapse");
 			}
-			await explorer.reveal(provider.items[0], { select: false });
+			await explorer.reveal(provider.items[0], { select: false, focus: true });
 		};
 
 		try {
 			await explorer.reveal(provider.items[0], { select: false, focus: true });
 			await afterReveal();
 		} catch {}
+	}
+
+	/**
+	 * Toggles explorer fold status: Layer1, Layer2, Collapsed
+	 */
+	async function toggleExplorerFold(): Promise<void> {
+		foldState = (foldState + 1) % 3;
+		await updateExpandState(foldState > 0, foldState > 1);
 	}
 
 	/**

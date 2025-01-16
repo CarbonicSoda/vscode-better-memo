@@ -71,14 +71,14 @@
 			{
 				"command": "better-memo.switchToFileView",
 				"title": "Switch to File View",
-				"enablement": "treeView.better-memo.memoExplorer.toggleCollapseAll && view.better-memo.memoExplorer.visible && better-memo.explorerView == Tag",
+				"enablement": "better-memo.explorerInitFinished && view.better-memo.memoExplorer.visible && better-memo.explorerView == Tag && !better-memo.noMemos",
 				"icon": "$(folder-library)",
 				"category": "Better Memo"
 			},
 			{
 				"command": "better-memo.switchToTagView",
 				"title": "Switch to Tag View",
-				"enablement": "treeView.better-memo.memoExplorer.toggleCollapseAll && view.better-memo.memoExplorer.visible && better-memo.explorerView == File",
+				"enablement": "better-memo.explorerInitFinished && view.better-memo.memoExplorer.visible && better-memo.explorerView == File && !better-memo.noMemos",
 				"icon": "$(symbol-parameter)",
 				"category": "Better Memo"
 			},
@@ -96,10 +96,10 @@
 				"category": "Better Memo"
 			},
 			{
-				"command": "better-memo.expandExplorer",
-				"title": "Expand Explorer",
-				"enablement": "treeView.better-memo.memoExplorer.toggleCollapseAll && view.better-memo.memoExplorer.visible",
-				"icon": "$(expand-all)",
+				"command": "better-memo.toggleExplorerFold",
+				"title": "Toggle Explorer Fold",
+				"enablement": "view.better-memo.memoExplorer.visible && better-memo.explorerInitFinished && !better-memo.noMemos",
+				"icon": "$(fold)",
 				"category": "Better Memo"
 			},
 			{
@@ -189,12 +189,12 @@
 		"keybindings": [
 			{
 				"command": "better-memo.switchToFileView",
-				"when": "focusedView == 'better-memo.memoExplorer' && treeView.better-memo.memoExplorer.toggleCollapseAll && better-memo.explorerView == Tag",
+				"when": "focusedView == 'better-memo.memoExplorer' && better-memo.explorerView == Tag && !better-memo.noMemos",
 				"key": "Ctrl+Shift+V"
 			},
 			{
 				"command": "better-memo.switchToTagView",
-				"when": "focusedView == 'better-memo.memoExplorer' && treeView.better-memo.memoExplorer.toggleCollapseAll && better-memo.explorerView == File",
+				"when": "focusedView == 'better-memo.memoExplorer' && better-memo.explorerView == File && !better-memo.noMemos",
 				"key": "Ctrl+Shift+V"
 			},
 			{
@@ -240,12 +240,12 @@
 			"view/title": [
 				{
 					"command": "better-memo.switchToFileView",
-					"when": "view.better-memo.memoExplorer.visible && better-memo.explorerInitFinished && better-memo.explorerView == Tag",
+					"when": "view.better-memo.memoExplorer.visible && better-memo.explorerInitFinished && better-memo.explorerView == Tag && !better-memo.noMemos",
 					"group": "navigation@1"
 				},
 				{
 					"command": "better-memo.switchToTagView",
-					"when": "view.better-memo.memoExplorer.visible && better-memo.explorerInitFinished && better-memo.explorerView == File",
+					"when": "view.better-memo.memoExplorer.visible && better-memo.explorerInitFinished && better-memo.explorerView == File && !better-memo.noMemos",
 					"group": "navigation@1"
 				},
 				{
@@ -255,12 +255,12 @@
 				},
 				{
 					"command": "better-memo.completeAllMemos",
-					"when": "view.better-memo.memoExplorer.visible && better-memo.explorerInitFinished && !better-memo.noFiles && !better-memo.noMemos",
+					"when": "view.better-memo.memoExplorer.visible && better-memo.explorerInitFinished && !better-memo.noMemos",
 					"group": "navigation@3"
 				},
 				{
-					"command": "better-memo.expandExplorer",
-					"when": "view.better-memo.memoExplorer.visible && better-memo.explorerInitFinished",
+					"command": "better-memo.toggleExplorerFold",
+					"when": "view.better-memo.memoExplorer.visible && better-memo.explorerInitFinished && !better-memo.noMemos",
 					"group": "navigation@4"
 				}
 			],
