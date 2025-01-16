@@ -308,35 +308,29 @@ export namespace ExplorerView {
 	 * Updates view's view type (primary-secondary items hierarchy)
 	 * @param viewType "File" - primary items is workspace documents; "Tag" - primary items is Memo tags
 	 */
-	function updateViewType(viewType: "File" | "Tag"): void {
+	async function updateViewType(viewType: "File" | "Tag"): Promise<void> {
 		provider.viewType = viewType;
-		commands.executeCommand("setContext", "better-memo.explorerView", viewType);
-		updateView();
+		await commands.executeCommand("setContext", "better-memo.explorerView", viewType);
+		await updateView();
+
+		const level1 = ConfigMaid.get("view.defaultExpandPrimaryGroups");
+		const level2 = ConfigMaid.get("view.defaultExpandSecondaryGroups");
+		foldState = Number(level1) + Number(level1 && level2);
+		await updateExpandState(level1, level2);
 	}
 
 	/**
 	 * Updates primary & secondary item's expand/collapse state
 	 */
-	async function updateExpandState(expandPrimaryItems: boolean, expandSecondaryItems: boolean): Promise<void> {
-		const afterReveal = async () => {
-			await commands.executeCommand("list.collapseAll");
-			if (!expandPrimaryItems && !expandSecondaryItems) return;
-			if (expandSecondaryItems) {
-				await Aux.async.map(
-					provider.items.flatMap((item) => item.children),
-					async (child) => await explorer.reveal(child, { select: false, expand: true }),
-				);
-			}
-			for (const item of provider.items) {
-				await explorer.reveal(item, { select: false, focus: true, expand: expandPrimaryItems });
-				if (expandSecondaryItems && !expandPrimaryItems) await commands.executeCommand("list.collapse");
-			}
-		};
-
+	async function updateExpandState(level1: boolean, level2: boolean): Promise<void> {
 		try {
-			await explorer.reveal(provider.items[0], { select: false, focus: true });
-			await afterReveal();
-			await explorer.reveal(provider.items[0], { select: false, focus: true });
+			await explorer.reveal(provider.items[0], { focus: true });
+			await commands.executeCommand("list.collapseAll");
+			for (const item of provider.items) {
+				await explorer.reveal(item, { focus: true, select: false, expand: level2 ? 2 : false });
+				await commands.executeCommand(level1 ? "list.expand" : "list.collapse");
+			}
+			await explorer.reveal(provider.items[0], { focus: true });
 		} catch {}
 	}
 
