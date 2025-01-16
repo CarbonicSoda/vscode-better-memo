@@ -202,11 +202,13 @@ export namespace ExplorerView {
 	});
 
 	let updateSuppressed = false;
-	let foldState =
-		Number(ConfigMaid.get("view.defaultExpandPrimaryGroups")) +
-		Number(
-			ConfigMaid.get("view.defaultExpandPrimaryGroups") && ConfigMaid.get("view.defaultExpandSecondaryGroups"),
-		);
+	let foldState: 0 | 1 | 2 = <0 | 1 | 2>(
+		(Number(ConfigMaid.get("view.defaultExpandPrimaryGroups")) +
+			Number(
+				ConfigMaid.get("view.defaultExpandPrimaryGroups") &&
+					ConfigMaid.get("view.defaultExpandSecondaryGroups"),
+			))
+	);
 
 	/**
 	 * Inits Memo Explorer provider, view and event listeners
