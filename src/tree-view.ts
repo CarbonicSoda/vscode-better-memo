@@ -320,6 +320,7 @@ export namespace ExplorerView {
 	async function updateExpandState(expandPrimaryItems: boolean, expandSecondaryItems: boolean): Promise<void> {
 		const afterReveal = async () => {
 			await commands.executeCommand("list.collapseAll");
+			if (!expandPrimaryItems && !expandSecondaryItems) return;
 			if (expandSecondaryItems) {
 				await Aux.async.map(
 					provider.items.flatMap((item) => item.children),
@@ -328,14 +329,14 @@ export namespace ExplorerView {
 			}
 			for (const item of provider.items) {
 				await explorer.reveal(item, { select: false, focus: true, expand: expandPrimaryItems });
-				if (!expandPrimaryItems) await commands.executeCommand("list.collapse");
+				if (expandSecondaryItems && !expandPrimaryItems) await commands.executeCommand("list.collapse");
 			}
-			await explorer.reveal(provider.items[0], { select: false, focus: true });
 		};
 
 		try {
 			await explorer.reveal(provider.items[0], { select: false, focus: true });
 			await afterReveal();
+			await explorer.reveal(provider.items[0], { select: false, focus: true });
 		} catch {}
 	}
 
