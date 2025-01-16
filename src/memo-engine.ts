@@ -6,6 +6,7 @@
  */
 
 import { commands, TabGroupChangeEvent, TextDocument, ThemeColor, Uri, window, workspace } from "vscode";
+
 import { Aux } from "./utils/auxiliary";
 import { ConfigMaid } from "./utils/config-maid";
 import { EventEmitter } from "./utils/event-emitter";

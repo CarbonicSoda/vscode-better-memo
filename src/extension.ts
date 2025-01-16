@@ -1,8 +1,9 @@
 import { Janitor } from "./utils/janitor";
-import { MemoEngine } from "./memo-engine";
-import { ExplorerView } from "./tree-view";
+
 import { EditorCommands } from "./editor-commands";
 import { EditorDecorations } from "./editor-decorations";
+import { MemoEngine } from "./memo-engine";
+import { ExplorerView } from "./tree-view";
 
 /**
  * Extension entry point

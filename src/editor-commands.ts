@@ -16,10 +16,12 @@ import {
 	ThemeIcon,
 	window,
 } from "vscode";
+
 import { Aux } from "./utils/auxiliary";
 import { ConfigMaid } from "./utils/config-maid";
 import { EventEmitter } from "./utils/event-emitter";
 import { Janitor } from "./utils/janitor";
+
 import { MemoEngine } from "./memo-engine";
 
 /**

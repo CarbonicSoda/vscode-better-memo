@@ -1,5 +1,5 @@
-import { writeFileSync } from "fs";
 import { commands, env, Position, Range, TextDocument, UIKind, Uri, window, workspace, WorkspaceEdit } from "vscode";
+import { writeFileSync } from "fs";
 
 /**
  * Handles complicated logic of hybrid file editing with Node.fs and {@link workspace.fs},
