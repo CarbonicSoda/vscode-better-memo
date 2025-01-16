@@ -327,12 +327,8 @@ export namespace ExplorerView {
 				);
 			}
 			for (const item of provider.items) {
-				if (expandPrimaryItems) {
-					await explorer.reveal(item, { select: false, expand: true });
-					continue;
-				}
-				await explorer.reveal(item, { select: false, focus: true });
-				await commands.executeCommand("list.collapse");
+				await explorer.reveal(item, { select: false, focus: true, expand: expandPrimaryItems });
+				if (!expandPrimaryItems) await commands.executeCommand("list.collapse");
 			}
 			await explorer.reveal(provider.items[0], { select: false, focus: true });
 		};
