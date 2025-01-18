@@ -362,15 +362,15 @@
 						"title": "Default View",
 						"type": "string",
 						"enum": [
-							"File",
-							"Tag"
+							"Tag",
+							"File"
 						],
 						"enumDescriptions": [
-							"Use files as main groups.",
-							"Use Memo tags as main groups."
+							"Use Memo tags as main groups.",
+							"Use files as main groups."
 						],
 						"description": "Determines how items are grouped in Memo Explorer by default.",
-						"default": "File"
+						"default": "Tag"
 					},
 					"better-memo.view.defaultExpandPrimaryGroups": {
 						"order": 201,

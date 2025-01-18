@@ -74,16 +74,16 @@ Memos in the workspace are carefully organized and displayed in an explorer pane
 
 Within Memo Explorer, two distinct view types are offered, each determining how the Memos are grouped.
 
-**The File View**
-
-![Memo Explorer File View](https://github.com/CarbonicSoda/vscode-better-memo/blob/master/media/usage-guide/memo-explorer-file.png?raw=true)
-
 **The Tag View**
 
 ![Memo Explorer Tag View](https://github.com/CarbonicSoda/vscode-better-memo/blob/master/media/usage-guide/memo-explorer-tag.png?raw=true)
 
--   _File View_: Organizes Memos primarily by containing files;
+**The File View**
+
+![Memo Explorer File View](https://github.com/CarbonicSoda/vscode-better-memo/blob/master/media/usage-guide/memo-explorer-file.png?raw=true)
+
 -   _Tag View_: Organizes Memos primarily by Memo tags;
+-   _File View_: Organizes Memos primarily by containing files;
 
 In each view, the other grouping method is used as the secondary organization layer.
 
