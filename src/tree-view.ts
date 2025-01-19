@@ -128,7 +128,7 @@ export namespace ExplorerView {
 				(label) => new (isFileView ? TreeItems.FileItem : TreeItems.TagItem)(label, expandPrimaryGroup),
 			);
 
-			await Aux.async.range(innerLabels.length, async (i) => {
+			for (let i = 0; i < innerLabels.length; i++) {
 				const innerLabel = innerLabels[i];
 				const innerItem = innerItems[i];
 				if (!isFileView) innerItem.iconPath = new ThemeIcon("bookmark", tagColors[innerLabel]);
@@ -147,7 +147,7 @@ export namespace ExplorerView {
 				innerItem.children = halfLeafItems;
 
 				let childMemoCount = 0;
-				await Aux.async.range(innerItem.children.length, async (j) => {
+				for (let j = 0; j < innerItem.children.length; j++) {
 					const halfLeafItem = <TreeItems.InnerItemType>innerItem.children[j];
 					const halfLeafLabel = halfLeafLabels[j];
 					if (isFileView) halfLeafItem.iconPath = new ThemeIcon("bookmark", tagColors[halfLeafLabel]);
@@ -174,12 +174,11 @@ export namespace ExplorerView {
 
 					const tagColor = (<ThemeIcon>(isFileView ? halfLeafItem : innerItem).iconPath).color;
 					const maxPriority = Math.max(...memos.map((memo) => memo.priority));
-					const memoItems = await Aux.async.map(
-						memos,
-						async (memo) => new TreeItems.MemoItem(memo, tagColor, halfLeafItem, maxPriority),
+					const memoItems = memos.map(
+						(memo) => new TreeItems.MemoItem(memo, tagColor, halfLeafItem, maxPriority),
 					);
 					halfLeafItem.children = memoItems;
-				});
+				}
 
 				innerItem.description = `${halfLeafItems.length} ${isFileView ? "Tag" : "File"}${Aux.string.plural(
 					halfLeafItems,
@@ -190,7 +189,7 @@ export namespace ExplorerView {
 					} ${isFileView ? "$(bookmark)" : "$(file)"} ${childMemoCount} $(pencil)`,
 					true,
 				);
-			});
+			}
 
 			return innerItems;
 		}

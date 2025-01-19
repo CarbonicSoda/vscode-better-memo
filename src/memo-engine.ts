@@ -251,7 +251,7 @@ export namespace MemoEngine {
 		watchedDocInfoMap.clear();
 		for (const doc of docs) watchedDocInfoMap.set(doc, { version: doc.version, lang: doc.languageId });
 		for (const doc of docMemosMap.keys()) if (!isDocWatched(doc)) docMemosMap.delete(doc);
-		await Aux.async.map(watchedDocInfoMap.keys(), async (doc) => scanDoc(doc));
+		await Aux.async.map(watchedDocInfoMap.keys(), async (doc) => await scanDoc(doc));
 		if (options?.emitUpdate) EventEmitter.emit("update");
 	}
 
@@ -272,7 +272,7 @@ export namespace MemoEngine {
 		if (!tagsUpdate) return;
 		await fetchCustomTagColors();
 		const newTagColors: { [tag: string]: ThemeColor } = {};
-		await Aux.async.map(getTags(), async (tag) => (newTagColors[tag] = customTagColors[tag] ?? VSColors.hash(tag)));
+		for (const tag of getTags()) newTagColors[tag] = customTagColors[tag] ?? VSColors.hash(tag);
 		tagColors = newTagColors;
 		tagsUpdate = false;
 	}
@@ -286,11 +286,11 @@ export namespace MemoEngine {
 		const userCustomTagColors: { [tag: string]: string } = ConfigMaid.get("general.customTags");
 		const validCustomTagColors: { [tag: string]: ThemeColor } = {};
 		const validHEXRE = /(?:^#?[0-9a-f]{6}$)|(?:^#?[0-9a-f]{3}$)/i;
-		await Aux.async.map(Object.entries(userCustomTagColors), async ([tag, hex]) => {
+		for (let [tag, hex] of Object.entries(userCustomTagColors)) {
 			[tag, hex] = [tag.trim().toUpperCase(), hex.trim()];
-			if (!isTagValid(tag) || !validHEXRE.test(hex)) return;
+			if (!isTagValid(tag) || !validHEXRE.test(hex)) continue;
 			validCustomTagColors[tag] = VSColors.interpolate(hex);
-		});
+		}
 		customTagColors = validCustomTagColors;
 		customTagsUpdate = false;
 	}

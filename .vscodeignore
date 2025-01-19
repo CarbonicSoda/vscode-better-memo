@@ -4,3 +4,4 @@ src
 eslint.config.mjs
 tsconfig.json
 **/*.map
+*.cpuprofile
