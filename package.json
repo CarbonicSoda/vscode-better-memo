@@ -341,7 +341,8 @@
 						"type": "object",
 						"uniqueItems": true,
 						"additionalProperties": {
-							"type": "string"
+							"type": "string",
+							"pattern": "(?:^#?[0-9a-fA-F]{6}$)|(?:^#?[0-9a-fA-F]{3}$)"
 						},
 						"markdownDescription": "Defines custom colors for specified tags.\nAccepted formats are **#FFFFFF** & **#FFF**, case insensitive and **#** could be omitted.\n\nSpecified tags will always be in the *New Memo on Line* tag picker.",
 						"default": {
