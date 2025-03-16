@@ -188,6 +188,10 @@
 	"swift": {
 		"open": "//"
 	},
+	"tailwindcss": {
+		"open": "/*",
+		"close": "*/"
+	},
 	"tex": {
 		"open": "%"
 	},
