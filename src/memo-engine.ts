@@ -151,7 +151,9 @@ export namespace MemoEngine {
 	 * - options.sortOccurrence: Sorts tags by occurrence (desc);
 	 * @returns all currently known tags, together with user-defined custom tag-colors' tags
 	 */
-	export function getTags(options?: { sortOccurrence?: boolean }): string[] {
+	export async function getTags(options?: { sortOccurrence?: boolean }): Promise<string[]> {
+		await fetchCustomTagColors();
+
 		let tags = getMemos()
 			.map((memo) => memo.tag)
 			.concat(Object.keys(customTagColors));
@@ -270,9 +272,10 @@ export namespace MemoEngine {
 	 */
 	async function fetchTagColors(): Promise<void> {
 		if (!tagsUpdate) return;
+
 		await fetchCustomTagColors();
 		const newTagColors: { [tag: string]: ThemeColor } = {};
-		for (const tag of getTags()) newTagColors[tag] = customTagColors[tag] ?? VSColors.hash(tag);
+		for (const tag of await getTags()) newTagColors[tag] = customTagColors[tag] ?? VSColors.hash(tag);
 		tagColors = newTagColors;
 		tagsUpdate = false;
 	}

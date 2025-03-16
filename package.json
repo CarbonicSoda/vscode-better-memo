@@ -348,8 +348,9 @@
 						"default": {
 							"TODO": "#090",
 							"FIX": "#C00",
-							"REFACTOR": "#6CE",
-							"DEV": "#72F"
+							"TEST": "#FD5",
+							"DEV": "#72F",
+							"REFACTOR": "#6CE"
 						}
 					}
 				}

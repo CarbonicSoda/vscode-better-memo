@@ -49,7 +49,7 @@ export namespace EditorCommands {
 
 		// const tagColors = await MemoEngine.getTagColors();
 		// UNTIL VSCODE ADDS SUPPORT FOR CUSTOM ITEM COLORS
-		const tags = MemoEngine.getTags({ sortOccurrence: true }).map((tag) => ({
+		const tags = (await MemoEngine.getTags({ sortOccurrence: true })).map((tag) => ({
 			label: tag,
 			iconPath: new ThemeIcon("bookmark"),
 			// iconPath: new ThemeIcon("bookmark", tagColors[tag]),
