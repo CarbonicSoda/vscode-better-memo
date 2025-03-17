@@ -1,5 +1,5 @@
 src
-media
+media/usage-guide
 .vscode
 .gitignore
 eslint.config.mjs
