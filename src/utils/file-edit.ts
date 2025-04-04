@@ -1,4 +1,15 @@
-import { commands, env, Position, Range, TextDocument, UIKind, Uri, window, workspace, WorkspaceEdit } from "vscode";
+import {
+	commands,
+	env,
+	Position,
+	Range,
+	TextDocument,
+	UIKind,
+	Uri,
+	window,
+	workspace,
+	WorkspaceEdit,
+} from "vscode";
 import { writeFileSync } from "fs";
 
 /**
@@ -46,12 +57,17 @@ export namespace FileEdit {
 		 * - options.alwaysOpenFile: Always open the modified files and use {@link workspace.fs};
 		 * - options.throwError: Throw errors when modifying files;
 		 */
-		async apply(options?: { alwaysOpenFile?: boolean; throwError?: boolean }): Promise<void> {
+		async apply(options?: {
+			alwaysOpenFile?: boolean;
+			throwError?: boolean;
+		}): Promise<void> {
 			for (const [uri, fileEdits] of this.uriEditsMap.entries()) {
 				try {
 					await this.editFile(fileEdits, uri, options?.alwaysOpenFile);
 				} catch (err) {
-					if (options?.throwError) throw new Error(`Failed to apply edits to files: ${err}`);
+					if (options?.throwError) {
+						throw new Error(`Failed to apply edits to files: ${err}`);
+					}
 				}
 			}
 		}
@@ -59,7 +75,11 @@ export namespace FileEdit {
 		/**
 		 * Applies `edits` to the document with `uri` hybridly
 		 */
-		private async editFile(edits: EditEntries, uri: Uri, alwaysOpenFile?: boolean): Promise<void> {
+		private async editFile(
+			edits: EditEntries,
+			uri: Uri,
+			alwaysOpenFile?: boolean,
+		): Promise<void> {
 			const doc = await workspace.openTextDocument(uri);
 			if (!alwaysOpenFile && !doc.isDirty && env.uiKind !== UIKind.Web) {
 				this.editFileWithFs(edits, doc);
@@ -67,7 +87,10 @@ export namespace FileEdit {
 			}
 
 			await window.showTextDocument(doc);
-			await commands.executeCommand("workbench.action.files.saveWithoutFormatting", doc);
+			await commands.executeCommand(
+				"workbench.action.files.saveWithoutFormatting",
+				doc,
+			);
 			const wsEdit = new WorkspaceEdit();
 			for (const [, { range, edit }] of edits.entries()) {
 				let [start, end] = range;
@@ -78,7 +101,10 @@ export namespace FileEdit {
 
 			try {
 				await workspace.applyEdit(wsEdit);
-				await commands.executeCommand("workbench.action.files.saveWithoutFormatting", doc);
+				await commands.executeCommand(
+					"workbench.action.files.saveWithoutFormatting",
+					doc,
+				);
 			} catch (err) {
 				throw new Error(`Failed modifying ${uri.path}: ${err}`);
 			}

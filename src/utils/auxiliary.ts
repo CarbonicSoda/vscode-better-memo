@@ -5,7 +5,8 @@ export namespace Aux.math {
 	/**
 	 * @returns sum of `numbers`
 	 */
-	export const sum = (...numbers: number[]) => numbers.reduce((sum, n) => sum + n);
+	export const sum = (...numbers: number[]) =>
+		numbers.reduce((sum, n) => sum + n);
 }
 
 /**
@@ -34,7 +35,8 @@ export namespace Aux.object {
 		objects: { [key: string]: any }[],
 		grouper: keyof (typeof objects)[number],
 	): { [group: string]: typeof objects } {
-		const groups: { [group: keyof (typeof objects)[number]]: typeof objects } = {};
+		const groups: { [group: keyof (typeof objects)[number]]: typeof objects } =
+			{};
 		for (const object of objects) groups[object[grouper]] = [];
 		for (const object of objects) groups[object[grouper]].push(object);
 		return groups;
@@ -64,12 +66,14 @@ export namespace Aux.re {
 	 * Makes a raw string valid for `RegExp()` without conflicts
 	 * @example "[(1+1)-2]*3" becomes "\[\(1\+1\)\-2\]\*3"
 	 */
-	export const escape = (str: string) => str.replace(/[[\]*+?{}.()^$|/\\-]/g, "\\$&");
+	export const escape = (str: string) =>
+		str.replace(/[[\]*+?{}.()^$|/\\-]/g, "\\$&");
 
 	/**
 	 * Concats several regular expressions into a union `RegExp`: (?:...)|(?:...)|...
 	 */
-	export const union = (...regExps: string[]) => RegExp(`(?:${regExps.join(")|(?:")})`);
+	export const union = (...regExps: string[]) =>
+		RegExp(`(?:${regExps.join(")|(?:")})`);
 }
 
 /**
@@ -81,7 +85,9 @@ export namespace Aux.string {
 	 * @returns "s" if countable is plural or else ""
 	 */
 	export const plural = (countable: number | any[]) => {
-		return (typeof countable === "number" ? countable : countable.length) === 1 ? "" : "s";
+		return (typeof countable === "number" ? countable : countable.length) === 1
+			? ""
+			: "s";
 	};
 }
 

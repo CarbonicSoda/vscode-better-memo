@@ -22,7 +22,9 @@ export namespace Janitor {
 	 * @param disposableOrTimeout instances to manage
 	 * @returns unique id for `DisposableOrTimeout`
 	 */
-	export function add(...disposableOrTimeout: (DisposableLike | NodeJS.Timeout)[]): Id {
+	export function add(
+		...disposableOrTimeout: (DisposableLike | NodeJS.Timeout)[]
+	): Id {
 		managed[currId++] = disposableOrTimeout;
 		return currId;
 	}
@@ -30,7 +32,10 @@ export namespace Janitor {
 	/**
 	 * Disposes/Clears the original managed instances with `id` and replaces it with `DisposableOrTimeout[]`
 	 */
-	export function override(id: Id, ...disposableOrTimeout: (DisposableLike | NodeJS.Timeout)[]): void {
+	export function override(
+		id: Id,
+		...disposableOrTimeout: (DisposableLike | NodeJS.Timeout)[]
+	): void {
 		clear(id);
 		managed[id] = disposableOrTimeout;
 	}

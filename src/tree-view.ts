@@ -36,18 +36,23 @@ export namespace ExplorerView {
 		items: TreeItems.InnerItemType[] = [];
 		memoCount = 0;
 
-		private treeDataChangeEmitter: vsEventEmitter<void | undefined | TreeItems.TreeItemType> = new vsEventEmitter<
+		private treeDataChangeEmitter: vsEventEmitter<
 			void | undefined | TreeItems.TreeItemType
-		>();
-		onDidChangeTreeData: vsEvent<void | undefined | TreeItems.TreeItemType> = this.treeDataChangeEmitter.event;
+		> = new vsEventEmitter<void | undefined | TreeItems.TreeItemType>();
+		onDidChangeTreeData: vsEvent<void | undefined | TreeItems.TreeItemType> =
+			this.treeDataChangeEmitter.event;
 
 		/**
 		 * Init provider and loads tree items
 		 */
-		async initProvider(): Promise<void> {
+		initProvider(): void {
 			this.viewType = ConfigMaid.get("view.defaultView");
-			commands.executeCommand("setContext", "better-memo.explorerView", this.viewType);
-			await this.reloadItems();
+			commands.executeCommand(
+				"setContext",
+				"better-memo.explorerView",
+				this.viewType,
+			);
+			this.reloadItems();
 		}
 
 		//#region Interface implementation methods
@@ -56,11 +61,15 @@ export namespace ExplorerView {
 			return element;
 		}
 
-		getParent(element: TreeItems.TreeItemType): TreeItems.InnerItemType | undefined {
+		getParent(
+			element: TreeItems.TreeItemType,
+		): TreeItems.InnerItemType | undefined {
 			return element.parent;
 		}
 
-		getChildren(element: TreeItems.InnerItemType | undefined): TreeItems.TreeItemType[] {
+		getChildren(
+			element: TreeItems.InnerItemType | undefined,
+		): TreeItems.TreeItemType[] {
 			if (element) return element.children;
 			return this.items;
 		}
@@ -103,8 +112,8 @@ export namespace ExplorerView {
 		/**
 		 * Reloads provider with updated items from {@link MemoEngine}
 		 */
-		async reloadItems(): Promise<void> {
-			this.items = await this.getItems();
+		reloadItems(): void {
+			this.items = this.getItems();
 			this.treeDataChangeEmitter.fire();
 		}
 
@@ -112,37 +121,58 @@ export namespace ExplorerView {
 		 * Retrieves updated items from {@link MemoEngine} and builds explorer items
 		 * @returns built inner items (primary-hierarchy)
 		 */
-		private async getItems(): Promise<TreeItems.InnerItemType[]> {
+		private getItems(): TreeItems.InnerItemType[] {
 			const isFileView = this.viewType === "File";
-			const expandPrimaryGroup = ConfigMaid.get("view.defaultExpandPrimaryGroups");
-			const expandSecondaryGroup = ConfigMaid.get("view.defaultExpandSecondaryGroups");
+			const expandPrimaryGroup = ConfigMaid.get(
+				"view.defaultExpandPrimaryGroups",
+			);
+			const expandSecondaryGroup = ConfigMaid.get(
+				"view.defaultExpandSecondaryGroups",
+			);
 
 			const memos = MemoEngine.getMemos();
 			this.memoCount = memos.length;
 			if (memos.length === 0) return [];
 
-			const tagColors = await MemoEngine.getTagColors();
+			const tagColors = MemoEngine.getTagColors();
 			const inner = Aux.object.group(memos, isFileView ? "fileName" : "tag");
 			const innerLabels = Object.keys(inner).sort();
 			const innerItems = innerLabels.map(
-				(label) => new (isFileView ? TreeItems.FileItem : TreeItems.TagItem)(label, expandPrimaryGroup),
+				(label) =>
+					new (isFileView ? TreeItems.FileItem : TreeItems.TagItem)(
+						label,
+						expandPrimaryGroup,
+					),
 			);
 
 			for (let i = 0; i < innerLabels.length; i++) {
 				const innerLabel = innerLabels[i];
 				const innerItem = innerItems[i];
-				if (!isFileView) innerItem.iconPath = new ThemeIcon("bookmark", tagColors[innerLabel]);
+				if (!isFileView) {
+					innerItem.iconPath = new ThemeIcon("bookmark", tagColors[innerLabel]);
+				}
 
-				const halfLeaves = Aux.object.group(inner[innerLabel], isFileView ? "tag" : "fileName");
+				const halfLeaves = Aux.object.group(
+					inner[innerLabel],
+					isFileView ? "tag" : "fileName",
+				);
 				const halfLeafLabels = Object.keys(halfLeaves).sort();
 				const halfLeafItems: TreeItems.InnerItemType[] = isFileView
 					? halfLeafLabels.map(
 							(label) =>
-								new TreeItems.TagItem(label, expandSecondaryGroup, <TreeItems.FileItem>innerItem),
+								new TreeItems.TagItem(
+									label,
+									expandSecondaryGroup,
+									<TreeItems.FileItem>innerItem,
+								),
 					  )
 					: halfLeafLabels.map(
 							(label) =>
-								new TreeItems.FileItem(label, expandSecondaryGroup, <TreeItems.TagItem>innerItem),
+								new TreeItems.FileItem(
+									label,
+									expandSecondaryGroup,
+									<TreeItems.TagItem>innerItem,
+								),
 					  );
 				innerItem.children = halfLeafItems;
 
@@ -150,7 +180,12 @@ export namespace ExplorerView {
 				for (let j = 0; j < innerItem.children.length; j++) {
 					const halfLeafItem = <TreeItems.InnerItemType>innerItem.children[j];
 					const halfLeafLabel = halfLeafLabels[j];
-					if (isFileView) halfLeafItem.iconPath = new ThemeIcon("bookmark", tagColors[halfLeafLabel]);
+					if (isFileView) {
+						halfLeafItem.iconPath = new ThemeIcon(
+							"bookmark",
+							tagColors[halfLeafLabel],
+						);
+					}
 
 					let memos = <MemoEngine.Memo[]>halfLeaves[halfLeafLabel];
 					const [important, normal]: MemoEngine.Memo[][] = [[], []];
@@ -161,32 +196,43 @@ export namespace ExplorerView {
 						}
 						normal.push(memo);
 					}
-					memos = important.sort((a, b) => b.priority - a.priority).concat(normal);
+					memos = important
+						.sort((a, b) => b.priority - a.priority)
+						.concat(normal);
 					childMemoCount += memos.length;
 
-					halfLeafItem.description = `${memos.length} Memo${Aux.string.plural(memos)}`;
+					halfLeafItem.description = `${memos.length} Memo${Aux.string.plural(
+						memos,
+					)}`;
 					halfLeafItem.tooltip = new MarkdownString(
-						`${isFileView ? "Tag: " : "File: *"}${halfLeafItem.label}${isFileView ? "" : "*"} - ${
-							memos.length
-						} $(pencil)`,
+						`${isFileView ? "Tag: " : "File: *"}${halfLeafItem.label}${
+							isFileView ? "" : "*"
+						} - ${memos.length} $(pencil)`,
 						true,
 					);
 
-					const tagColor = (<ThemeIcon>(isFileView ? halfLeafItem : innerItem).iconPath).color;
+					const tagColor = (<ThemeIcon>(
+						(isFileView ? halfLeafItem : innerItem).iconPath
+					)).color;
 					const maxPriority = Math.max(...memos.map((memo) => memo.priority));
 					const memoItems = memos.map(
-						(memo) => new TreeItems.MemoItem(memo, tagColor, halfLeafItem, maxPriority),
+						(memo) =>
+							new TreeItems.MemoItem(memo, tagColor, halfLeafItem, maxPriority),
 					);
 					halfLeafItem.children = memoItems;
 				}
 
-				innerItem.description = `${halfLeafItems.length} ${isFileView ? "Tag" : "File"}${Aux.string.plural(
+				innerItem.description = `${halfLeafItems.length} ${
+					isFileView ? "Tag" : "File"
+				}${Aux.string.plural(
 					halfLeafItems,
 				)} > ${childMemoCount} Memo${Aux.string.plural(childMemoCount)}`;
 				innerItem.tooltip = new MarkdownString(
-					`${isFileView ? "File: *" : "Tag: "}${innerItem.label}${isFileView ? "*" : ""} - ${
-						halfLeafItems.length
-					} ${isFileView ? "$(bookmark)" : "$(file)"} ${childMemoCount} $(pencil)`,
+					`${isFileView ? "File: *" : "Tag: "}${innerItem.label}${
+						isFileView ? "*" : ""
+					} - ${halfLeafItems.length} ${
+						isFileView ? "$(bookmark)" : "$(file)"
+					} ${childMemoCount} $(pencil)`,
 					true,
 				);
 			}
@@ -195,24 +241,27 @@ export namespace ExplorerView {
 		}
 	}
 	const provider = new Provider();
-	const explorer: TreeView<TreeItems.TreeItemType> = window.createTreeView("better-memo.memoExplorer", {
-		treeDataProvider: provider,
-		canSelectMany: false,
-	});
+	const explorer: TreeView<TreeItems.TreeItemType> = window.createTreeView(
+		"better-memo.memoExplorer",
+		{
+			treeDataProvider: provider,
+			canSelectMany: false,
+		},
+	);
 
 	let updateSuppressed = false;
 	let foldState: 0 | 1 | 2 = <0 | 1 | 2>(
-		(Number(ConfigMaid.get("view.defaultExpandPrimaryGroups")) +
-			Number(
+		(+ConfigMaid.get("view.defaultExpandPrimaryGroups") +
+			+(
 				ConfigMaid.get("view.defaultExpandPrimaryGroups") &&
-					ConfigMaid.get("view.defaultExpandSecondaryGroups"),
+				ConfigMaid.get("view.defaultExpandSecondaryGroups")
 			))
 	);
 
 	/**
 	 * Inits Memo Explorer provider, view and event listeners
 	 */
-	export async function initExplorerView(): Promise<void> {
+	export function initExplorerView(): void {
 		ConfigMaid.onChange("view.defaultView", updateViewType);
 		ConfigMaid.onChange(
 			["view.defaultExpandPrimaryGroups", "view.defaultExpandSecondaryGroups"],
@@ -227,44 +276,72 @@ export namespace ExplorerView {
 
 			EventEmitter.subscribe("update", updateView),
 
-			window.onDidChangeTextEditorSelection((ev) => onChangeEditorSelection(ev.textEditor)),
+			window.onDidChangeTextEditorSelection((ev) =>
+				onChangeEditorSelection(ev.textEditor),
+			),
 
-			commands.registerCommand("better-memo.toggleExplorerFold", toggleExplorerFold),
-			commands.registerCommand("better-memo.switchToFileView", () => updateViewType("File")),
-			commands.registerCommand("better-memo.switchToTagView", () => updateViewType("Tag")),
-			commands.registerCommand("better-memo.completeAllMemos", completeAllMemos),
+			commands.registerCommand(
+				"better-memo.toggleExplorerFold",
+				toggleExplorerFold,
+			),
+			commands.registerCommand("better-memo.switchToFileView", () =>
+				updateViewType("File"),
+			),
+			commands.registerCommand("better-memo.switchToTagView", () =>
+				updateViewType("Tag"),
+			),
+			commands.registerCommand(
+				"better-memo.completeAllMemos",
+				completeAllMemos,
+			),
 
-			commands.registerCommand("better-memo.navigateToFile", (fileItem: TreeItems.FileItem) =>
-				fileItem.navigateTo(),
+			commands.registerCommand(
+				"better-memo.navigateToFile",
+				(fileItem: TreeItems.FileItem) => fileItem.navigateTo(),
 			),
-			commands.registerCommand("better-memo.completeFile", (fileItem: TreeItems.FileItem) =>
-				fileItem.markMemosAsCompleted(),
+			commands.registerCommand(
+				"better-memo.completeFile",
+				(fileItem: TreeItems.FileItem) => fileItem.markMemosAsCompleted(),
 			),
-			commands.registerCommand("better-memo.completeFileNoConfirm", (fileItem: TreeItems.FileItem) =>
-				fileItem.markMemosAsCompleted({ noConfirm: true }),
+			commands.registerCommand(
+				"better-memo.completeFileNoConfirm",
+				(fileItem: TreeItems.FileItem) =>
+					fileItem.markMemosAsCompleted({ noConfirm: true }),
 			),
-			commands.registerCommand("better-memo.completeTag", (tagItem: TreeItems.TagItem) =>
-				tagItem.markMemosAsCompleted(),
+			commands.registerCommand(
+				"better-memo.completeTag",
+				(tagItem: TreeItems.TagItem) => tagItem.markMemosAsCompleted(),
 			),
-			commands.registerCommand("better-memo.completeTagNoConfirm", (tagItem: TreeItems.TagItem) =>
-				tagItem.markMemosAsCompleted({ noConfirm: true }),
+			commands.registerCommand(
+				"better-memo.completeTagNoConfirm",
+				(tagItem: TreeItems.TagItem) =>
+					tagItem.markMemosAsCompleted({ noConfirm: true }),
 			),
-			commands.registerCommand("better-memo.navigateToMemo", (memoItem: TreeItems.MemoItem) =>
-				memoItem.navigateTo(),
+			commands.registerCommand(
+				"better-memo.navigateToMemo",
+				(memoItem: TreeItems.MemoItem) => memoItem.navigateTo(),
 			),
-			commands.registerCommand("better-memo.completeMemo", (memoItem: TreeItems.MemoItem) =>
-				memoItem.markAsCompleted(),
+			commands.registerCommand(
+				"better-memo.completeMemo",
+				(memoItem: TreeItems.MemoItem) => memoItem.markAsCompleted(),
 			),
-			commands.registerCommand("better-memo.confirmCompleteMemo", (memoItem: TreeItems.MemoItem) =>
-				memoItem.markAsCompleted(),
+			commands.registerCommand(
+				"better-memo.confirmCompleteMemo",
+				(memoItem: TreeItems.MemoItem) => memoItem.markAsCompleted(),
 			),
-			commands.registerCommand("better-memo.completeMemoNoConfirm", (memoItem: TreeItems.MemoItem) =>
-				memoItem.markAsCompleted({ noConfirm: true }),
+			commands.registerCommand(
+				"better-memo.completeMemoNoConfirm",
+				(memoItem: TreeItems.MemoItem) =>
+					memoItem.markAsCompleted({ noConfirm: true }),
 			),
 		);
 
-		await provider.initProvider();
-		commands.executeCommand("setContext", "better-memo.explorerInitFinished", true);
+		provider.initProvider();
+		commands.executeCommand(
+			"setContext",
+			"better-memo.explorerInitFinished",
+			true,
+		);
 
 		const editor = window.activeTextEditor;
 		if (editor?.selection) onChangeEditorSelection(editor);
@@ -274,8 +351,8 @@ export namespace ExplorerView {
 	 * Reloads explorer with updated items from {@link MemoEngine},
 	 * delays update if explorer is hidden or if update is suppressed
 	 */
-	export async function updateView(): Promise<void> {
-		if (!updateSuppressed) await provider.reloadItems();
+	export function updateView(): void {
+		if (!updateSuppressed) provider.reloadItems();
 	}
 
 	/**
@@ -313,8 +390,12 @@ export namespace ExplorerView {
 	 */
 	async function updateViewType(viewType: "File" | "Tag"): Promise<void> {
 		provider.viewType = viewType;
-		await commands.executeCommand("setContext", "better-memo.explorerView", viewType);
-		await updateView();
+		await commands.executeCommand(
+			"setContext",
+			"better-memo.explorerView",
+			viewType,
+		);
+		updateView();
 
 		const level1 = ConfigMaid.get("view.defaultExpandPrimaryGroups");
 		const level2 = ConfigMaid.get("view.defaultExpandSecondaryGroups");
@@ -325,12 +406,19 @@ export namespace ExplorerView {
 	/**
 	 * Updates primary & secondary item's expand/collapse state
 	 */
-	async function updateExpandState(level1: boolean, level2: boolean): Promise<void> {
+	async function updateExpandState(
+		level1: boolean,
+		level2: boolean,
+	): Promise<void> {
 		try {
 			await explorer.reveal(provider.items[0], { focus: true });
 			await commands.executeCommand("list.collapseAll");
 			for (const item of provider.items) {
-				await explorer.reveal(item, { focus: true, select: false, expand: level2 ? 2 : false });
+				await explorer.reveal(item, {
+					focus: true,
+					select: false,
+					expand: level2 ? 2 : false,
+				});
 				await commands.executeCommand(level1 ? "list.expand" : "list.collapse");
 			}
 			await explorer.reveal(provider.items[0], { focus: true });
@@ -354,9 +442,11 @@ export namespace ExplorerView {
 		const items = provider.items;
 
 		const completionDetail = `Are you sure you want to proceed?
-			This will mark all ${memoCount} memo${Aux.string.plural(memoCount)} ${provider.viewType === "File" ? "in" : "under"} ${
-			items.length
-		} ${provider.viewType.toLowerCase()}${Aux.string.plural(items)} as completed.`;
+			This will mark all ${memoCount} memo${Aux.string.plural(memoCount)} ${
+			provider.viewType === "File" ? "in" : "under"
+		} ${items.length} ${provider.viewType.toLowerCase()}${Aux.string.plural(
+			items,
+		)} as completed.`;
 		const option = await window.showInformationMessage(
 			"Confirm Completion of Memos",
 			{ modal: true, detail: completionDetail },
@@ -367,7 +457,9 @@ export namespace ExplorerView {
 			return;
 		}
 
-		for (const item of items) await item.markMemosAsCompleted({ noConfirm: true, _noExtraTasks: true });
+		for (const item of items) {
+			await item.markMemosAsCompleted({ noConfirm: true, _noExtraTasks: true });
+		}
 		MemoEngine.forgetAllMemos();
 		provider.removeAllItems();
 		refresh();
@@ -384,7 +476,9 @@ export namespace ExplorerView {
 		if (!MemoEngine.isDocWatched(doc)) return;
 
 		const memoItems = provider.getMemoItems();
-		const docMemoItems = memoItems.filter((memoItem) => memoItem.memo.fileName === doc.fileName);
+		const docMemoItems = memoItems.filter(
+			(memoItem) => memoItem.memo.fileName === doc.fileName,
+		);
 		if (docMemoItems.length === 0) return;
 
 		let offset = doc.offsetAt(editor.selection.active);

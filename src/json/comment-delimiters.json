@@ -45,9 +45,6 @@
 	"git-commit": {
 		"open": "#"
 	},
-	"ignore": {
-		"open": "#"
-	},
 	"git-rebase": {
 		"open": "#"
 	},
@@ -68,48 +65,27 @@
 		"open": "<!--",
 		"close": "-->"
 	},
+	"ignore": {
+		"open": "#"
+	},
 	"ini": {
 		"open": ";"
 	},
 	"java": {
 		"open": "//"
 	},
-	"javascript": [
-		{
-			"open": "//"
-		},
-		{
-			"open": "/*",
-			"close": "*/"
-		}
-	],
-	"javascriptreact": [
-		{
-			"open": "//"
-		},
-		{
-			"open": "/*",
-			"close": "*/"
-		}
-	],
-	"jsonl": [
-		{
-			"open": "//"
-		},
-		{
-			"open": "/*",
-			"close": "*/"
-		}
-	],
-	"jsonc": [
-		{
-			"open": "//"
-		},
-		{
-			"open": "/*",
-			"close": "*/"
-		}
-	],
+	"javascript": {
+		"open": "//"
+	},
+	"javascriptreact": {
+		"open": "//"
+	},
+	"jsonl": {
+		"open": "//"
+	},
+	"jsonc": {
+		"open": "//"
+	},
 	"julia": {
 		"open": "#"
 	},
@@ -128,6 +104,9 @@
 	"markdown": {
 		"open": "<!--",
 		"close": "-->"
+	},
+	"sql": {
+		"open": "--"
 	},
 	"objective-c": {
 		"open": "//"
@@ -182,37 +161,18 @@
 	"shellscript": {
 		"open": "#"
 	},
-	"sql": {
-		"open": "--"
-	},
 	"swift": {
 		"open": "//"
-	},
-	"tailwindcss": {
-		"open": "/*",
-		"close": "*/"
 	},
 	"tex": {
 		"open": "%"
 	},
-	"typescript": [
-		{
-			"open": "//"
-		},
-		{
-			"open": "/*",
-			"close": "*/"
-		}
-	],
-	"typescriptreact": [
-		{
-			"open": "//"
-		},
-		{
-			"open": "/*",
-			"close": "*/"
-		}
-	],
+	"typescript": {
+		"open": "//"
+	},
+	"typescriptreact": {
+		"open": "//"
+	},
 	"vb": {
 		"open": "'"
 	},

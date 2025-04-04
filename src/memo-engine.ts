@@ -5,7 +5,15 @@
  * general.customTags
  */
 
-import { commands, TabGroupChangeEvent, TextDocument, ThemeColor, Uri, window, workspace } from "vscode";
+import {
+	commands,
+	TabGroupChangeEvent,
+	TextDocument,
+	ThemeColor,
+	Uri,
+	window,
+	workspace,
+} from "vscode";
 
 import { Aux } from "./utils/auxiliary";
 import { ConfigMaid } from "./utils/config-maid";
@@ -36,16 +44,18 @@ export namespace MemoEngine {
 		raw: string;
 	};
 
-	const commentDelimiters: {
-		[langId: string]: { open: string; close?: string } | { open: string; close?: string }[];
-	} = CommentDelimiters;
+	let commentDelimiters!: {
+		[langId: string]:
+			| { open: string; close?: string }
+			| { open: string; close?: string }[];
+	};
+	let commentCloserChars!: string;
+	updateCustomLangComments();
 
-	const tmp = Object.values(commentDelimiters)
-		.flat()
-		.flatMap((format) => format.close?.split(""));
-	const commentCloserChars = Aux.re.escape([...new Set(tmp)].join(""));
-
-	const watchedDocInfoMap: Map<TextDocument, { version: number; lang: string }> = new Map();
+	const watchedDocInfoMap: Map<
+		TextDocument,
+		{ version: number; lang: string }
+	> = new Map();
 	const docMemosMap: Map<TextDocument, Memo[]> = new Map();
 
 	let customTagColors: { [tag: string]: ThemeColor } = {};
@@ -60,18 +70,29 @@ export namespace MemoEngine {
 	 * Inits fetcher engine, event listeners and intervals
 	 */
 	export async function initEngine(): Promise<void> {
-		ConfigMaid.onChange(["fetcher.watch", "fetcher.ignore"], () => fetchDocs({ emitUpdate: true }));
+		ConfigMaid.onChange(["fetcher.watch", "fetcher.ignore"], () =>
+			fetchDocs({ emitUpdate: true }),
+		);
 		ConfigMaid.onChange("general.customTags", () => {
 			customTagsUpdate = true;
 			EventEmitter.emit("update");
 		});
+		ConfigMaid.onChange("general.customLanguages", () => {
+			updateCustomLangComments();
+			fetchDocs({ emitUpdate: true });
+		});
 
 		ConfigMaid.schedule(scheduledScan, "fetcher.scanDelay");
 		ConfigMaid.schedule(scheduledForceScan, "fetcher.forceScanDelay");
-		ConfigMaid.schedule(() => fetchDocs({ emitUpdate: true }), "fetcher.docsScanDelay");
+		ConfigMaid.schedule(
+			() => fetchDocs({ emitUpdate: true }),
+			"fetcher.docsScanDelay",
+		);
 
 		Janitor.add(
-			EventEmitter.subscribe("scan", (doc: TextDocument) => scanDoc(doc, { emitUpdate: true })),
+			EventEmitter.subscribe("scan", (doc: TextDocument) =>
+				scanDoc(doc, { emitUpdate: true }),
+			),
 
 			workspace.onDidChangeWorkspaceFolders(() => {
 				setTimeout(() => fetchDocs({ emitUpdate: true }), 1000);
@@ -91,7 +112,9 @@ export namespace MemoEngine {
 				EventEmitter.emit("update");
 			}),
 
-			commands.registerCommand("better-memo.reloadExplorer", () => fetchMemos({ emitUpdate: true })),
+			commands.registerCommand("better-memo.reloadExplorer", () =>
+				fetchMemos({ emitUpdate: true }),
+			),
 		);
 
 		await fetchMemos();
@@ -116,7 +139,11 @@ export namespace MemoEngine {
 	 */
 	export function getMemos(): Memo[] {
 		const memos = [...docMemosMap.values()].flat();
-		commands.executeCommand("setContext", "better-memo.noMemos", memos.length === 0);
+		commands.executeCommand(
+			"setContext",
+			"better-memo.noMemos",
+			memos.length === 0,
+		);
 		return memos;
 	}
 
@@ -138,7 +165,10 @@ export namespace MemoEngine {
 	/**
 	 * @returns Memo template for `langId`, Memos is like `${head}..tag..content..${tail}`
 	 */
-	export function getMemoTemplate(langId: keyof typeof commentDelimiters): { head: string; tail: string } {
+	export function getMemoTemplate(langId: keyof typeof commentDelimiters): {
+		head: string;
+		tail: string;
+	} {
 		const commentFormat = [commentDelimiters[langId]].flat()[0];
 		const padding = commentFormat.close ? " " : "";
 		return {
@@ -151,8 +181,8 @@ export namespace MemoEngine {
 	 * - options.sortOccurrence: Sorts tags by occurrence (desc);
 	 * @returns all currently known tags, together with user-defined custom tag-colors' tags
 	 */
-	export async function getTags(options?: { sortOccurrence?: boolean }): Promise<string[]> {
-		await fetchCustomTagColors();
+	export function getTags(options?: { sortOccurrence?: boolean }): string[] {
+		fetchCustomTagColors();
 
 		let tags = getMemos()
 			.map((memo) => memo.tag)
@@ -172,8 +202,8 @@ export namespace MemoEngine {
 	/**
 	 * @returns tags mapped to hashed {@link ThemeColor}s
 	 */
-	export async function getTagColors(): Promise<{ [tag: string]: ThemeColor }> {
-		await fetchTagColors();
+	export function getTagColors(): { [tag: string]: ThemeColor } {
+		fetchTagColors();
 		return tagColors;
 	}
 
@@ -200,7 +230,10 @@ export namespace MemoEngine {
 	 * Scans `doc` for contained Memos
 	 * - options.emitUpdate: Emits update signal to view/editorDecors etc;
 	 */
-	export async function scanDoc(doc: TextDocument, options?: { emitUpdate?: boolean }): Promise<void> {
+	export function scanDoc(
+		doc: TextDocument,
+		options?: { emitUpdate?: boolean },
+	): void {
 		const docContent = doc.getText();
 		const matchRE = getMemoMatchRE(doc);
 
@@ -233,6 +266,20 @@ export namespace MemoEngine {
 	}
 
 	/**
+	 * Updates lang comment-delimiter mappings
+	 */
+	function updateCustomLangComments(): void {
+		const customLang = ConfigMaid.get("general.customLanguages") ?? {};
+
+		commentDelimiters = { ...CommentDelimiters, ...customLang };
+		const tmp = Object.values(commentDelimiters)
+			.flat()
+			.flatMap((format) => format.close?.split(""));
+
+		commentCloserChars = Aux.re.escape([...new Set(tmp)].join(""));
+	}
+
+	/**
 	 * Fetches supported text documents from current workspace to watch,
 	 * also executing a force scan on documents
 	 * - options.emitUpdate: Emits update signal to view/editorDecors etc;
@@ -247,13 +294,22 @@ export namespace MemoEngine {
 			} catch {}
 		};
 		const fileUris = await workspace.findFiles(watch, ignore);
-		const files = await Aux.async.map(fileUris, async (uri) => await getDoc(uri));
+		const files = await Aux.async.map(fileUris, getDoc);
 		const docs = files.filter((doc) => commentDelimiters[doc?.languageId]);
 
 		watchedDocInfoMap.clear();
-		for (const doc of docs) watchedDocInfoMap.set(doc, { version: doc.version, lang: doc.languageId });
-		for (const doc of docMemosMap.keys()) if (!isDocWatched(doc)) docMemosMap.delete(doc);
-		await Aux.async.map(watchedDocInfoMap.keys(), async (doc) => await scanDoc(doc));
+		for (const doc of docs) {
+			watchedDocInfoMap.set(doc, {
+				version: doc.version,
+				lang: doc.languageId,
+			});
+		}
+		for (const doc of docMemosMap.keys()) {
+			if (!isDocWatched(doc)) docMemosMap.delete(doc);
+		}
+		for (const doc of watchedDocInfoMap.keys()) scanDoc(doc);
+		console.log(commentDelimiters);
+		console.log(docs);
 		if (options?.emitUpdate) EventEmitter.emit("update");
 	}
 
@@ -263,19 +319,21 @@ export namespace MemoEngine {
 	 */
 	async function fetchMemos(options?: { emitUpdate?: boolean }): Promise<void> {
 		await fetchDocs();
-		await Aux.async.map(watchedDocInfoMap.keys(), async (doc) => await scanDoc(doc));
+		for (const doc of watchedDocInfoMap.keys()) scanDoc(doc);
 		if (options?.emitUpdate) EventEmitter.emit("update");
 	}
 
 	/**
 	 * Fetches tags-ThemeColors map and stores in {@link tagColors}
 	 */
-	async function fetchTagColors(): Promise<void> {
+	function fetchTagColors(): void {
 		if (!tagsUpdate) return;
 
-		await fetchCustomTagColors();
+		fetchCustomTagColors();
 		const newTagColors: { [tag: string]: ThemeColor } = {};
-		for (const tag of await getTags()) newTagColors[tag] = customTagColors[tag] ?? VSColors.hash(tag);
+		for (const tag of getTags()) {
+			newTagColors[tag] = customTagColors[tag] ?? VSColors.hash(tag);
+		}
 		tagColors = newTagColors;
 		tagsUpdate = false;
 	}
@@ -283,10 +341,11 @@ export namespace MemoEngine {
 	/**
 	 * Fetches customTags-ThemeColors map and stores in {@link customTagColors}
 	 */
-	async function fetchCustomTagColors(): Promise<void> {
+	function fetchCustomTagColors(): Promise<void> {
 		if (!customTagsUpdate) return;
 
-		const userCustomTagColors: { [tag: string]: string } = ConfigMaid.get("general.customTags");
+		const userCustomTagColors: { [tag: string]: string } =
+			ConfigMaid.get("general.customTags");
 		const validCustomTagColors: { [tag: string]: ThemeColor } = {};
 		const validHEXRE = /(?:^#?[0-9a-f]{6}$)|(?:^#?[0-9a-f]{3}$)/i;
 		for (let [tag, hex] of Object.entries(userCustomTagColors)) {
@@ -319,22 +378,26 @@ export namespace MemoEngine {
 	 */
 	function getFormattedMemo(memo: Memo): string {
 		const template = getMemoTemplate(memo.langId);
-		return `${template.head}${memo.tag}${memo.content ? " " : ""}${"!".repeat(memo.priority)}${memo.content}${
-			template.tail
-		}`;
+		return `${template.head}${memo.tag}${memo.content ? " " : ""}${"!".repeat(
+			memo.priority,
+		)}${memo.content}${template.tail}`;
 	}
 
 	/**
 	 * Formats all Memos in `doc` with {@link getFormattedMemo()}
 	 */
 	async function formatMemosInDoc(doc: TextDocument): Promise<void> {
-		await scanDoc(doc);
+		scanDoc(doc);
 		const memos = getMemosInDoc(doc);
 		if (memos.length === 0) return;
 
 		const edit = new FileEdit.Edit();
 		for (const memo of memos) {
-			edit.replace(doc.uri, [memo.offset, memo.offset + memo.length], getFormattedMemo(memo));
+			edit.replace(
+				doc.uri,
+				[memo.offset, memo.offset + memo.length],
+				getFormattedMemo(memo),
+			);
 		}
 		await edit.apply();
 	}
@@ -386,7 +449,9 @@ export namespace MemoEngine {
 
 			let doc;
 			try {
-				doc = await workspace.openTextDocument((<{ uri?: Uri }>activeTab.input).uri);
+				doc = await workspace.openTextDocument(
+					(<{ uri?: Uri }>activeTab.input).uri,
+				);
 			} catch {
 				continue;
 			}

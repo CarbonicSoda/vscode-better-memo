@@ -55,7 +55,7 @@ Typing a Memo by hand can be tedious and inefficient. Instead, you can follow th
 ---
 
 <details>
-<summary>Additional Syntax: <i>Memo</i> Priority</summary>
+<summary>Additional Syntax: Memo Priority</summary>
 <p></p>
 
 To assign priority to more urgent code actions, you can add an exclamation mark `!` before the content.
@@ -90,7 +90,7 @@ In each view, the other grouping method is used as the secondary organization la
 Each tag is assigned a hashed color that will be inherited by all Memos associated with that tag. The color will also serve as the highlighting color for Memos within documents.
 
 > Users can set custom colors for specific tags in the `better-memo.general.customTags` setting.  
-> **e.g.** The preset tags _FIX_, _TODO_, and _REFACTOR_ are assigned the colors _red_, _green_, and _blue_, respectively.
+> **e.g.** The preset tags are _TODO_, _FIX_, _TEST_, _DEV_ and _REFACTOR_.
 
 > The final colors used may differ from the expected colors, this is _intended_ to maintain a higher level of color contrast.
 

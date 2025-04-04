@@ -1,8 +1,9 @@
-src
-media/usage-guide
-.vscode
 .gitignore
-eslint.config.mjs
-tsconfig.json
-**/*.map
+.vscode
 *.cpuprofile
+**/*.map
+eslint.config.mjs
+media/usage-guide
+src
+tools
+tsconfig.json

@@ -342,7 +342,7 @@
 						"uniqueItems": true,
 						"additionalProperties": {
 							"type": "string",
-							"pattern": "(?:^#?[0-9a-fA-F]{6}$)|(?:^#?[0-9a-fA-F]{3}$)"
+							"pattern": "(?:^\\s*#?[0-9a-fA-F]{6}\\s*$)|(?:^\\s*#?[0-9a-fA-F]{3}\\s*$)"
 						},
 						"markdownDescription": "Defines custom colors for specified tags.\nAccepted formats are **#FFFFFF** & **#FFF**, case insensitive and **#** could be omitted.\n\nSpecified tags will always be in the *New Memo on Line* tag picker.",
 						"default": {
@@ -351,7 +351,18 @@
 							"TEST": "#FD5",
 							"DEV": "#72F",
 							"REFACTOR": "#6CE"
-						}
+						},
+						"scope": "application"
+					},
+					"better-memo.general.customLanguages": {
+						"order": 111,
+						"title": "Custom Languages",
+						"type": "object",
+						"additionalProperties": {
+							"type": "object"
+						},
+						"markdownDescription": "Defines cutom languages to support.\n\nThe key will be the languageid (visible by clicking on the status bar langauge item), and the value be the comment format in it.\nValid formats are e.g. `{ \"open\": \"//\" }` and `{ \"open\": \"/*\", \"close\": \"*/\" }`.",
+						"scope": "application"
 					}
 				}
 			},
@@ -372,21 +383,24 @@
 							"Use files as main groups."
 						],
 						"description": "Determines how items are grouped in Memo Explorer by default.",
-						"default": "Tag"
+						"default": "Tag",
+						"scope": "application"
 					},
 					"better-memo.view.defaultExpandPrimaryGroups": {
 						"order": 201,
 						"title": "Expand Primary Groups by Default",
 						"type": "boolean",
 						"description": "Expand Memo Explorer primary groups by default.",
-						"default": true
+						"default": true,
+						"scope": "application"
 					},
 					"better-memo.view.defaultExpandSecondaryGroups": {
 						"order": 202,
 						"title": "Expand Secondary Groups by Default",
 						"type": "boolean",
 						"description": "Expand Memo Explorer secondary groups by default.",
-						"default": true
+						"default": true,
+						"scope": "application"
 					}
 				}
 			},
@@ -399,42 +413,48 @@
 						"title": "Ask for Confirmation on Completion of Memo",
 						"type": "boolean",
 						"description": "Wait for confirmation before completing a single Memo.",
-						"default": false
+						"default": false,
+						"scope": "application"
 					},
 					"better-memo.actions.memoCompletionConfirmTimeout": {
 						"order": 102,
 						"title": "Timeout of Confirmation on Completion of Memo",
 						"type": "integer",
 						"markdownDescription": "The timeout before aborting a pending completion, only applies if `#better-memo.actions.askForConfirmOnMemoCompletion#` is set to **true**.",
-						"default": 3000
+						"default": 3000,
+						"scope": "application"
 					},
 					"better-memo.actions.alwaysOpenFileOnMemoCompletion": {
 						"order": 103,
 						"title": "Always Open File on Completion of Memo",
 						"type": "boolean",
 						"description": "Always open the file after completing a single Memo.",
-						"default": true
+						"default": true,
+						"scope": "application"
 					},
 					"better-memo.actions.askForConfirmOnMemosCompletion": {
 						"order": 201,
 						"title": "Ask for Confirmation on Completion of Memos",
 						"type": "boolean",
 						"description": "Wait for confirmation before completing Memos under the parent item.",
-						"default": true
+						"default": true,
+						"scope": "application"
 					},
 					"better-memo.actions.removeLineIfMemoSpansLine": {
 						"order": 301,
 						"title": "Remove Line if Memo Spans Line",
 						"type": "boolean",
 						"description": "Remove line containing completed Memo if the line becomes blank.",
-						"default": true
+						"default": true,
+						"scope": "application"
 					},
 					"better-memo.actions.newMemoOnNewLine": {
 						"order": 401,
 						"title": "Always Insert New Memos on New Line",
 						"type": "boolean",
 						"markdownDescription": "Always insert new Memos on the line above the current line when using the *New Memo on Line* command.",
-						"default": true
+						"default": true,
+						"scope": "application"
 					}
 				}
 			},
@@ -453,7 +473,8 @@
 						"default": [
 							"**/*"
 						],
-						"uniqueItems": true
+						"uniqueItems": true,
+						"scope": "application"
 					},
 					"better-memo.fetcher.ignore": {
 						"order": 102,
@@ -468,7 +489,8 @@
 							"**/out",
 							"**/dist"
 						],
-						"uniqueItems": true
+						"uniqueItems": true,
+						"scope": "application"
 					},
 					"better-memo.fetcher.scanDelay": {
 						"order": 201,
@@ -477,7 +499,8 @@
 						"minimum": 500,
 						"maximum": 1000000,
 						"description": "Configures the delay between casual document scans in ms. Casual scans only scans the currently active document and will not run if document is not changed etc.",
-						"default": 2000
+						"default": 2000,
+						"scope": "application"
 					},
 					"better-memo.fetcher.forceScanDelay": {
 						"order": 202,
@@ -486,7 +509,8 @@
 						"minimum": 1000,
 						"maximum": 5000000,
 						"description": "Configures the delay between forced document scans in ms. Forced scans will scan the currently active document without checks, to prevent cases where casual scans failed.",
-						"default": 10000
+						"default": 10000,
+						"scope": "application"
 					},
 					"better-memo.fetcher.docsScanDelay": {
 						"order": 203,
@@ -495,7 +519,8 @@
 						"minimum": 5000,
 						"maximum": 10000000,
 						"description": "Configures the delay between workspace document scans in ms. The scan scans for unwatched documents in the workspace and scans them. Though typically documents would be taken care of by event listeners, this prevents potential failures.",
-						"default": 60000
+						"default": 60000,
+						"scope": "application"
 					}
 				}
 			},
@@ -508,7 +533,8 @@
 						"title": "Enable Editor Decorations",
 						"type": "boolean",
 						"description": "Enable document decorations such as giving Memos higher font-weight, and coloring tags with their corresponding colors.",
-						"default": true
+						"default": true,
+						"scope": "application"
 					}
 				}
 			}
