@@ -45,9 +45,7 @@ export namespace MemoEngine {
 	};
 
 	let commentDelimiters!: {
-		[langId: string]:
-			| { open: string; close?: string }
-			| { open: string; close?: string }[];
+		[langId: string]: { open: string; close?: string };
 	};
 	let commentCloserChars!: string;
 	updateCustomLangComments();
@@ -169,7 +167,7 @@ export namespace MemoEngine {
 		head: string;
 		tail: string;
 	} {
-		const commentFormat = [commentDelimiters[langId]].flat()[0];
+		const commentFormat = commentDelimiters[langId];
 		const padding = commentFormat.close ? " " : "";
 		return {
 			head: `${commentFormat.open}${padding}MO `,
@@ -272,10 +270,10 @@ export namespace MemoEngine {
 		const customLang = ConfigMaid.get("general.customLanguages") ?? {};
 
 		commentDelimiters = { ...CommentDelimiters, ...customLang };
-		const tmp = Object.values(commentDelimiters)
-			.flat()
-			.flatMap((format) => format.close?.split(""));
 
+		const tmp = Object.values(commentDelimiters).flatMap((format) =>
+			format.close?.split(""),
+		);
 		commentCloserChars = Aux.re.escape([...new Set(tmp)].join(""));
 	}
 
@@ -308,8 +306,6 @@ export namespace MemoEngine {
 			if (!isDocWatched(doc)) docMemosMap.delete(doc);
 		}
 		for (const doc of watchedDocInfoMap.keys()) scanDoc(doc);
-		console.log(commentDelimiters);
-		console.log(docs);
 		if (options?.emitUpdate) EventEmitter.emit("update");
 	}
 
@@ -361,15 +357,14 @@ export namespace MemoEngine {
 	 * @returns `RegExp` for matching Memos in `doc`
 	 */
 	function getMemoMatchRE(doc: TextDocument): RegExp {
-		const delimiters = [commentDelimiters[doc.languageId]].flat();
-		const commentFormatREs = delimiters.map((del) => {
-			const open = Aux.re.escape(del.open);
-			const close = Aux.re.escape(del.close ?? "");
-			return `(?<![${open}])${open}[\\t ]*mo[\\t ]+(?<tag>[^\\r\\n\\t ${commentCloserChars}]+)[\\t ]*(?<priority>!*)(?<content>.*${
-				close ? "?" : ""
-			})${close}`;
-		});
-		const matchPattern = Aux.re.union(...commentFormatREs);
+		const delimiters = commentDelimiters[doc.languageId];
+
+		const open = Aux.re.escape(delimiters.open);
+		const close = Aux.re.escape(delimiters.close ?? "");
+
+		const matchPattern = `(?<![${open}])${open}[\\t ]*mo[\\t ]+(?<tag>[^\\r\\n\\t ${commentCloserChars}]+)[\\t ]*(?<priority>!*)(?<content>.*${
+			close ? "?" : ""
+		})${close}`;
 		return RegExp(matchPattern, "gim");
 	}
 
