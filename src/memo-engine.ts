@@ -1,8 +1,8 @@
 /**
  * Configs used in memo-engine.ts:
- * fetcher.watch, fetcher.ignore
- * fetcher.scanDelay, fetcher.forceScanDelay, fetcher.docsScanDelay
  * general.customTags
+ * fetcher.watch, fetcher.ignore
+ * fetcher.scanDelay, fetcher.cleanScanDelay
  */
 
 import {
