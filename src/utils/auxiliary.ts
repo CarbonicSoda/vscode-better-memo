@@ -11,6 +11,35 @@ export namespace Aux.array {
 }
 
 /**
+ * Object related functions
+ */
+export namespace Aux.object {
+	type Key = number | string | symbol;
+
+	/**
+	 * Polyfill implementation of Object.groupBy()
+	 *
+	 * @param group key of object or a callback returning a symbol for grouping
+	 * @returns `obj[group]` | `group(obj)` as keys and corresponding objects as values
+	 */
+	export function group<T extends { [key: Key]: any }>(
+		objs: T[],
+		group: Key | ((obj: T, i: number) => Key),
+	): { [group: Key]: T[] } {
+		const groups: { [group: Key]: T[] } = {};
+
+		objs.forEach((obj, i) => {
+			const grouper = typeof group === "function" ? group(obj, i) : obj[group];
+
+			groups[grouper] ??= [];
+			groups[grouper].push(obj);
+		});
+
+		return groups;
+	}
+}
+
+/**
  * Asynchronous operation functions
  */
 export namespace Aux.async {
