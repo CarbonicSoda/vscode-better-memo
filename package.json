@@ -37,34 +37,41 @@
 		"onStartupFinished"
 	],
 	"icon": "media/icon.png",
-	"main": "./dist/extension",
-	"browser": "./dist/web-extension",
+	"main": "./dist/extension.js",
+	"browser": "./dist/web/extension.js",
 	"scripts": {
-		"vscode:prepublish": "webpack --mode production",
-		"compile": "webpack",
-		"watch": "tsc --watch -p ./",
-		"webpack-dev": "webpack --mode development --watch",
-		"webpack": "webpack --mode development",
-		"package": "webpack --mode production --devtool hidden-source-map",
-		"pretest": "npm run compile-tests && npm run compile && npm run lint",
+		"vscode:prepublish": "pnpm run package",
+		"compile": "pnpm run check-types && pnpm run lint && node esbuild.js && node esbuild.web.js",
+		"watch": "npm-run-all -p watch:*",
+		"watch:esbuild": "node esbuild.js --watch && node esbuild.web.js --watch",
+		"watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+		"package": "pnpm run check-types && pnpm run lint && node esbuild.js --production && node esbuild.web.js --production",
+		"compile-tests": "tsc -p . --outDir out",
+		"watch-tests": "tsc -p . -w --outDir out",
+		"pretest": "pnpm run compile-tests && pnpm run compile && pnpm run lint",
+		"check-types": "tsc --noEmit",
 		"lint": "eslint src",
-		"test-in-browser": "vscode-test-web --extensionDevelopmentPath=. ."
+		"test": "vscode-test",
+		"run-in-browser": "vscode-test-web --browserType=chromium --extensionDevelopmentPath=. ."
 	},
 	"devDependencies": {
-		"@types/mocha": "^10.0.8",
-		"@types/node": "20.x",
+		"@types/node": "~20.17.11",
 		"@types/vscode": "^1.80.0",
-		"@typescript-eslint/eslint-plugin": "^8.7.0",
-		"@typescript-eslint/parser": "^8.7.0",
+		"@typescript-eslint/eslint-plugin": "^8.19.0",
+		"@typescript-eslint/parser": "^8.19.0",
 		"@vscode/test-cli": "^0.0.10",
 		"@vscode/test-electron": "^2.4.1",
 		"@vscode/test-web": "^0.0.65",
-		"clean-webpack-plugin": "^4.0.0",
-		"eslint": "^9.11.1",
-		"ts-loader": "^9.5.1",
-		"typescript": "^5.6.2",
-		"webpack": "^5.95.0",
-		"webpack-cli": "^5.1.4"
+		"esbuild": "^0.25.1",
+		"eslint": "^9.17.0",
+		"npm-run-all": "^4.1.5",
+		"typescript": "^5.7.2"
+	},
+	"pnpm": {
+		"onlyBuiltDependencies": [
+			"@playwright/browser-chromium",
+			"esbuild"
+		]
 	},
 	"contributes": {
 		"commands": [
