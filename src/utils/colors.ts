@@ -11,6 +11,7 @@ export namespace Colors {
 	} = {};
 	for (const [themeKind, colors] of Object.entries(VSCodeColors)) {
 		VSCodeColorsRgb[themeKind] = {};
+
 		for (const [colorName, hex] of Object.entries(colors)) {
 			VSCodeColorsRgb[themeKind][colorName] = hexToRgb(hex);
 		}
@@ -61,7 +62,7 @@ export namespace Colors {
 	 * and I'm too dumb ~~lazy~~ to fix that
 	 */
 	export function hash(hashString: string): ThemeColor {
-		const rgb = sRgbHash(hashString);
+		const rgb = hashRgb(hashString);
 		return interpolate(rgb);
 	}
 
@@ -71,7 +72,7 @@ export namespace Colors {
 	 * Hash function is from https://github.com/RolandR/ColorHash
 	 * modified to make permutations of characters to give different colors
 	 */
-	function sRgbHash(hashString: string): RGB3 {
+	function hashRgb(hashString: string): RGB3 {
 		let sum = 0;
 		for (let i = 0; i < hashString.length; i++) {
 			sum += hashString.charCodeAt(i) * (i + 1);
@@ -133,6 +134,9 @@ export namespace Colors {
 		return i < 0 ? 0 : Math.sqrt(i);
 	}
 
+	/**
+	 * Color space transit from rgb to lab
+	 */
 	function rgbToLab(rgb: RGB3): [number, number, number] {
 		let r = rgb[0] / 255,
 			g = rgb[1] / 255,
@@ -141,17 +145,17 @@ export namespace Colors {
 			y,
 			z;
 
-		r = r > 0.04045 ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
-		g = g > 0.04045 ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
-		b = b > 0.04045 ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
+		r = r > 0.04045 ? (r + 0.055) / 1.055 ** 2.4 : r / 12.92;
+		g = g > 0.04045 ? (g + 0.055) / 1.055 ** 2.4 : g / 12.92;
+		b = b > 0.04045 ? (b + 0.055) / 1.055 ** 2.4 : b / 12.92;
 
 		x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047;
 		y = (r * 0.2126 + g * 0.7152 + b * 0.0722) / 1.0;
 		z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883;
 
-		x = x > 0.008856 ? Math.pow(x, 1 / 3) : 7.787 * x + 16 / 116;
-		y = y > 0.008856 ? Math.pow(y, 1 / 3) : 7.787 * y + 16 / 116;
-		z = z > 0.008856 ? Math.pow(z, 1 / 3) : 7.787 * z + 16 / 116;
+		x = x > 0.008856 ? x ** 1 / 3 : 7.787 * x + 16 / 116;
+		y = y > 0.008856 ? y ** 1 / 3 : 7.787 * y + 16 / 116;
+		z = z > 0.008856 ? z ** 1 / 3 : 7.787 * z + 16 / 116;
 
 		return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
 	}

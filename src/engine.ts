@@ -1,10 +1,3 @@
-/**
- * Configs used in memo-engine.ts:
- * general.customTags
- * fetcher.watch, fetcher.ignore
- * fetcher.scanDelay, fetcher.cleanScanDelay
- */
-
 import {
 	commands,
 	Position,
@@ -17,24 +10,24 @@ import {
 } from "vscode";
 
 import { Aux } from "./utils/auxiliary";
+import { Colors } from "./utils/colors";
 import { Config } from "./utils/config";
 import { EventEmitter } from "./utils/event-emitter";
 import { FileEdit } from "./utils/file-edit";
 import { Janitor } from "./utils/janitor";
-import { Colors } from "./utils/colors";
 
 import PredefinedLangs from "./json/predefined-langs.json";
 
 /**
  * Core engine for fetching documents, memos, and other non-presentation related data module
  */
-export namespace MemoEngine {
+export namespace Engine {
 	//#region langs
 	type LangDelimiters = {
 		[langId: string]: { open: string; close?: string };
 	};
 
-	let langs: {
+	export let langs: {
 		list: string[];
 		delimiters: LangDelimiters;
 
@@ -48,7 +41,7 @@ export namespace MemoEngine {
 	 * Get defined language details
 	 */
 	function getLangs(): typeof langs {
-		const customLangs = Config.get("general.customLanguages") ?? {};
+		const customLangs = Config.get("general.customLangs") ?? {};
 
 		const delimiters: (typeof langs)["delimiters"] = {
 			...PredefinedLangs,
@@ -71,13 +64,12 @@ export namespace MemoEngine {
 			},
 		};
 	}
-
 	//#endregion langs
 
 	//#region docs
 	type DocMeta = { version: number; lang: string };
 
-	let docs: {
+	export let docs: {
 		list: TextDocument[];
 		metas: Map<TextDocument, DocMeta>;
 
@@ -126,7 +118,6 @@ export namespace MemoEngine {
 			includes: docs.includes,
 		};
 	}
-
 	//#endregion docs
 
 	//#region memos
@@ -262,7 +253,6 @@ export namespace MemoEngine {
 
 		return RegExp(matchPattern, "gim");
 	}
-
 	//#endregion memos
 
 	//#region tags
@@ -305,24 +295,6 @@ export namespace MemoEngine {
 			},
 		};
 	}
-
-	//MO TODO sorter will be moved to usage
-	// /**
-	//  * @returns all currently known tags together with user-defined custom tags
-	//  * sorted by occurrence (desc)
-	//  */
-	// export function getTagList(): string[] {
-	// 	const tagList = tags.list;
-
-	// 	const occurrence: { [tag: string]: number } = {};
-	// 	for (const tag of tagList) {
-	// 		occurrence[tag] ??= 0;
-	// 		occurrence[tag]++;
-	// 	}
-
-	// 	return tagList.sort((a, b) => occurrence[b] - occurrence[a]);
-	// }
-
 	//#endregion tags
 
 	//#region scans
@@ -330,7 +302,7 @@ export namespace MemoEngine {
 		EventEmitter.emit("UpdateView");
 	}
 
-	export async function scanClean(): Promise<void> {
+	async function scanClean(): Promise<void> {
 		langs = getLangs();
 		docs = await getDocs();
 		memos = getMemos();
@@ -375,10 +347,9 @@ export namespace MemoEngine {
 
 		return isChanged;
 	}
-
 	//#endregion scans
 
-	//#region aux
+	//#region format
 	/**
 	 * Handles tab change and formats doc memos
 	 */
@@ -451,11 +422,10 @@ export namespace MemoEngine {
 			tail: `${padding}${delimiters.close ?? ""}`,
 		};
 	}
-
-	//#endregion aux
+	//#endregion format
 
 	/**
-	 * Init fetcher engine, event listeners and intervals
+	 * Init fetcher engine, event listeners and scan intervals
 	 */
 	export async function init(): Promise<void> {
 		Config.onChange("general.customTags", () => {
@@ -463,7 +433,7 @@ export namespace MemoEngine {
 			updateView();
 		});
 
-		Config.onChange("general.customLanguages", async () => {
+		Config.onChange("general.customLangs", async () => {
 			langs = getLangs();
 			await scanFsChange();
 			updateView();

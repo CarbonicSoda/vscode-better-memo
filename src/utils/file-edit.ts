@@ -57,12 +57,12 @@ export namespace FileEdit {
 		/**
 		 * Applies all previously stacked edits in order hybridly
 		 *
-		 * @param options.alwaysOpenFile: Always open the modified files and use {@link workspace.fs};
+		 * @param options.openFile open the modified files and use {@link WorkspaceEdit};
 		 */
-		async apply(options?: { alwaysOpenFile?: boolean }): Promise<void> {
+		async apply(options?: { openFile?: boolean }): Promise<void> {
 			for (const [uri, fileEdits] of this.uriEditsMap.entries()) {
 				try {
-					await this.editFile(fileEdits, uri, options?.alwaysOpenFile);
+					await this.editFile(fileEdits, uri, options?.openFile);
 				} catch {}
 			}
 		}
@@ -73,11 +73,11 @@ export namespace FileEdit {
 		private async editFile(
 			edits: EditEntries,
 			uri: Uri,
-			alwaysOpenFile?: boolean,
+			openFile?: boolean,
 		): Promise<void> {
 			const doc = await workspace.openTextDocument(uri);
 
-			if (!alwaysOpenFile && !doc.isDirty && env.uiKind !== UIKind.Web) {
+			if (!openFile && !doc.isDirty && env.uiKind !== UIKind.Web) {
 				this.editFileWithFs(edits, doc);
 				return;
 			}

@@ -1,18 +1,3 @@
-/**
- * Array related functions
- */
-export namespace Aux.array {
-	/**
-	 * @returns copy of `array` with `items` removed (all duplicates of `items` are also removed)
-	 */
-	export function removeFrom<T>(array: T[], ...items: T[]): T[] {
-		return array.filter((item) => !items.includes(item));
-	}
-}
-
-/**
- * Object related functions
- */
 export namespace Aux.object {
 	type Key = number | string | symbol;
 
@@ -39,9 +24,6 @@ export namespace Aux.object {
 	}
 }
 
-/**
- * Asynchronous operation functions
- */
 export namespace Aux.async {
 	/**
 	 * Sugar for Promise.all(`iterable`.map(`async (ele) => {...}`))
@@ -54,9 +36,6 @@ export namespace Aux.async {
 	}
 }
 
-/**
- * RegExp related functions
- */
 export namespace Aux.re {
 	/**
 	 * Makes a raw string valid for `RegExp()` without conflicts
@@ -67,9 +46,6 @@ export namespace Aux.re {
 	};
 }
 
-/**
- * String related functions
- */
 export namespace Aux.string {
 	/**
 	 * @param countable number or object with `.length` property
@@ -82,9 +58,6 @@ export namespace Aux.string {
 	};
 }
 
-/**
- * Useful algorithms
- */
 export namespace Aux.algorithm {
 	/**
 	 * @returns index of the latest element in `sorted` <= `candid`

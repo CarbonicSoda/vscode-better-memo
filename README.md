@@ -33,7 +33,7 @@ For example, the following (line 2) is a valid Memo in JS:
 > **e.g.** `//` will be replaced by `#` in Python;  
 > **e.g.** `<!-- MO TAG ... -->` is used in HTML; You can configure custom
 > comment-delimiters for specific languages **e.g.** ANTLR via
-> `better-memo.general.customLanguages`.
+> `better-memo.general.customLangs`.
 
 > A Memo doesn't necessarily need to have content.  
 > **e.g.** If some code is left to be cleaned up, you could simply add
