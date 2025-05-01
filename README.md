@@ -1,12 +1,11 @@
 <h3 align="center">
-	<img src="https://raw.githubusercontent.com/CarbonicSoda/vscode-better-memo/master/media/icon.png" width="100" alt="Better Memo icon" /><br />
+	<img src="https://raw.githubusercontent.com/CarbonicSoda/vscode-better-memo/master/media/icon.png" width="100" alt="Better Memo icon" />
+   <p></p>
 	Better Memo for VSCode
 </h3>
-<p align="center">Automatic Comment Curation for Developers</p>
+<h4 align="center">Automatic Comment Curation for Developers</h4>
 
----
-
-### Features
+## Features
 
 - Automated tracking of workspace Memos
 - Centralized curation in accessible Memo Explorer
@@ -15,9 +14,9 @@
 - Syntax highlighting to differentiate Memos
 - _And various other convenient functionalities_...
 
-### Usage Guide
+## Usage Guide
 
-#### Syntax of Memos
+### Syntax of Memos
 
 Comments are only curated by Better Memo if they start with `MO`
 (case-insensitive).
@@ -44,7 +43,7 @@ For example, the following (line 2) is a valid Memo in JS:
 > format Memos for you automatically.  
 > **e.g.** `// mO tAg hi` > `//MO TAG hi`;
 
-#### New Memo Command
+### New Memo Command
 
 Typing a Memo by hand can be tedious and inefficient. Instead, you can follow
 these simple steps:
@@ -81,7 +80,7 @@ instance, `//MO FIX !!critical failure` would have an even higher priority than
 
 </details>
 
-#### The Memo Explorer
+### The Memo Explorer
 
 Memos in the workspace are carefully organized and displayed in an explorer
 panel, available conveniently in the sidebar, known as the Memo Explorer.
@@ -114,9 +113,9 @@ for Memos within documents.
 > The final colors used may differ from the expected colors, this is _intended_
 > to maintain a higher level of color contrast.
 
-#### Available Actions
+### Available Actions
 
-##### Actions/Title Bar
+#### Actions/Title Bar
 
 The title bar provides the following actions, from left to right:
 
@@ -126,7 +125,7 @@ The title bar provides the following actions, from left to right:
 4. Expand Explorer;
 5. Collapse Explorer;
 
-##### Actions/Context
+#### Actions/Context
 
 _File Item_:
 
@@ -148,7 +147,7 @@ _Memo Item_:
 > `Mark Memo(s) as Completed` from the right-click context-menu will _always_
 > ignore the _`Ask For Confirmation ...`_ settings.
 
-### Editor Commands
+## Editor Commands
 
 Better Memo provides several commands to help users work more efficiently in
 editors.
