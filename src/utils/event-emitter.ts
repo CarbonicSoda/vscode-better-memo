@@ -14,7 +14,9 @@ export namespace EventEmitter {
 		dispose(): void {
 			const removed = eventCallbacksMap
 				.get(this.event)
-				.filter((_, i) => i !== this.id);
+				?.filter((_, i) => i !== this.id);
+			if (!removed) return;
+
 			eventCallbacksMap.set(this.event, removed);
 		}
 	}
@@ -29,8 +31,9 @@ export namespace EventEmitter {
 		callback: (...args: any) => any,
 	): Disposable {
 		if (!eventCallbacksMap.has(event)) eventCallbacksMap.set(event, []);
-		eventCallbacksMap.get(event).push(callback);
-		return new Disposable(event, eventCallbacksMap.get(event).length - 1);
+		eventCallbacksMap.get(event)!.push(callback);
+
+		return new Disposable(event, eventCallbacksMap.get(event)!.length - 1);
 	}
 
 	/**

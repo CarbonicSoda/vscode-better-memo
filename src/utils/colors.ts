@@ -5,7 +5,7 @@ import VSCodeColors from "../json/vscode-colors.json";
 /**
  * Functions to return {@link ThemeColor} from sRGB or string-hash
  */
-export namespace VSColors {
+export namespace Colors {
 	const VSCodeColorsRgb: {
 		[themeKind: string]: { [colorName: string]: RGB3 };
 	} = {};
@@ -32,19 +32,24 @@ export namespace VSColors {
 	 * @param RGBorHEX `RGB3`: [R, G, B], `"#rrggbb"` or `"#rgb"` (case insensitive, "#" could be omitted)
 	 */
 	export function interpolate(RGBorHEX: RGB3 | string): ThemeColor {
-		const rgb = typeof RGBorHEX === "string" ? hexToRgb(RGBorHEX) : RGBorHEX;
 		const colorThemeKind = ColorThemeKind[window.activeColorTheme.kind];
+
+		const rgb = typeof RGBorHEX === "string" ? hexToRgb(RGBorHEX) : RGBorHEX;
+
 		let bestDeltaE = Infinity;
 		let best = "";
+
 		for (const [colorName, colorRgb] of Object.entries(
-			VSCodeColorsRgb[<keyof typeof VSCodeColorsRgb>colorThemeKind],
+			VSCodeColorsRgb[colorThemeKind as keyof typeof VSCodeColorsRgb],
 		)) {
 			const deltaE = getDeltaE(rgb, colorRgb);
+
 			if (deltaE < bestDeltaE) {
 				bestDeltaE = deltaE;
 				best = colorName;
 			}
 		}
+
 		return new ThemeColor(best);
 	}
 
@@ -71,9 +76,13 @@ export namespace VSColors {
 		for (let i = 0; i < hashString.length; i++) {
 			sum += hashString.charCodeAt(i) * (i + 1);
 		}
-		const getVal = (param: number) =>
-			Math.trunc(Number(`0.${String(Math.sin(sum + param)).slice(6)}`) * 256);
-		return [getVal(1), getVal(2), getVal(3)];
+
+		const getVal = (salt: number) => {
+			return Math.trunc(
+				+`.${`${Math.sin(sum + 0.1 * salt * Math.PI)}`.slice(12)}` * 256,
+			);
+		};
+		return [getVal(0), getVal(1), getVal(2)];
 	}
 
 	/**
@@ -82,9 +91,11 @@ export namespace VSColors {
 	 */
 	function hexToRgb(hex: string): RGB3 {
 		hex = hex.replace("#", "");
+
 		if (hex.length === 3) {
 			hex = hex[0].repeat(2) + hex[1].repeat(2) + hex[2].repeat(2);
 		}
+
 		return [
 			parseInt(hex.slice(0, 2), 16),
 			parseInt(hex.slice(2, 4), 16),
@@ -100,16 +111,21 @@ export namespace VSColors {
 		const deltaL = labA[0] - labB[0];
 		const deltaA = labA[1] - labB[1];
 		const deltaB = labA[2] - labB[2];
+
 		const c1 = Math.sqrt(labA[1] * labA[1] + labA[2] * labA[2]);
 		const c2 = Math.sqrt(labB[1] * labB[1] + labB[2] * labB[2]);
+
 		const deltaC = c1 - c2;
 		let deltaH = deltaA * deltaA + deltaB * deltaB - deltaC * deltaC;
 		deltaH = deltaH < 0 ? 0 : Math.sqrt(deltaH);
+
 		const sc = 1.0 + 0.045 * c1;
 		const sh = 1.0 + 0.015 * c1;
+
 		const deltaLKlsl = deltaL / 1.0;
 		const deltaCkcsc = deltaC / sc;
 		const deltaHkhsh = deltaH / sh;
+
 		const i =
 			deltaLKlsl * deltaLKlsl +
 			deltaCkcsc * deltaCkcsc +
@@ -124,15 +140,19 @@ export namespace VSColors {
 			x,
 			y,
 			z;
+
 		r = r > 0.04045 ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
 		g = g > 0.04045 ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
 		b = b > 0.04045 ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
+
 		x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047;
 		y = (r * 0.2126 + g * 0.7152 + b * 0.0722) / 1.0;
 		z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883;
+
 		x = x > 0.008856 ? Math.pow(x, 1 / 3) : 7.787 * x + 16 / 116;
 		y = y > 0.008856 ? Math.pow(y, 1 / 3) : 7.787 * y + 16 / 116;
 		z = z > 0.008856 ? Math.pow(z, 1 / 3) : 7.787 * z + 16 / 116;
+
 		return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
 	}
 }

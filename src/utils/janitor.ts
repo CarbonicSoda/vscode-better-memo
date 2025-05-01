@@ -16,7 +16,7 @@ export namespace Janitor {
 	};
 
 	export const managed: (DisposableLike | NodeJS.Timeout)[][] = [];
-	export let currId = 0;
+	export let currentId = 0;
 
 	/**
 	 * @param disposableOrTimeout instances to manage
@@ -25,8 +25,8 @@ export namespace Janitor {
 	export function add(
 		...disposableOrTimeout: (DisposableLike | NodeJS.Timeout)[]
 	): Id {
-		managed[currId++] = disposableOrTimeout;
-		return currId;
+		managed[currentId++] = disposableOrTimeout;
+		return currentId;
 	}
 
 	/**
@@ -45,6 +45,7 @@ export namespace Janitor {
 	 */
 	export function clear(id: Id): void {
 		if (!managed[id] || managed[id].length === 0) return;
+
 		for (const instance of managed[id]) {
 			if ("dispose" in instance) {
 				instance.dispose();
@@ -52,6 +53,7 @@ export namespace Janitor {
 			}
 			clearTimeout(instance);
 		}
+
 		managed[id] = [];
 	}
 
@@ -59,6 +61,6 @@ export namespace Janitor {
 	 * Disposes/Clears all currently managed instances
 	 */
 	export function cleanUp(): void {
-		for (let i = 0; i < currId; i++) clear(i);
+		for (let i = 0; i < currentId; i++) clear(i);
 	}
 }

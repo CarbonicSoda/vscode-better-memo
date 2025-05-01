@@ -5,7 +5,7 @@ import { Janitor } from "./janitor";
 /**
  * Simplified functions for config related tasks
  */
-export namespace ConfigMaid {
+export namespace Config {
 	let userConfigs = workspace.getConfiguration("better-memo");
 
 	/**
@@ -23,7 +23,8 @@ export namespace ConfigMaid {
 		configs: string | string[],
 		callback: (...newValues: any[]) => any,
 	): number {
-		const _configs = [configs].flat();
+		const _configs = Array.isArray(configs) ? configs : [configs];
+
 		const onChangeConfig = workspace.onDidChangeConfiguration((ev) => {
 			if (
 				!ev.affectsConfiguration("better-memo") ||
@@ -33,9 +34,11 @@ export namespace ConfigMaid {
 			) {
 				return;
 			}
+
 			userConfigs = workspace.getConfiguration("better-memo");
 			callback(..._configs.map(get));
 		});
+
 		return Janitor.add(onChangeConfig);
 	}
 
@@ -49,22 +52,26 @@ export namespace ConfigMaid {
 		callback: () => any,
 		delayConfigName: string,
 	): number {
-		const id = Janitor.currId++;
+		const id = Janitor.currentId++;
+
 		const startSchedule = async () => {
 			await callback();
 			next();
 		};
-		const next = () =>
+		const next = () => {
 			Janitor.override(id, setTimeout(startSchedule, get(delayConfigName)));
+		};
 
 		next();
 		onChange(delayConfigName, next);
+
 		return id;
 	}
 
 	Janitor.add(
 		workspace.onDidChangeConfiguration((ev) => {
 			if (!ev.affectsConfiguration("better-memo")) return;
+
 			userConfigs = workspace.getConfiguration("better-memo");
 		}),
 	);
