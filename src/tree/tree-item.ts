@@ -64,8 +64,8 @@ export namespace TreeItem {
 			super(label, expand, parent);
 		}
 
-		async complete(options?: { noConfirm?: boolean }): Promise<void> {
-			if (!this.children[0] || !("children" in this.children[0])) return;
+		async complete(options?: { noConfirm?: boolean }): Promise<Memo.Memo[]> {
+			if (!this.children[0] || !("children" in this.children[0])) return [];
 
 			const memos = (
 				this.children as (TagItem<"secondary"> | FileItem<"secondary">)[]
@@ -82,11 +82,12 @@ export namespace TreeItem {
 					{ modal: true, detail: prompt },
 					"Yes",
 				);
-
-				if (!confirm) return;
+				if (!confirm) return [];
 			}
 
 			for (const memo of memos) await memo.complete();
+
+			return memos.map((item) => item.memo);
 		}
 	}
 
@@ -140,7 +141,7 @@ export namespace TreeItem {
 			title: "Navigate to Memo",
 			command: "better-memo.navigateToMemo",
 			tooltip: "Navigate to Memo",
-			arguments: [this],
+			arguments: [() => this.navigate()],
 		};
 
 		constructor(

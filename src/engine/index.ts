@@ -26,7 +26,7 @@ export async function initEngine(): Promise<void> {
 		updateView();
 	});
 
-	Config.schedule(Scan.currentDoc, "fetcher.scanDelay");
+	Config.schedule(Scan.activeDoc, "fetcher.scanDelay");
 
 	Config.schedule(Scan.clean, "fetcher.cleanScanDelay");
 
@@ -50,7 +50,7 @@ export async function initEngine(): Promise<void> {
 			updateView();
 		}),
 
-		workspace.onDidSaveTextDocument(Scan.currentDoc),
+		workspace.onDidSaveTextDocument(Scan.activeDoc),
 
 		window.onDidChangeActiveColorTheme(() => {
 			Tag.data = Tag.getData();

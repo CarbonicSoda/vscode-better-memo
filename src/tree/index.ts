@@ -5,6 +5,8 @@ import { Config } from "../utils/config";
 import { Janitor } from "../utils/janitor";
 import { EventEmitter } from "../utils/event-emitter";
 import { TreeItem } from "./tree-item";
+import { Memo } from "../engine/memo";
+import { Scan } from "../engine/scan";
 
 export function initTree() {
 	const provider = new TreeProvider();
@@ -15,7 +17,6 @@ export function initTree() {
 	});
 
 	const expand = { primary: true, secondary: true };
-
 	function updateFold(newExpand: typeof expand): void {
 		for (const item of provider.items) {
 			item.collapsibleState = newExpand.primary
@@ -49,6 +50,31 @@ export function initTree() {
 		updateView();
 	});
 
+	async function completeTag(
+		tagItem: TreeItem.TagItem<"primary">,
+		options?: { noConfirm?: boolean },
+	): Promise<void> {
+		const memos = await tagItem.complete(options);
+		if (memos.length === 0) return;
+
+		const docs = Array.from(new Set(memos.map((memo) => memo.meta.doc)));
+		for (const doc of docs) Scan.doc(doc);
+
+		updateView();
+	}
+
+	async function completeFile(
+		fileItem: TreeItem.FileItem<"primary">,
+		options?: { noConfirm?: boolean },
+	): Promise<void> {
+		const memos = await fileItem.complete(options);
+		if (memos.length === 0) return;
+
+		Scan.doc(memos[0].meta.doc);
+
+		updateView();
+	}
+
 	Janitor.add(
 		explorer,
 
@@ -73,10 +99,6 @@ export function initTree() {
 			provider.view = "file";
 			updateView();
 		}),
-		// commands.registerCommand(
-		// 	"better-memo.completeAllMemos",
-		// 	completeAllMemos,
-		// ),
 
 		commands.registerCommand(
 			"better-memo.navigateToFile",
@@ -84,41 +106,71 @@ export function initTree() {
 				fileItem.navigate();
 			},
 		),
-		// commands.registerCommand(
-		// 	"better-memo.completeFile",
-		// 	(fileItem: TreeItems.FileItem) => fileItem.markMemosAsCompleted(),
-		// ),
-		// commands.registerCommand(
-		// 	"better-memo.completeFileNoConfirm",
-		// 	(fileItem: TreeItems.FileItem) =>
-		// 		fileItem.markMemosAsCompleted({ noConfirm: true }),
-		// ),
-		// commands.registerCommand(
-		// 	"better-memo.completeTag",
-		// 	(tagItem: TreeItems.TagItem) => tagItem.markMemosAsCompleted(),
-		// ),
-		// commands.registerCommand(
-		// 	"better-memo.completeTagNoConfirm",
-		// 	(tagItem: TreeItems.TagItem) =>
-		// 		tagItem.markMemosAsCompleted({ noConfirm: true }),
-		// ),
-		// 	commands.registerCommand(
-		// 		"better-memo.navigateToMemo",
-		// 		(memoItem: TreeItem.MemoItem) => memoItem.navigateTo(),
-		// 	),
-		// 	commands.registerCommand(
-		// 		"better-memo.completeMemo",
-		// 		(memoItem: TreeItem.MemoItem) => memoItem.markAsCompleted(),
-		// 	),
-		// 	commands.registerCommand(
-		// 		"better-memo.confirmCompleteMemo",
-		// 		(memoItem: TreeItem.MemoItem) => memoItem.markAsCompleted(),
-		// 	),
-		// 	commands.registerCommand(
-		// 		"better-memo.completeMemoNoConfirm",
-		// 		(memoItem: TreeItem.MemoItem) =>
-		// 			memoItem.markAsCompleted({ noConfirm: true }),
-		// 	),
+
+		commands.registerCommand(
+			"better-memo.completeTag",
+			(tagItem: TreeItem.TagItem<"primary">) => completeTag(tagItem),
+		),
+		commands.registerCommand(
+			"better-memo.completeTagNoConfirm",
+			(tagItem: TreeItem.TagItem<"primary">) => {
+				completeTag(tagItem, { noConfirm: true });
+			},
+		),
+
+		commands.registerCommand(
+			"better-memo.completeFile",
+			(fileItem: TreeItem.FileItem<"primary">) => completeFile(fileItem),
+		),
+		commands.registerCommand(
+			"better-memo.completeFileNoConfirm",
+			(fileItem: TreeItem.FileItem<"primary">) => {
+				completeFile(fileItem, { noConfirm: true });
+			},
+		),
+
+		commands.registerCommand("better-memo.completeAllMemos", () => {
+			// const memoCount = Memo.data.memos.length;
+			// const primaryItems = provider.items;
+			// const completionDetail = `Are you sure you want to proceed?
+			// 		This will mark all ${memoCount} memo${Aux.string.plural(memoCount)} ${
+			// 	provider.viewType === "File" ? "in" : "under"
+			// } ${
+			// 	primaryItems.length
+			// } ${provider.viewType.toLowerCase()}${Aux.string.plural(
+			// 	primaryItems,
+			// )} as completed.`;
+			// const option = await window.showInformationMessage(
+			// 	"Confirm Completion of Memos",
+			// 	{ modal: true, detail: completionDetail },
+			// 	"Yes",
+			// );
+			// if (!option) {
+			// 	unsuppressUpdate();
+			// 	return;
+			// }
+			// for (const item of primaryItems) {
+			// 	await item.markMemosAsCompleted({
+			// 		noConfirm: true,
+			// 		_noExtraTasks: true,
+			// 	});
+			// }
+			// // MemoEngine.forgetAllMemos();
+			// provider.removeAllItems();
+			// refresh();
+		}),
+
+		commands.registerCommand(
+			"better-memo.navigateToMemo",
+			(navigate: () => void) => navigate(),
+		),
+
+		commands.registerCommand(
+			"better-memo.completeMemo",
+			(memoItem: TreeItem.MemoItem<"tag" | "file">) => {
+				memoItem.complete();
+			},
+		),
 	);
 
 	updateView();
@@ -136,107 +188,11 @@ export function initTree() {
 // 		// if (editor?.selection) onChangeEditorSelection(editor);
 // 	}
 
-// 	/**
-// 	 * Reloads explorer with updated items from {@link Engine},
-// 	 * delays update if explorer is hidden or if update is suppressed
-// 	 */
-// 	export function updateView(): void {
-// 		if (!updateSuppressed) provider.reloadItems();
-// 	}
-
-// 	/**
-// 	 * Updates provider items (does not reload items)
-// 	 * @param item item to be updated, if not given the whole tree is refreshed
-// 	 */
-// 	export function refresh(item?: TreeItem.ItemType): void {
-// 		provider.refresh(item);
-// 	}
-
-// 	/**
-// 	 * Removes `items` from treeview
-// 	 */
-// 	export function removeItems(...items: TreeItem.InnerItemType[]): void {
-// 		provider.removeItems(...items);
-// 	}
-
-// 	/**
-// 	 * Suppresses view update (does not affect view refresh)
-// 	 */
-// 	export function suppressUpdate(): void {
-// 		updateSuppressed = true;
-// 	}
-
-// 	/**
-// 	 * Unsuppresses view update
-// 	 */
-// 	export function unsuppressUpdate(): void {
-// 		updateSuppressed = false;
-// 	}
-
-// 	/**
-// 	 * Updates view's view type (primary-secondary items hierarchy)
-// 	 * @param viewType "File" - primary items is workspace documents; "Tag" - primary items is Memo tags
-// 	 */
-// 	async function updateViewType(viewType: "File" | "Tag"): Promise<void> {
-// 		provider.viewType = viewType;
-// 		await commands.executeCommand(
-// 			"setContext",
-// 			"better-memo.explorerView",
-// 			viewType,
-// 		);
-// 		updateView();
-
-// 		const level1 = Config.get("view.defaultExpandPrimaryGroups");
-// 		const level2 = Config.get("view.defaultExpandSecondaryGroups");
-// 		foldState = Number(level1) + Number(level1 && level2);
-// 		await updateExpandState(level1, level2);
-// 	}
-
-// 	/**
-// 	 * Updates primary & secondary item's expand/collapse state
-// 	 */
-// 	function updateExpandState(level1: boolean, level2: boolean): void {
-//
-// 	}
-
-// 	/**
-// 	 * Toggles explorer fold status: Layer1, Layer2, Collapsed
-// 	 */
-// 	async function toggleExplorerFold(): Promise<void> {
-// 		foldState = (foldState + 1) % 3;
-// 		await updateExpandState(foldState > 0, foldState > 1);
-// 	}
-
 // 	// /**
 // 	//  * View action to mark all known Memos to be completed
 // 	//  */
 // 	// async function completeAllMemos(): Promise<void> {
 // 	// 	suppressUpdate();
-// 	// 	const memoCount = provider.memoCount;
-// 	// 	const items = provider.items;
-
-// 	// 	const completionDetail = `Are you sure you want to proceed?
-// 	// 		This will mark all ${memoCount} memo${Aux.string.plural(memoCount)} ${
-// 	// 		provider.viewType === "File" ? "in" : "under"
-// 	// 	} ${items.length} ${provider.viewType.toLowerCase()}${Aux.string.plural(
-// 	// 		items,
-// 	// 	)} as completed.`;
-// 	// 	const option = await window.showInformationMessage(
-// 	// 		"Confirm Completion of Memos",
-// 	// 		{ modal: true, detail: completionDetail },
-// 	// 		"Yes",
-// 	// 	);
-// 	// 	if (!option) {
-// 	// 		unsuppressUpdate();
-// 	// 		return;
-// 	// 	}
-
-// 	// 	for (const item of items) {
-// 	// 		await item.markMemosAsCompleted({ noConfirm: true, _noExtraTasks: true });
-// 	// 	}
-// 	// 	// MemoEngine.forgetAllMemos();
-// 	// 	provider.removeAllItems();
-// 	// 	refresh();
 // 	// 	unsuppressUpdate();
 // 	// }
 

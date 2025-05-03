@@ -1,4 +1,4 @@
-import { window } from "vscode";
+import { TextDocument, window } from "vscode";
 
 import { Doc } from "./doc";
 import { Lang } from "./lang";
@@ -26,10 +26,16 @@ export namespace Scan {
 		Memo.data = Memo.getData(createdDocs.concat(deletedDocs));
 	}
 
-	export function currentDoc(): void {
-		const doc = window.activeTextEditor?.document;
-		if (!doc || !Doc.isChanged(doc)) return;
+	export function doc(doc: TextDocument): void {
+		if (!Doc.isChanged(doc)) return;
 
 		Memo.data = Memo.getData([doc]);
+	}
+
+	export function activeDoc(): void {
+		const active = window.activeTextEditor?.document;
+		if (!active) return;
+
+		Scan.doc(active);
 	}
 }
