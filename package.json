@@ -322,31 +322,15 @@
 						"title": "Default View",
 						"type": "string",
 						"enum": [
-							"Tag",
-							"File"
+							"tag",
+							"file"
 						],
 						"enumDescriptions": [
 							"Group by memo tags.",
 							"Group by memo files."
 						],
 						"description": "Determines how items are grouped in Memo Explorer by default.",
-						"default": "Tag",
-						"scope": "application"
-					},
-					"better-memo.view.defaultExpandPrimaryGroups": {
-						"order": 221,
-						"title": "Expand Primary Groups by Default",
-						"type": "boolean",
-						"description": "Expand Memo Explorer primary groups by default.",
-						"default": true,
-						"scope": "application"
-					},
-					"better-memo.view.defaultExpandSecondaryGroups": {
-						"order": 222,
-						"title": "Expand Secondary Groups by Default",
-						"type": "boolean",
-						"description": "Expand Memo Explorer secondary groups by default.",
-						"default": true,
+						"default": "tag",
 						"scope": "application"
 					}
 				}

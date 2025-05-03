@@ -7,9 +7,8 @@ import { Lang } from "./lang";
 export namespace Memo {
 	type MemoMeta = {
 		doc: TextDocument;
-		lang: string;
-		file: string;
 		path: string;
+		lang: string;
 
 		start: Position;
 		end: Position;
@@ -52,9 +51,8 @@ export namespace Memo {
 	}
 
 	function getDocMemos(doc: TextDocument): Memo[] {
-		const lang = doc.languageId;
-		const file = doc.fileName;
 		const path = workspace.asRelativePath(doc.uri);
+		const lang = doc.languageId;
 
 		let memos: Memo[] = [];
 
@@ -86,9 +84,8 @@ export namespace Memo {
 
 				meta: {
 					doc,
-					lang,
-					file,
 					path,
+					lang,
 
 					start,
 					end,

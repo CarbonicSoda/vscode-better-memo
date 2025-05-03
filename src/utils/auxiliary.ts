@@ -1,23 +1,24 @@
 export namespace Aux.object {
-	type Key = number | string | symbol;
-
 	/**
-	 * Polyfill implementation of Object.groupBy()
+	 * Similar to Object.groupBy()
 	 *
-	 * @param group key of object or a callback returning a symbol for grouping
-	 * @returns `obj[group]` | `group(obj)` as keys and corresponding objects as values
+	 * @param grouper callback for group keys
+	 * @returns ``grouper(obj)` as keys and corresponding objects as values
 	 */
-	export function group<T extends { [key: Key]: any }>(
-		objs: T[],
-		group: Key | ((obj: T, i: number) => Key),
-	): { [group: Key]: T[] } {
-		const groups: { [group: Key]: T[] } = {};
+	export function group<O extends { [key: string]: any }, V>(
+		objs: O[],
+		grouper: (obj: O, i: number) => V,
+	): Map<V, O[]> {
+		const groups: Map<V, O[]> = new Map();
 
 		objs.forEach((obj, i) => {
-			const grouper = typeof group === "function" ? group(obj, i) : obj[group];
+			const group =
+				typeof grouper === "function"
+					? grouper(obj, i)
+					: obj[grouper as keyof O];
 
-			groups[grouper] ??= [];
-			groups[grouper].push(obj);
+			if (!groups.has(group)) groups.set(group, []);
+			groups.get(group)!.push(obj);
 		});
 
 		return groups;

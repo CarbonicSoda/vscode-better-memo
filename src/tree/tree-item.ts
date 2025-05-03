@@ -4,27 +4,38 @@ import {
 	Range,
 	Selection,
 	ThemeIcon,
-	TreeItem,
 	TreeItemCollapsibleState,
 	Uri,
+	TreeItem as VSTreeItem,
 	window,
 	workspace,
 } from "vscode";
 
-import { Engine } from "./engine";
-import { Aux } from "./utils/auxiliary";
-import { Colors } from "./utils/colors";
-import { FileEdit } from "./utils/file-edit";
+import { Memo } from "../engine/memo";
+import { Tag } from "../engine/tag";
+import { Aux } from "../utils/auxiliary";
+import { Colors } from "../utils/colors";
+import { FileEdit } from "../utils/file-edit";
 
-/**
- * Treeview item types and classes for {@link ExplorerView}
- */
-export namespace ExplorerItems {
-	/**
-	 * Base class for {@link ExplorerView} tree items
-	 */
-	class ExplorerItem<P extends undefined | ExplorerItem<any>> extends TreeItem {
-		constructor(label: string, expand: boolean | null, public parent?: P) {
+export namespace TreeItem {
+	export type PrimaryType = TagItem<"primary"> | FileItem<"primary">;
+
+	export type SecondaryType = TagItem<"secondary"> | FileItem<"secondary">;
+
+	export type InnerType = PrimaryType | SecondaryType;
+
+	export type MemoType = MemoItem<"tag"> | MemoItem<"file">;
+
+	export type ItemType = InnerType | MemoType;
+
+	class ExplorerItem<
+		P extends undefined | ExplorerItem<undefined | ExplorerItem<undefined>>,
+	> extends VSTreeItem {
+		constructor(
+			public label: string,
+			expand: boolean | null,
+			public parent: P,
+		) {
 			super(
 				label,
 				expand === null
@@ -36,36 +47,29 @@ export namespace ExplorerItems {
 		}
 	}
 
-	/**
-	 * Base class for {@link ExplorerView} inner items
-	 */
 	class InnerItem<
-		P extends undefined | InnerItem<any, any>,
-		C extends
-			| InnerItem<any, any>
-			| MemoItem<TagItem<"secondary"> | FileItem<"secondary">>,
+		P extends undefined | InnerItem<undefined>,
 	> extends ExplorerItem<P> {
-		children: C[] = [];
+		children: (P extends undefined
+			? TagItem<"secondary"> | FileItem<"secondary">
+			: MemoItem<"tag" | "file">)[] = [];
 
 		constructor(
 			public contextValue: "tag" | "file",
 
 			label: string,
 			expand: boolean,
-
-			parent?: P,
+			parent: P,
 		) {
 			super(label, expand, parent);
 		}
 
-		/**
-		 * Mark all memos under as completed
-		 * @param options.noConfirm dont ask for confirmation
-		 */
-		async $complete(options?: { noConfirm?: boolean }): Promise<void> {
-			const memos = this.children as MemoItem<
-				TagItem<"secondary"> | FileItem<"secondary">
-			>[];
+		async complete(options?: { noConfirm?: boolean }): Promise<void> {
+			if (!this.children[0] || !("children" in this.children[0])) return;
+
+			const memos = (
+				this.children as (TagItem<"secondary"> | FileItem<"secondary">)[]
+			).flatMap((child) => child.children);
 
 			if (!options?.noConfirm) {
 				const prompt = `Are you sure you want to proceed?
@@ -86,12 +90,8 @@ export namespace ExplorerItems {
 		}
 	}
 
-	/**
-	 * {@link InnerItem} representing a memo tag
-	 */
 	export class TagItem<T extends "primary" | "secondary"> extends InnerItem<
-		T extends "primary" ? undefined : FileItem<"primary">,
-		T extends "primary" ? FileItem<"secondary"> : MemoItem<TagItem<"secondary">>
+		T extends "primary" ? undefined : FileItem<"primary">
 	> {
 		constructor(
 			tag: string,
@@ -101,16 +101,12 @@ export namespace ExplorerItems {
 		) {
 			super("tag", tag, expand, parent);
 
-			this.iconPath = new ThemeIcon("bookmark", Engine.tags.colors[tag]);
+			this.iconPath = new ThemeIcon("bookmark", Tag.data.colors[tag]);
 		}
 	}
 
-	/**
-	 * {@link InnerItem} representing a watched file
-	 */
 	export class FileItem<T extends "primary" | "secondary"> extends InnerItem<
-		T extends "primary" ? undefined : TagItem<"primary">,
-		T extends "primary" ? TagItem<"secondary"> : MemoItem<FileItem<"secondary">>
+		T extends "primary" ? undefined : TagItem<"primary">
 	> {
 		iconPath = ThemeIcon.File;
 
@@ -125,9 +121,6 @@ export namespace ExplorerItems {
 			super("file", path, expand, parent);
 		}
 
-		/**
-		 * View action to navigate to the file
-		 */
 		async navigate(): Promise<void> {
 			const editor = await window.showTextDocument(this.resourceUri);
 
@@ -138,12 +131,9 @@ export namespace ExplorerItems {
 		}
 	}
 
-	/**
-	 * Class extending {@link ExplorerItem} representing a Memo's item
-	 */
-	export class MemoItem<
-		P extends TagItem<"secondary"> | FileItem<"secondary">,
-	> extends ExplorerItem<P> {
+	export class MemoItem<T extends "tag" | "file"> extends ExplorerItem<
+		T extends "tag" ? TagItem<"secondary"> : FileItem<"secondary">
+	> {
 		contextValue = "memo";
 
 		command = {
@@ -154,10 +144,10 @@ export namespace ExplorerItems {
 		};
 
 		constructor(
-			public memo: Engine.Memo,
+			public memo: Memo.Memo,
 			urgency: number,
 
-			parent: P,
+			parent: T extends "tag" ? TagItem<"secondary"> : FileItem<"secondary">,
 		) {
 			super(memo.content, null, parent);
 
@@ -169,7 +159,7 @@ export namespace ExplorerItems {
 				}`,
 			);
 
-			const color = Engine.tags.colors[memo.tag];
+			const color = Tag.data.colors[memo.tag];
 			this.iconPath =
 				memo.priority === 0
 					? new ThemeIcon("circle-filled", color)
@@ -179,13 +169,10 @@ export namespace ExplorerItems {
 					  );
 		}
 
-		/**
-		 * View action to navigate to the memo
-		 */
 		async navigate(): Promise<void> {
 			const memo = this.memo;
 
-			const editor = await window.showTextDocument(memo.meta.doc.uri);
+			const editor = await window.showTextDocument(memo.meta.doc);
 
 			const pos = memo.meta.end;
 
@@ -193,12 +180,9 @@ export namespace ExplorerItems {
 			editor.revealRange(new Range(pos, pos));
 		}
 
-		/**
-		 * Mark memo as completed
-		 */
 		async complete(): Promise<void> {
 			const memo = this.memo;
-			const doc = await workspace.openTextDocument(memo.meta.file);
+			const doc = memo.meta.doc;
 
 			const removeLine =
 				memo.meta.line < doc.lineCount - 1 &&
