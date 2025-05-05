@@ -14,9 +14,8 @@
 		"noEmit": true,
 		"sourceMap": true,
 
-		//MO DEV no unused stuff off
-		// "noUnusedLocals": true,
-		// "noUnusedParameters": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
 		"noFallthroughCasesInSwitch": true
 	}
 }
