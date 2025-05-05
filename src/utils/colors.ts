@@ -120,8 +120,8 @@ export namespace Colors {
 		let deltaH = deltaA * deltaA + deltaB * deltaB - deltaC * deltaC;
 		deltaH = deltaH < 0 ? 0 : Math.sqrt(deltaH);
 
-		const sc = 1.0 + 0.045 * c1;
-		const sh = 1.0 + 0.015 * c1;
+		const sc = 1 + 0.045 * c1;
+		const sh = 1 + 0.015 * c1;
 
 		const deltaLKlsl = deltaL / 1.0;
 		const deltaCkcsc = deltaC / sc;

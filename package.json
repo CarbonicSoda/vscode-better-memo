@@ -2,7 +2,7 @@
 	"name": "better-memo",
 	"displayName": "Better Memo",
 	"description": "Automatic Comment Curation for Developers",
-	"version": "3.0.3",
+	"version": "3.0.4",
 	"publisher": "carbonsoda",
 	"author": {
 		"name": "David W."
@@ -360,20 +360,20 @@
 						"order": 6,
 						"title": "Scan Delay",
 						"type": "integer",
-						"minimum": 500,
-						"maximum": 1000000,
+						"minimum": 100,
+						"maximum": 10000,
 						"description": "Configures the delay between document scans, which scans the current active document, in ms.",
-						"default": 2000,
+						"default": 500,
 						"scope": "application"
 					},
 					"better-memo.cleanScanDelay": {
 						"order": 7,
 						"title": "Clean Scan Delay",
 						"type": "integer",
-						"minimum": 5000,
-						"maximum": 10000000,
+						"minimum": 1000,
+						"maximum": 100000,
 						"description": "Configures the delay between clean rescans, which prevents potential event listener failures, in ms.",
-						"default": 60000,
+						"default": 10000,
 						"scope": "application"
 					}
 				}

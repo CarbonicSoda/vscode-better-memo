@@ -10,10 +10,6 @@ export namespace Tag {
 
 	export let data: { tags: string[]; colors: TagColors } = getData();
 
-	export function includes(tag: string): boolean {
-		return !!data.colors[tag];
-	}
-
 	export function isValid(tag: string): boolean {
 		return RegExp(`^[^\\s${Lang.data.closersRE}!]+$`).test(tag);
 	}
