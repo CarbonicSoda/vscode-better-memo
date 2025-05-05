@@ -26,7 +26,7 @@ export function initTree() {
 		provider.refresh(expand);
 	}
 
-	Config.onChange("view.defaultView", (view: "tag" | "file") => {
+	Config.onChange("defaultView", (view: "tag" | "file") => {
 		provider.view = view;
 		updateView();
 	});

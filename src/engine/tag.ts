@@ -19,7 +19,7 @@ export namespace Tag {
 
 		for (const { tag } of Memo.data.memos) colors[tag] = Colors.hash(tag);
 
-		const customTags = Config.get("general.customTags") as {
+		const customTags = Config.get("customTags") as {
 			[tag: string]: string;
 		};
 

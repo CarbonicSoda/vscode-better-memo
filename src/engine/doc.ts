@@ -34,8 +34,8 @@ export namespace Doc {
 	}
 
 	export async function getData(): Promise<typeof data> {
-		const watch = `{${Config.get("fetcher.watch").join(",")}}`;
-		const ignore = `{${Config.get("fetcher.ignore").join(",")}}`;
+		const watch = `{${Config.get("watch").join(",")}}`;
+		const ignore = `{${Config.get("ignore").join(",")}}`;
 
 		const uris = await workspace.findFiles(watch, ignore);
 		const textDocs = (

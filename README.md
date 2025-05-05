@@ -33,7 +33,7 @@ For example, the following (line 2) is a valid Memo in JS:
 > **e.g.** `//` will be replaced by `#` in Python;  
 > **e.g.** `<!-- MO TAG ... -->` is used in HTML; You can configure custom
 > comment-delimiters for specific languages **e.g.** ANTLR via
-> `better-memo.general.customLangs`.
+> `better-memo.customLangs`.
 
 > A Memo doesn't necessarily need to have content.  
 > **e.g.** If some code is left to be cleaned up, you could simply add
@@ -107,7 +107,7 @@ associated with that tag. The color will also serve as the highlighting color
 for Memos within documents.
 
 > Users can set custom colors for specific tags in the
-> `better-memo.general.customTags` setting.  
+> `better-memo.customTags` setting.  
 > **e.g.** The preset tags are _TODO_, _FIX_, _TEST_, _DEV_ and _REFACTOR_.
 
 > The final colors used may differ from the expected colors, this is _intended_

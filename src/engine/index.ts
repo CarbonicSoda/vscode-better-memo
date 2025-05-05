@@ -10,18 +10,18 @@ import { Scan } from "./scan";
 import { Tag } from "./tag";
 
 export async function initEngine(): Promise<void> {
-	Config.onChange("general.customTags", () => {
+	Config.onChange("customTags", () => {
 		Tag.data = Tag.getData();
 		updateView();
 	});
 
-	Config.onChange("general.customLangs", async () => {
+	Config.onChange("customLangs", async () => {
 		Lang.data = Lang.getData();
 		await Scan.filesChanged();
 		updateView();
 	});
 
-	Config.onChange(["fetcher.watch", "fetcher.ignore"], async () => {
+	Config.onChange(["watch", "ignore"], async () => {
 		await Scan.filesChanged();
 		updateView();
 	});
@@ -29,12 +29,12 @@ export async function initEngine(): Promise<void> {
 	Config.schedule(async () => {
 		const scanned = await Scan.activeDoc();
 		if (scanned) updateView();
-	}, "fetcher.scanDelay");
+	}, "scanDelay");
 
 	Config.schedule(async () => {
 		await Scan.clean();
 		updateView();
-	}, "fetcher.cleanScanDelay");
+	}, "cleanScanDelay");
 
 	Janitor.add(
 		commands.registerCommand("better-memo.refresh", async () => {

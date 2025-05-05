@@ -50,7 +50,7 @@ export class TreeProvider implements TreeDataProvider<TreeItem.ItemType> {
 	}
 
 	constructor() {
-		this.view = Config.get("view.defaultView") as typeof this.view;
+		this.view = Config.get("defaultView") as typeof this.view;
 	}
 
 	items: TreeItem.PrimaryType[] = [];

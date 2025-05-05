@@ -20,7 +20,7 @@ export namespace Lang {
 	}
 
 	export function getData(): typeof data {
-		const customLangs = Config.get("general.customLangs") ?? {};
+		const customLangs = Config.get("customLangs") ?? {};
 
 		const delimiters: (typeof data)["delimiters"] = {
 			...PredefinedLangs,

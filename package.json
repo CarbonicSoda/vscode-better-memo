@@ -279,11 +279,10 @@
 		],
 		"configuration": [
 			{
-				"title": "General",
-				"order": 1,
+				"title": "Better Memo",
 				"properties": {
-					"better-memo.general.customTags": {
-						"order": 111,
+					"better-memo.customTags": {
+						"order": 1,
 						"title": "Custom Tags",
 						"type": "object",
 						"uniqueItems": true,
@@ -301,24 +300,18 @@
 						},
 						"scope": "application"
 					},
-					"better-memo.general.customLangs": {
-						"order": 121,
+					"better-memo.customLangs": {
+						"order": 2,
 						"title": "Custom Languages",
 						"type": "object",
 						"additionalProperties": {
 							"type": "object"
 						},
-						"markdownDescription": "Defines cutom languages to support.\n\nThe key will be the languageid (visible by clicking on the status bar langauge item), and the value be the comment format in it.\nValid formats are e.g. `{ \"open\": \"//\" }` and `{ \"open\": \"/*\", \"close\": \"*/\" }`.",
+						"markdownDescription": "Defines custom languages to support.\n\nThe key being the languageid (via status-bar language mode picker e.g. `bat` and `csharp`), with values being the comment format in it e.g. `{ \"open\": \"//\" }` and `{ \"open\": \"/*\", \"close\": \"*/\" }`.",
 						"scope": "application"
-					}
-				}
-			},
-			{
-				"title": "View",
-				"order": 2,
-				"properties": {
-					"better-memo.view.defaultView": {
-						"order": 211,
+					},
+					"better-memo.defaultView": {
+						"order": 3,
 						"title": "Default View",
 						"type": "string",
 						"enum": [
@@ -326,55 +319,35 @@
 							"file"
 						],
 						"enumDescriptions": [
-							"Group by memo tags.",
-							"Group by memo files."
+							"Group primarily with memo tags.",
+							"Group primarily with memo files."
 						],
-						"description": "Determines how items are grouped in Memo Explorer by default.",
+						"description": "Determines how items are grouped in the explorer by default.",
 						"default": "tag",
 						"scope": "application"
-					}
-				}
-			},
-			{
-				"title": "Actions",
-				"order": 3,
-				"properties": {
-					"better-memo.actions.memoOnNewLine": {
-						"order": 311,
-						"title": "Always Insert New Memos on New Line",
-						"type": "boolean",
-						"markdownDescription": "Always insert new memos on the line above the current line when using the *New Memo on Line* command.",
-						"default": true,
-						"scope": "application"
-					}
-				}
-			},
-			{
-				"title": "Fetcher",
-				"order": 4,
-				"properties": {
-					"better-memo.fetcher.watch": {
-						"order": 411,
+					},
+					"better-memo.watch": {
+						"order": 4,
 						"title": "Watch",
 						"type": "array",
 						"items": {
 							"type": "string"
 						},
-						"markdownDescription": "Configures Memo fetcher file watch glob pattern, for format see [glob pattern reference](https://aka.ms/vscode-glob-patterns/).",
+						"markdownDescription": "Configures memo fetcher file watch glob pattern, for format see [glob pattern reference](https://aka.ms/vscode-glob-patterns/).",
 						"default": [
 							"**/*"
 						],
 						"uniqueItems": true,
 						"scope": "application"
 					},
-					"better-memo.fetcher.ignore": {
-						"order": 412,
+					"better-memo.ignore": {
+						"order": 5,
 						"title": "Ignore",
 						"type": "array",
 						"items": {
 							"type": "string"
 						},
-						"markdownDescription": "Configures Memo fetcher file ignore glob pattern, for format see [glob pattern reference](https://aka.ms/vscode-glob-patterns/).",
+						"markdownDescription": "Configures memo fetcher file ignore glob pattern, for format see [glob pattern reference](https://aka.ms/vscode-glob-patterns/).",
 						"default": [
 							"**/node_modules",
 							"**/out",
@@ -383,38 +356,24 @@
 						"uniqueItems": true,
 						"scope": "application"
 					},
-					"better-memo.fetcher.scanDelay": {
-						"order": 421,
+					"better-memo.scanDelay": {
+						"order": 6,
 						"title": "Scan Delay",
 						"type": "integer",
 						"minimum": 500,
 						"maximum": 1000000,
-						"description": "Configures the delay between casual document scans in ms. Casual scans only scans the currently active document and will not run if document is not changed etc.",
+						"description": "Configures the delay between document scans, which scans the current active document, in ms.",
 						"default": 2000,
 						"scope": "application"
 					},
-					"better-memo.fetcher.cleanScanDelay": {
-						"order": 422,
+					"better-memo.cleanScanDelay": {
+						"order": 7,
 						"title": "Clean Scan Delay",
 						"type": "integer",
 						"minimum": 5000,
 						"maximum": 10000000,
-						"description": "Configures the delay between clean rescans in ms. This prevents potential event listener failures.",
+						"description": "Configures the delay between clean rescans, which prevents potential event listener failures, in ms.",
 						"default": 60000,
-						"scope": "application"
-					}
-				}
-			},
-			{
-				"title": "Other",
-				"order": 5,
-				"properties": {
-					"better-memo.other.enableEditorDecorations": {
-						"order": 511,
-						"title": "Enable Editor Decorations",
-						"type": "boolean",
-						"description": "Enable document decorations such as giving memos higher font-weight and coloring tags with their corresponding colors.",
-						"default": true,
 						"scope": "application"
 					}
 				}
