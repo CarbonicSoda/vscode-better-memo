@@ -1,16 +1,4 @@
-import { writeFileSync } from "fs";
-import {
-	commands,
-	env,
-	Position,
-	Range,
-	TextDocument,
-	UIKind,
-	Uri,
-	window,
-	workspace,
-	WorkspaceEdit,
-} from "vscode";
+import { Position, Range, TextDocument, workspace } from "vscode";
 
 /**
  * Handles complicated logic of hybrid file editing with Node.fs and {@link workspace.fs},
@@ -24,94 +12,62 @@ export namespace FileEdit {
 	/**
 	 * Maps {@link EditRange}s to replacement string
 	 */
-	export type EditEntries = { range: EditRange; edit: string }[];
+	export type Edits = { range: EditRange; replace: string }[];
 
 	/**
-	 * Defines a new edit collection that would be applied at once
+	 * Define a new edit collection that would be applied at once
 	 *
-	 * Text ranges' delta would be calculated internally,
+	 * Text range deltas would be calculated internally,
 	 * using original doc's range is sufficient
 	 */
 	export class Edit {
-		private uriEditsMap: Map<Uri, EditEntries> = new Map();
+		private edits: Map<TextDocument, Edits> = new Map();
+
+		get docs(): TextDocument[] {
+			return Array.from(this.edits.keys());
+		}
 
 		/**
-		 * Replaces text in `range`, `range`.end is not included
+		 * Replace text in `range`, `range`.end is not included
 		 */
-		replace(uri: Uri, range: EditRange | Range, text: string): void {
+		replace(
+			doc: TextDocument,
+			range: EditRange | Range,
+			replace: string,
+		): this {
 			if (range instanceof Range) range = [range.start, range.end];
 
-			if (!this.uriEditsMap.has(uri)) this.uriEditsMap.set(uri, []);
-			this.uriEditsMap
-				.get(uri)!
-				.push({ range: range as EditRange, edit: text });
+			if (!this.edits.has(doc)) this.edits.set(doc, []);
+			this.edits.get(doc)!.push({ range, replace });
+
+			return this;
 		}
 
 		/**
-		 * Deletes text in `range`, `range`.end is not included
+		 * Delete text in `range`, `range`.end is not included
 		 */
-		delete(uri: Uri, range: EditRange | Range): void {
-			this.replace(uri, range, "");
+		delete(doc: TextDocument, range: EditRange | Range): this {
+			return this.replace(doc, range, "");
 		}
 
 		/**
-		 * Applies all previously stacked edits in order hybridly
-		 *
-		 * @param options.openFile open the modified files and use {@link WorkspaceEdit};
+		 * Apply all previously stacked edits in order
 		 */
-		async apply(options?: { openFile?: boolean }): Promise<void> {
-			for (const [uri, fileEdits] of this.uriEditsMap.entries()) {
+		async apply(): Promise<this> {
+			for (const [doc, edits] of this.edits.entries()) {
 				try {
-					await this.editFile(fileEdits, uri, options?.openFile);
+					await this.editDoc(doc, edits);
 				} catch {}
 			}
+			return this;
 		}
 
-		/**
-		 * Applies `edits` to the document with `uri` hybridly
-		 */
-		private async editFile(
-			edits: EditEntries,
-			uri: Uri,
-			openFile?: boolean,
-		): Promise<void> {
-			const doc = await workspace.openTextDocument(uri);
-
-			if (!openFile && !doc.isDirty && env.uiKind !== UIKind.Web) {
-				this.editFileWithFs(edits, doc);
-				return;
-			}
-
-			await window.showTextDocument(doc);
-			await commands.executeCommand(
-				"workbench.action.files.saveWithoutFormatting",
-				doc,
-			);
-
-			const wsEdit = new WorkspaceEdit();
-			for (const [, { range, edit }] of edits.entries()) {
-				let [start, end] = range;
-				if (typeof start === "number") start = doc.positionAt(start);
-				if (typeof end === "number") end = doc.positionAt(end);
-
-				wsEdit.replace(uri, new Range(start, end), edit);
-			}
-
-			await workspace.applyEdit(wsEdit);
-			await commands.executeCommand(
-				"workbench.action.files.saveWithoutFormatting",
-				doc,
-			);
-		}
-
-		/**
-		 * Applies `edits` to the `doc` with Node.fs
-		 */
-		private editFileWithFs(edits: EditEntries, doc: TextDocument): void {
+		private async editDoc(doc: TextDocument, edits: Edits): Promise<void> {
 			let text = doc.getText();
 
 			let delta = 0;
-			for (let { range, edit } of edits) {
+
+			for (let { range, replace: edit } of edits) {
 				let [start, end] = range;
 				if (typeof start !== "number") start = doc.offsetAt(start);
 				if (typeof end !== "number") end = doc.offsetAt(end);
@@ -120,7 +76,7 @@ export namespace FileEdit {
 				delta += end - start - edit.length;
 			}
 
-			writeFileSync(doc.uri.fsPath, text);
+			await workspace.fs.writeFile(doc.uri, new TextEncoder().encode(text));
 		}
 	}
 }

@@ -26,12 +26,18 @@ export async function initEngine(): Promise<void> {
 		updateView();
 	});
 
-	Config.schedule(Scan.activeDoc, "fetcher.scanDelay");
+	Config.schedule(async () => {
+		const scanned = await Scan.activeDoc();
+		if (scanned) updateView();
+	}, "fetcher.scanDelay");
 
-	Config.schedule(Scan.clean, "fetcher.cleanScanDelay");
+	Config.schedule(async () => {
+		await Scan.clean();
+		updateView();
+	}, "fetcher.cleanScanDelay");
 
 	Janitor.add(
-		commands.registerCommand("better-memo.reloadExplorer", async () => {
+		commands.registerCommand("better-memo.refresh", async () => {
 			await Scan.clean();
 			updateView();
 		}),
@@ -50,7 +56,10 @@ export async function initEngine(): Promise<void> {
 			updateView();
 		}),
 
-		workspace.onDidSaveTextDocument(Scan.activeDoc),
+		workspace.onDidSaveTextDocument(async () => {
+			const scanned = await Scan.activeDoc();
+			if (scanned) updateView();
+		}),
 
 		window.onDidChangeActiveColorTheme(() => {
 			Tag.data = Tag.getData();

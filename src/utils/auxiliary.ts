@@ -66,32 +66,35 @@ export namespace Aux.algorithm {
 	 * - If `sorted`[0] > `candid`, returns -1;
 	 * - If `sorted`.length === 0, returns undefined;
 	 *
-	 * @param transform optional function that returns a number for comparison if T is not number
+	 * @param transform optional function that returns T for comparison
+	 * @param compare optional function that returns a number for comparison if T is not number
 	 */
-	export function predecessorSearch<T>(
-		sorted: T[],
-		candid: number,
-		transform: (ele: T) => number = (ele) => Number(ele),
+	export function predecessorSearch<O, T>(
+		candid: T,
+		array: O[],
+		transform: (a: O) => T = (a) => a as unknown as T,
+		compare: (a: T, b: T) => number = (a, b) => +a - +b,
 	): number | undefined {
-		if (sorted.length === 0) return undefined;
+		if (array.length === 0) return undefined;
 
-		const firstEle = transform(sorted[0]);
-		const lastEle = transform(sorted.at(-1)!);
+		const sorted = array.map(transform).sort(compare);
 
-		if (firstEle > candid) return -1;
-		if (firstEle === candid) return 0;
-		if (candid >= lastEle) return sorted.length - 1;
+		const boundsLeft = compare(sorted[0], candid);
+		const boundsRight = compare(candid, sorted.at(-1)!);
+
+		if (boundsLeft === 0) return 0;
+
+		if (boundsLeft > 0) return -1;
+		if (boundsRight > 0) return sorted.length - 1;
 
 		let left = 0;
 		let right = sorted.length - 1;
 
 		while (true) {
 			const mid = Math.trunc((left + right) / 2);
-			const midEle = transform(sorted[mid]);
 
-			if (candid >= midEle) {
-				const nextEle = transform(sorted[mid + 1]);
-				if (nextEle > candid) return mid;
+			if (compare(candid, sorted[mid]) >= 0) {
+				if (compare(sorted[mid + 1], candid) > 0) return mid;
 
 				left = mid + 1;
 				continue;

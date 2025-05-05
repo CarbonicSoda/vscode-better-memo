@@ -64,9 +64,10 @@ export namespace TreeItem {
 			super(label, expand, parent);
 		}
 
-		async complete(options?: { noConfirm?: boolean }): Promise<Memo.Memo[]> {
-			if (!this.children[0] || !("children" in this.children[0])) return [];
-
+		async complete(
+			edit: FileEdit.Edit = new FileEdit.Edit(),
+			options?: { noConfirm?: boolean },
+		): Promise<FileEdit.Edit> {
 			const memos = (
 				this.children as (TagItem<"secondary"> | FileItem<"secondary">)[]
 			).flatMap((child) => child.children);
@@ -82,12 +83,11 @@ export namespace TreeItem {
 					{ modal: true, detail: prompt },
 					"Yes",
 				);
-				if (!confirm) return [];
+				if (!confirm) return edit;
 			}
 
-			for (const memo of memos) await memo.complete();
-
-			return memos.map((item) => item.memo);
+			for (const memo of memos) memo.complete(edit);
+			return edit;
 		}
 	}
 
@@ -181,7 +181,7 @@ export namespace TreeItem {
 			editor.revealRange(new Range(pos, pos));
 		}
 
-		async complete(): Promise<void> {
+		complete(edit: FileEdit.Edit = new FileEdit.Edit()): FileEdit.Edit {
 			const memo = this.memo;
 			const doc = memo.meta.doc;
 
@@ -197,9 +197,7 @@ export namespace TreeItem {
 				? new Position(memo.meta.line + 1, 0)
 				: memo.meta.end;
 
-			const edit = new FileEdit.Edit();
-			edit.delete(doc.uri, new Range(start, end));
-			await edit.apply();
+			return edit.delete(doc, new Range(start, end));
 		}
 	}
 }

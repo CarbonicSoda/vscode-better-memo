@@ -56,7 +56,7 @@
 				"category": "Better Memo"
 			},
 			{
-				"command": "better-memo.reloadExplorer",
+				"command": "better-memo.refresh",
 				"title": "Refresh Explorer",
 				"enablement": "better-memo.init && view.better-memo.memoExplorer.visible",
 				"icon": "$(refresh)",
@@ -64,13 +64,13 @@
 			},
 			{
 				"command": "better-memo.completeAllMemos",
-				"title": "Mark All Memos as Completed",
+				"title": "Complete All Memos",
 				"icon": "$(checklist)",
 				"category": "Better Memo"
 			},
 			{
-				"command": "better-memo.toggleExplorerFold",
-				"title": "Toggle Explorer Fold",
+				"command": "better-memo.toggleFold",
+				"title": "Toggle Fold",
 				"enablement": "view.better-memo.memoExplorer.visible && better-memo.init && !better-memo.noMemos",
 				"icon": "$(fold)",
 				"category": "Better Memo"
@@ -84,27 +84,27 @@
 			},
 			{
 				"command": "better-memo.completeTag",
-				"title": "Mark All Memos of Tag as Completed",
+				"title": "Complete All Memos of Tag",
 				"enablement": "view.better-memo.memoExplorer.visible && better-memo.explorerView == tag && viewItem == tag",
 				"icon": "$(check-all)",
 				"category": "Better Memo"
 			},
 			{
 				"command": "better-memo.completeTagNoConfirm",
-				"title": "Mark All Memos of Tag as Completed",
+				"title": "Complete All Memos of Tag",
 				"enablement": "view.better-memo.memoExplorer.visible && better-memo.explorerView == tag && viewItem == tag",
 				"category": "Better Memo"
 			},
 			{
 				"command": "better-memo.completeFile",
-				"title": "Mark All Memos in File as Completed",
+				"title": "Complete All Memos in File",
 				"enablement": "view.better-memo.memoExplorer.visible && better-memo.explorerView == file && viewItem == file",
 				"icon": "$(check-all)",
 				"category": "Better Memo"
 			},
 			{
 				"command": "better-memo.completeFileNoConfirm",
-				"title": "Mark All Memos in File as Completed",
+				"title": "Complete All Memos in File",
 				"enablement": "view.better-memo.memoExplorer.visible && better-memo.explorerView == file && viewItem == file",
 				"category": "Better Memo"
 			},
@@ -116,7 +116,7 @@
 			},
 			{
 				"command": "better-memo.completeMemo",
-				"title": "Mark Memo as Completed",
+				"title": "Complete Memo",
 				"enablement": "view.better-memo.memoExplorer.visible && viewItem == memo",
 				"icon": "$(check)",
 				"category": "Better Memo"
@@ -128,14 +128,14 @@
 				"category": "Better Memo"
 			},
 			{
-				"command": "better-memo.completeNearestMemo",
-				"title": "Mark Memo(s) Next to Cursor(s) as Completed",
+				"command": "better-memo.completeMemoNearCursor",
+				"title": "Complete Memo Near Cursor",
 				"enablement": "editorIsOpen",
 				"category": "Better Memo"
 			},
 			{
-				"command": "better-memo.navigateToLastMemo",
-				"title": "Navigate to Last Memo",
+				"command": "better-memo.navigateToPrevMemo",
+				"title": "Navigate to Prev Memo",
 				"enablement": "editorIsOpen",
 				"category": "Better Memo"
 			},
@@ -158,7 +158,7 @@
 				"key": "Ctrl+Shift+V"
 			},
 			{
-				"command": "better-memo.reloadExplorer",
+				"command": "better-memo.refresh",
 				"when": "focusedView == 'better-memo.memoExplorer' && better-memo.init",
 				"key": "Ctrl+R"
 			},
@@ -167,11 +167,11 @@
 				"key": "Alt+M"
 			},
 			{
-				"command": "better-memo.completeNearestMemo",
+				"command": "better-memo.completeMemoNearCursor",
 				"key": "Alt+Shift+M"
 			},
 			{
-				"command": "better-memo.navigateToLastMemo",
+				"command": "better-memo.navigateToPrevMemo",
 				"key": "Ctrl+Alt+M Ctrl+Alt+,"
 			},
 			{
@@ -209,7 +209,7 @@
 					"group": "navigation@1"
 				},
 				{
-					"command": "better-memo.reloadExplorer",
+					"command": "better-memo.refresh",
 					"when": "view == better-memo.memoExplorer && better-memo.init",
 					"group": "navigation@2"
 				},
@@ -219,7 +219,7 @@
 					"group": "navigation@3"
 				},
 				{
-					"command": "better-memo.toggleExplorerFold",
+					"command": "better-memo.toggleFold",
 					"when": "view == better-memo.memoExplorer && better-memo.init && !better-memo.noMemos",
 					"group": "navigation@4"
 				}
@@ -273,7 +273,7 @@
 			},
 			{
 				"view": "better-memo.memoExplorer",
-				"contents": "Oops, cannot spot any memos throughout the universe.\nConsider spicing up the place with some memos!\nIf this is not intended, \n[Reload Explorer](command:better-memo.reloadExplorer)\nor [inspect fetcher configurations](command:workbench.action.openSettings?[\"better-memo.fetcher\"]).",
+				"contents": "Oops, cannot spot any memos throughout the universe.\nConsider spicing up the place with some memos!\nIf this is not intended, \n[Reload Explorer](command:better-memo.refresh)\nor [inspect fetcher configurations](command:workbench.action.openSettings?[\"better-memo.fetcher\"]).",
 				"when": "workspaceFolderCount != 0 && better-memo.init && better-memo.noMemos"
 			}
 		],

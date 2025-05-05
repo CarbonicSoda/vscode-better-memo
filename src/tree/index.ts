@@ -1,12 +1,16 @@
 import { commands, TreeItemCollapsibleState, window } from "vscode";
 
-import { TreeProvider } from "./tree-provider";
-import { Config } from "../utils/config";
-import { Janitor } from "../utils/janitor";
-import { EventEmitter } from "../utils/event-emitter";
-import { TreeItem } from "./tree-item";
+import { Doc } from "../engine/doc";
+import { Format } from "../engine/format";
 import { Memo } from "../engine/memo";
 import { Scan } from "../engine/scan";
+import { Aux } from "../utils/auxiliary";
+import { Config } from "../utils/config";
+import { EventEmitter } from "../utils/event-emitter";
+import { FileEdit } from "../utils/file-edit";
+import { Janitor } from "../utils/janitor";
+import { TreeItem } from "./tree-item";
+import { TreeProvider } from "./tree-provider";
 
 export function initTree() {
 	const provider = new TreeProvider();
@@ -17,29 +21,6 @@ export function initTree() {
 	});
 
 	const expand = { primary: true, secondary: true };
-	function updateFold(newExpand: typeof expand): void {
-		for (const item of provider.items) {
-			item.collapsibleState = newExpand.primary
-				? TreeItemCollapsibleState.Expanded
-				: TreeItemCollapsibleState.Collapsed;
-
-			if (item.label.endsWith("\u200b")) {
-				item.label = item.label.slice(0, -1);
-			} else {
-				item.label = item.label + "\u200b";
-			}
-
-			for (const child of item.children) {
-				child.collapsibleState = newExpand.secondary
-					? TreeItemCollapsibleState.Expanded
-					: TreeItemCollapsibleState.Collapsed;
-			}
-		}
-		provider.flush();
-
-		expand.primary = newExpand.primary;
-		expand.secondary = newExpand.secondary;
-	}
 
 	function updateView(): void {
 		provider.refresh(expand);
@@ -50,28 +31,16 @@ export function initTree() {
 		updateView();
 	});
 
-	async function completeTag(
-		tagItem: TreeItem.TagItem<"primary">,
-		options?: { noConfirm?: boolean },
+	async function completeItem(
+		item: TreeItem.TagItem<"primary"> | TreeItem.FileItem<"primary">,
+		options?: {
+			noConfirm?: boolean;
+		},
 	): Promise<void> {
-		const memos = await tagItem.complete(options);
-		if (memos.length === 0) return;
+		const { docs } = await (await item.complete(undefined, options)).apply();
+		if (docs.length === 0) return;
 
-		const docs = Array.from(new Set(memos.map((memo) => memo.meta.doc)));
-		for (const doc of docs) Scan.doc(doc);
-
-		updateView();
-	}
-
-	async function completeFile(
-		fileItem: TreeItem.FileItem<"primary">,
-		options?: { noConfirm?: boolean },
-	): Promise<void> {
-		const memos = await fileItem.complete(options);
-		if (memos.length === 0) return;
-
-		Scan.doc(memos[0].meta.doc);
-
+		await Scan.docs(docs, { flush: true });
 		updateView();
 	}
 
@@ -80,15 +49,30 @@ export function initTree() {
 
 		EventEmitter.subscribe("UpdateView", updateView),
 
-		// window.onDidChangeTextEditorSelection((ev) =>
-		// 	onChangeEditorSelection(ev.textEditor),
-		// ),
+		commands.registerCommand("better-memo.toggleFold", () => {
+			[expand.primary, expand.secondary] = [
+				!expand.secondary,
+				expand.primary && !expand.secondary,
+			];
 
-		commands.registerCommand("better-memo.toggleExplorerFold", () => {
-			updateFold({
-				primary: !expand.primary || !expand.secondary,
-				secondary: expand.primary && !expand.secondary,
-			});
+			for (const item of provider.items) {
+				item.collapsibleState = expand.primary
+					? TreeItemCollapsibleState.Expanded
+					: TreeItemCollapsibleState.Collapsed;
+
+				if (item.label.endsWith("\u200b")) {
+					item.label = item.label.slice(0, -1);
+				} else {
+					item.label = item.label + "\u200b";
+				}
+
+				for (const child of item.children) {
+					child.collapsibleState = expand.secondary
+						? TreeItemCollapsibleState.Expanded
+						: TreeItemCollapsibleState.Collapsed;
+				}
+			}
+			provider.flush();
 		}),
 
 		commands.registerCommand("better-memo.switchToTagView", () => {
@@ -107,57 +91,46 @@ export function initTree() {
 			},
 		),
 
-		commands.registerCommand(
-			"better-memo.completeTag",
-			(tagItem: TreeItem.TagItem<"primary">) => completeTag(tagItem),
-		),
+		commands.registerCommand("better-memo.completeTag", completeItem),
 		commands.registerCommand(
 			"better-memo.completeTagNoConfirm",
-			(tagItem: TreeItem.TagItem<"primary">) => {
-				completeTag(tagItem, { noConfirm: true });
+			async (tagItem: TreeItem.TagItem<"primary">) => {
+				completeItem(tagItem, { noConfirm: true });
 			},
 		),
 
-		commands.registerCommand(
-			"better-memo.completeFile",
-			(fileItem: TreeItem.FileItem<"primary">) => completeFile(fileItem),
-		),
+		commands.registerCommand("better-memo.completeFile", completeItem),
 		commands.registerCommand(
 			"better-memo.completeFileNoConfirm",
-			(fileItem: TreeItem.FileItem<"primary">) => {
-				completeFile(fileItem, { noConfirm: true });
+			async (fileItem: TreeItem.FileItem<"primary">) => {
+				completeItem(fileItem, { noConfirm: true });
 			},
 		),
 
-		commands.registerCommand("better-memo.completeAllMemos", () => {
-			// const memoCount = Memo.data.memos.length;
-			// const primaryItems = provider.items;
-			// const completionDetail = `Are you sure you want to proceed?
-			// 		This will mark all ${memoCount} memo${Aux.string.plural(memoCount)} ${
-			// 	provider.viewType === "File" ? "in" : "under"
-			// } ${
-			// 	primaryItems.length
-			// } ${provider.viewType.toLowerCase()}${Aux.string.plural(
-			// 	primaryItems,
-			// )} as completed.`;
-			// const option = await window.showInformationMessage(
-			// 	"Confirm Completion of Memos",
-			// 	{ modal: true, detail: completionDetail },
-			// 	"Yes",
-			// );
-			// if (!option) {
-			// 	unsuppressUpdate();
-			// 	return;
-			// }
-			// for (const item of primaryItems) {
-			// 	await item.markMemosAsCompleted({
-			// 		noConfirm: true,
-			// 		_noExtraTasks: true,
-			// 	});
-			// }
-			// // MemoEngine.forgetAllMemos();
-			// provider.removeAllItems();
-			// refresh();
+		commands.registerCommand("better-memo.completeAllMemos", async () => {
+			const items = provider.items;
+			const memos = Memo.data.memos;
+
+			const completionDetail = `Are you sure you want to proceed?
+					This will mark all ${memos.length} memo${Aux.string.plural(memos)} ${
+				provider.view === "tag" ? "of" : "in"
+			} ${items.length} ${provider.view}${Aux.string.plural(
+				items,
+			)} as completed.`;
+
+			const confirm = await window.showInformationMessage(
+				"Confirm Completion of Memos",
+				{ modal: true, detail: completionDetail },
+				"Yes",
+			);
+			if (!confirm) return;
+
+			const edit = new FileEdit.Edit();
+			for (const item of items) await item.complete(edit, { noConfirm: true });
+			await edit.apply();
+
+			await Scan.docs(edit.docs, { flush: true });
+			updateView();
 		}),
 
 		commands.registerCommand(
@@ -167,58 +140,45 @@ export function initTree() {
 
 		commands.registerCommand(
 			"better-memo.completeMemo",
-			(memoItem: TreeItem.MemoItem<"tag" | "file">) => {
-				memoItem.complete();
+			async (memoItem: TreeItem.MemoItem<"tag" | "file">) => {
+				await memoItem.complete().apply();
+
+				await Scan.doc(memoItem.memo.meta.doc, { flush: true });
+				updateView();
 			},
 		),
+
+		window.onDidChangeTextEditorSelection((ev) => {
+			if (!explorer.visible) return;
+
+			const editor = ev.textEditor;
+			const doc = editor.document;
+			if (!Doc.includes(doc)) return;
+
+			const docMemos = provider.memos.filter(
+				(item) => item.memo.meta.doc === doc,
+			);
+			if (docMemos.length === 0) return;
+
+			let active = editor.selection.active;
+			if (!active) return;
+			if (Format.getTemplate(doc.languageId).tail) {
+				active = active.translate(0, -1);
+			}
+
+			let i = Aux.algorithm.predecessorSearch(
+				active,
+				docMemos,
+				(item) => item.memo.meta.start,
+				(a, b) => a.compareTo(b),
+			);
+			if (i === undefined) return;
+			if (i === -1) i = 0;
+
+			explorer.reveal(docMemos[i]);
+		}),
 	);
 
 	updateView();
 	commands.executeCommand("setContext", "better-memo.init", true);
 }
-
-// 	/**
-// 	 * Inits Memo Explorer provider, view and event listeners
-// 	 */
-// 	export function init(): void {
-
-// 		provider.reloadItems();
-
-// 		// const editor = window.activeTextEditor;
-// 		// if (editor?.selection) onChangeEditorSelection(editor);
-// 	}
-
-// 	// /**
-// 	//  * View action to mark all known Memos to be completed
-// 	//  */
-// 	// async function completeAllMemos(): Promise<void> {
-// 	// 	suppressUpdate();
-// 	// 	unsuppressUpdate();
-// 	// }
-
-// 	// /**
-// 	//  * Selects the MemoItem right before editor selection in Memo Explorer
-// 	//  */
-// 	// function onChangeEditorSelection(editor: TextEditor): void {
-// 	// 	if (!explorer.visible) return;
-
-// 	// 	const doc = editor.document;
-// 	// 	if (!MemoEngine.isDocWatched(doc)) return;
-
-// 	// 	const memoItems = provider.getMemoItems();
-// 	// 	const docMemoItems = memoItems.filter(
-// 	// 		(memoItem) => memoItem.memo.fileName === doc.fileName,
-// 	// 	);
-// 	// 	if (docMemoItems.length === 0) return;
-
-// 	// 	let offset = doc.offsetAt(editor.selection.active);
-// 	// 	if (MemoEngine.getTemplate(doc.languageId).tail) offset--;
-// 	// 	let i = Aux.algorithm.predecessorSearch(
-// 	// 		docMemoItems.sort((m1, m2) => m1.memo.offset - m2.memo.offset),
-// 	// 		offset,
-// 	// 		(memoItem) => memoItem.memo.offset,
-// 	// 	);
-// 	// 	if (i === -1) i = 0;
-// 	// 	explorer.reveal(docMemoItems[i]);
-// 	// }
-// }

@@ -12,11 +12,7 @@ export namespace Format {
 		const edit = new FileEdit.Edit();
 
 		for (const memo of list) {
-			edit.replace(
-				doc.uri,
-				[memo.meta.start, memo.meta.end],
-				toFormatted(memo),
-			);
+			edit.replace(doc, [memo.meta.start, memo.meta.end], toFormatted(memo));
 		}
 
 		await edit.apply();

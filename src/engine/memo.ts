@@ -37,26 +37,36 @@ export namespace Memo {
 		return data.docmap.get(doc) ?? [];
 	}
 
-	export function getData(rescan?: TextDocument[]): typeof data {
-		const docmap: (typeof data)["docmap"] = rescan ? data.docmap : new Map();
+	export async function getData(options?: {
+		rescan?: TextDocument[];
+		flush?: boolean;
+	}): Promise<typeof data> {
+		const docmap: (typeof data)["docmap"] = options?.rescan
+			? data.docmap
+			: new Map();
 
-		for (const doc of rescan ?? Doc.data.docs) {
-			if (rescan && !Doc.includes(doc)) docmap.delete(doc);
-			else docmap.set(doc, getDocMemos(doc));
-		}
+		await Aux.async.map(options?.rescan ?? Doc.data.docs, async (doc) => {
+			if (options?.rescan && !Doc.includes(doc)) docmap.delete(doc);
+			else docmap.set(doc, await getDocMemos(doc, options));
+		});
 
 		const memos = Array.from(docmap.values()).flat();
 
 		return { memos, docmap };
 	}
 
-	function getDocMemos(doc: TextDocument): Memo[] {
+	async function getDocMemos(
+		doc: TextDocument,
+		options?: { flush?: boolean },
+	): Promise<Memo[]> {
 		const path = workspace.asRelativePath(doc.uri);
 		const lang = doc.languageId;
 
 		let memos: Memo[] = [];
 
-		const src = doc.getText();
+		const src = options?.flush
+			? new TextDecoder().decode(await workspace.fs.readFile(doc.uri))
+			: doc.getText();
 		const matchRE = getMemoRE(doc.languageId);
 
 		for (const match of src.matchAll(matchRE)) {
@@ -109,6 +119,6 @@ export namespace Memo {
 			Lang.data.closersRE
 		}]+)[\\t ]*(?<priority>!*)(?<content>.*${close ? "?" : ""})${close}`;
 
-		return RegExp(matchPattern, "gim");
+		return RegExp(matchPattern, "gi");
 	}
 }
