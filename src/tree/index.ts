@@ -155,10 +155,12 @@ export function initTree() {
 			const doc = editor.document;
 			if (!Doc.includes(doc)) return;
 
-			const docMemos = provider.memos.filter(
-				(item) => item.memo.meta.doc === doc,
+			const memos = provider.memos.filter((item) => item.memo.meta.doc === doc);
+			if (memos.length === 0) return;
+
+			memos.sort((itemA, itemB) =>
+				itemA.memo.meta.start.compareTo(itemB.memo.meta.start),
 			);
-			if (docMemos.length === 0) return;
 
 			let active = editor.selection.active;
 			if (!active) return;
@@ -168,14 +170,14 @@ export function initTree() {
 
 			let i = Aux.algorithm.predecessorSearch(
 				active,
-				docMemos,
+				memos,
 				(item) => item.memo.meta.start,
 				(a, b) => a.compareTo(b),
 			);
 			if (i === undefined) return;
 			if (i === -1) i = 0;
 
-			explorer.reveal(docMemos[i]);
+			explorer.reveal(memos[i]);
 		}),
 	);
 

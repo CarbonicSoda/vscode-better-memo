@@ -7,7 +7,7 @@ import VSCodeColors from "../json/vscode-colors.json";
  */
 export namespace Colors {
 	const VSCodeColorsRgb: {
-		[themeKind: string]: { [colorName: string]: RGB3 };
+		[themeKind: string]: { [colorName: string]: Rgb };
 	} = {};
 	for (const [themeKind, colors] of Object.entries(VSCodeColors)) {
 		VSCodeColorsRgb[themeKind] = {};
@@ -20,7 +20,7 @@ export namespace Colors {
 	/**
 	 * RGB entry
 	 */
-	export type RGB3 = [R: number, G: number, B: number];
+	export type Rgb = [R: number, G: number, B: number];
 
 	/**
 	 * @returns the closest {@link ThemeColor} to `rgbOrHex`, interpolated in RGB color space with DeltaE
@@ -30,12 +30,12 @@ export namespace Colors {
 	 *
 	 * A demo of original & filtered colors could be seen at https://www.desmos.com/3d/wf8kxmcols
 	 *
-	 * @param RGBorHEX `RGB3`: [R, G, B], `"#rrggbb"` or `"#rgb"` (case insensitive, "#" could be omitted)
+	 * @param RgbOrHex `RGB3`: [R, G, B], `"#rrggbb"` or `"#rgb"` (case insensitive, "#" could be omitted)
 	 */
-	export function interpolate(RGBorHEX: RGB3 | string): ThemeColor {
+	export function interpolate(RgbOrHex: Rgb | string): ThemeColor {
 		const colorThemeKind = ColorThemeKind[window.activeColorTheme.kind];
 
-		const rgb = typeof RGBorHEX === "string" ? hexToRgb(RGBorHEX) : RGBorHEX;
+		const rgb = typeof RgbOrHex === "string" ? hexToRgb(RgbOrHex) : RgbOrHex;
 
 		let bestDeltaE = Infinity;
 		let best = "";
@@ -72,7 +72,7 @@ export namespace Colors {
 	 * Hash function is from https://github.com/RolandR/ColorHash
 	 * modified to make permutations of characters to give different colors
 	 */
-	function hashRgb(hashString: string): RGB3 {
+	function hashRgb(hashString: string): Rgb {
 		let sum = 0;
 		for (let i = 0; i < hashString.length; i++) {
 			sum += hashString.charCodeAt(i) * (i + 1);
@@ -90,7 +90,7 @@ export namespace Colors {
 	 * Converts `hex` to `RGB3`
 	 * @param hex `"#rrggbb"` or `"#rgb"` (case insensitive, "#" could be omitted)
 	 */
-	function hexToRgb(hex: string): RGB3 {
+	function hexToRgb(hex: string): Rgb {
 		hex = hex.replace("#", "");
 
 		if (hex.length === 3) {
@@ -105,7 +105,7 @@ export namespace Colors {
 	}
 
 	// from https://stackoverflow.com/q/54738431
-	function getDeltaE(rgb1: RGB3, rgb2: RGB3): number {
+	function getDeltaE(rgb1: Rgb, rgb2: Rgb): number {
 		const labA = rgbToLab(rgb1);
 		const labB = rgbToLab(rgb2);
 
@@ -137,7 +137,7 @@ export namespace Colors {
 	/**
 	 * Color space transit from rgb to lab
 	 */
-	function rgbToLab(rgb: RGB3): [number, number, number] {
+	function rgbToLab(rgb: Rgb): [number, number, number] {
 		let r = rgb[0] / 255,
 			g = rgb[1] / 255,
 			b = rgb[2] / 255,

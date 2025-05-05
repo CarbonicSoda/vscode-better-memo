@@ -121,7 +121,7 @@ export class TreeProvider implements TreeDataProvider<TreeItem.ItemType> {
 
 				memos
 					.sort((memoA, memoB) => memoA.meta.line - memoB.meta.line)
-					.sort((memoA, memoB) => memoA.priority - memoB.priority);
+					.sort((memoA, memoB) => memoB.priority - memoA.priority);
 
 				const maxPriority = memos[0].priority;
 
@@ -197,7 +197,7 @@ export class TreeProvider implements TreeDataProvider<TreeItem.ItemType> {
 
 				memos
 					.sort((memoA, memoB) => memoA.meta.line - memoB.meta.line)
-					.sort((memoA, memoB) => memoA.priority - memoB.priority);
+					.sort((memoA, memoB) => memoB.priority - memoA.priority);
 
 				const maxPriority = memos[0].priority;
 

@@ -155,14 +155,14 @@ export namespace TreeItem {
 			this.description = `Ln ${memo.meta.line + 1}`;
 
 			this.tooltip = new MarkdownString(
-				`${memo.tag} ~ *${memo.meta.path}* - Ln ${memo.meta.line + 1}\n***\n${
+				`${memo.tag} - ${memo.meta.path} - Ln ${memo.meta.line + 1}\n***\n${
 					memo.content === "" ? "Placeholder" : memo.content
 				}`,
 			);
 
 			const color = Tag.data.colors[memo.tag];
 			this.iconPath =
-				memo.priority === 0
+				urgency === 0
 					? new ThemeIcon("circle-filled", color)
 					: new ThemeIcon(
 							"circle-outline",

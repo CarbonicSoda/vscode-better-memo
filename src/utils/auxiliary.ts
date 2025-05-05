@@ -61,7 +61,7 @@ export namespace Aux.string {
 
 export namespace Aux.algorithm {
 	/**
-	 * @returns index of the latest element in `sorted` <= `candid`
+	 * @returns index of the last element in `sorted` <= `candid`
 	 *
 	 * - If `sorted`[0] > `candid`, returns -1;
 	 * - If `sorted`.length === 0, returns undefined;
