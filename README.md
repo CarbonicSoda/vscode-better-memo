@@ -69,6 +69,9 @@ The Memo Explorer offers two distinct view types deciding how memos are grouped.
 
 ![File View](https://github.com/CarbonicSoda/vscode-better-memo/blob/master/media/usage-guide/file-view.png?raw=true)
 
+> The memo nearest to the active document selection will be focused in the
+> editor.
+
 Each memo tag is assigned a hashed color, which will also serve as the
 highlighting color for document decorations.
 
