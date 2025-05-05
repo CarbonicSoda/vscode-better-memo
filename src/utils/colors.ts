@@ -33,7 +33,7 @@ export namespace Colors {
 	 * @param RgbOrHex `RGB3`: [R, G, B], `"#rrggbb"` or `"#rgb"` (case insensitive, "#" could be omitted)
 	 */
 	export function interpolate(RgbOrHex: Rgb | string): ThemeColor {
-		const colorThemeKind = ColorThemeKind[window.activeColorTheme.kind];
+		const themeKind = ColorThemeKind[window.activeColorTheme.kind];
 
 		const rgb = typeof RgbOrHex === "string" ? hexToRgb(RgbOrHex) : RgbOrHex;
 
@@ -41,7 +41,7 @@ export namespace Colors {
 		let best = "";
 
 		for (const [colorName, colorRgb] of Object.entries(
-			VSCodeColorsRgb[colorThemeKind as keyof typeof VSCodeColorsRgb],
+			VSCodeColorsRgb[themeKind as keyof typeof VSCodeColorsRgb],
 		)) {
 			const deltaE = getDeltaE(rgb, colorRgb);
 

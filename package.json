@@ -2,7 +2,7 @@
 	"name": "better-memo",
 	"displayName": "Better Memo",
 	"description": "Automatic Comment Curation for Developers",
-	"version": "3.0.1",
+	"version": "3.0.2",
 	"publisher": "carbonsoda",
 	"author": {
 		"name": "David W."
@@ -270,12 +270,12 @@
 			},
 			{
 				"view": "better-memo.memoExplorer",
-				"contents": "Memo Explorer is loading.\nIf this is taking too long, [inspect fetcher configurations](command:workbench.action.openSettings?[\"better-memo.fetcher\"]).",
+				"contents": "Memo Explorer is loading.\nIf this is taking too long, [inspect configurations](command:workbench.action.openSettings?[\"better-memo\"]).",
 				"when": "workspaceFolderCount != 0 && !better-memo.init"
 			},
 			{
 				"view": "better-memo.memoExplorer",
-				"contents": "Oops, cannot spot any memos throughout the universe.\nConsider spicing up the place with some memos!\nIf this is not intended, \n[Refresh Explorer](command:better-memo.refresh)\nor [inspect fetcher configurations](command:workbench.action.openSettings?[\"better-memo.fetcher\"]).",
+				"contents": "Oops, cannot spot any memos throughout the universe.\nConsider spicing up the place with some memos!\nIf this is not intended, \n[Refresh Explorer](command:better-memo.refresh)\nor [inspect configurations](command:workbench.action.openSettings?[\"better-memo\"]).",
 				"when": "workspaceFolderCount != 0 && better-memo.init && better-memo.noMemos"
 			}
 		],
