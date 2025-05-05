@@ -1,168 +1,115 @@
 <h3 align="center">
-	<img src="https://raw.githubusercontent.com/CarbonicSoda/vscode-better-memo/master/media/icon.png" width="100" alt="Better Memo icon" />
+	<img src="https://raw.githubusercontent.com/CarbonicSoda/vscode-better-memo/master/media/icon.png" width="120" alt="Better Memo icon" />
    <p></p>
 	Better Memo for VSCode
 </h3>
 <h4 align="center">Automatic Comment Curation for Developers</h4>
 
-## Features
+## Usage
 
-- Automated tracking of workspace Memos
-- Centralized curation in accessible Memo Explorer
-- Streamlined Memo authoring and completion
-- Simple navigation between Memos
-- Syntax highlighting to differentiate Memos
-- _And various other convenient functionalities_...
-
-## Usage Guide
-
-### Syntax of Memos
+### Syntax
 
 Comments are only curated by Better Memo if they start with `MO`
 (case-insensitive).
 
-For example, the following (line 2) is a valid Memo in JS:
+For example, the following (line 2) is a valid memo in JS:
 
-![Memo Example](https://github.com/CarbonicSoda/vscode-better-memo/blob/master/media/usage-guide/memo-example.png?raw=true)
+![Memo](https://github.com/CarbonicSoda/vscode-better-memo/blob/master/media/usage-guide/memo.png?raw=true)
 
-- `MO` tells Better Memo to manage this comment;
-- `FIX` is a tag for comment organization (_case-insensitive_);
-- `breaks if *a === b*` is the comment content;
+- `MO` tells Better Memo to manage this comment
+- `FIX` is a tag for memo organization (case-insensitive)
+- `breaks if *a === b*` is the memo content
 
-> Better Memo supports comments in all languages.  
-> **e.g.** `//` will be replaced by `#` in Python;  
-> **e.g.** `<!-- MO TAG ... -->` is used in HTML; You can configure custom
-> comment-delimiters for specific languages **e.g.** ANTLR via
-> `better-memo.customLangs`.
+Content is not a must e.g. if some code is left to be cleaned up, simply put
+`//MO CLEAN` without anything additional.
 
-> A Memo doesn't necessarily need to have content.  
-> **e.g.** If some code is left to be cleaned up, you could simply add
-> `//MO CLEAN` without any additional text;
+> Better Memo supports all preset languages out of the box. Other languages e.g.
+> ANTLR4 can also be supported via `better-memo.customLangs`.
 
-> The format of Memos doesn't matter as long as it's valid, Better Memo will
-> format Memos for you automatically.  
-> **e.g.** `// mO tAg hi` > `//MO TAG hi`;
+> The format of memos doesn't matter as long as it's valid, Better Memo will
+> format memos for you automatically when a tab is closed.
 
-### New Memo Command
+#### Memo Priority
 
-Typing a Memo by hand can be tedious and inefficient. Instead, you can follow
-these simple steps:
+To assign priority to more urgent code actions, you can add `!` before the
+content e.g. `//MO FIX !breaks POST` has a higher priority than
+`//MO FIX no logs`. The more `!` you add, the higher the priority.
+
+Priority memos will be pinned on top in the Memo Explorer (introduced in the
+next section) with distinct appearance.
+
+### New Memo
+
+Typing a memo by hand can be tedious and inefficient. Instead, you can utilize a
+command:
 
 1. Place your cursor on a line.
 2. Press `Alt+M`.
 3. Select/Enter the desired Memo tag in the Quick Pick menu.  
-   (you can type in a tag that doesn't exist in the menu, and it will be
-   automatically inserted into the Quick Pick)
-4. And... _voilà_! The Memo is instantly inserted, and you can now type in the
-   content.
+   (you can enter a tag that is absent in the menu and it will be inserted into
+   the Quick Pick)
+4. And... _voilà_! A memo is instantly inserted for you to type in the content.
 
-> Insertion behavior could be configured in the `better-memo.actions` settings
-> section.
+> To complete a memo, press `Alt+Shift+M`.
 
----
-
-<details>
-<summary>Additional Syntax: Memo Priority</summary>
-<p></p>
-
-To assign priority to more urgent code actions, you can add an exclamation mark
-`!` before the content.
-
-For example, `//MO FIX !breaks POST` would have a higher priority than
-`//MO FIX no logs`.
-
-> As a result, the first one would be listed higher than the second in the Memo
-> Explorer. (_introduced in the next section_)
-
-The more exclamation marks you add, the higher the priority of the Memo. For
-instance, `//MO FIX !!critical failure` would have an even higher priority than
-`//MO FIX !breaks POST`.
-
-</details>
+> All commands mentioned supports multiple cursors.
 
 ### The Memo Explorer
 
 Memos in the workspace are carefully organized and displayed in an explorer
-panel, available conveniently in the sidebar, known as the Memo Explorer.
+panel, available conveniently in the sidebar.
 
-Within Memo Explorer, two distinct view types are offered, each determining how
-the Memos are grouped.
+The Memo Explorer offers two distinct view types deciding how memos are grouped.
 
-**The Tag View**
+#### The Tag View
 
-![Memo Explorer Tag View](https://github.com/CarbonicSoda/vscode-better-memo/blob/master/media/usage-guide/memo-explorer-tag.png?raw=true)
+![Tag View](https://github.com/CarbonicSoda/vscode-better-memo/blob/master/media/usage-guide/tag-view.png?raw=true)
 
-**The File View**
+#### The File View
 
-![Memo Explorer File View](https://github.com/CarbonicSoda/vscode-better-memo/blob/master/media/usage-guide/memo-explorer-file.png?raw=true)
+![File View](https://github.com/CarbonicSoda/vscode-better-memo/blob/master/media/usage-guide/file-view.png?raw=true)
 
-- _Tag View_: Organizes Memos primarily by Memo tags;
-- _File View_: Organizes Memos primarily by containing files;
+Each memo tag is assigned a hashed color, which will also serve as the
+highlighting color for document decorations.
 
-In each view, the other grouping method is used as the secondary organization
-layer.
+#### Available Actions
 
-Each tag is assigned a hashed color that will be inherited by all Memos
-associated with that tag. The color will also serve as the highlighting color
-for Memos within documents.
+##### Title Bar
 
-> Users can set custom colors for specific tags in the
-> `better-memo.customTags` setting.  
-> **e.g.** The preset tags are _TODO_, _FIX_, _TEST_, _DEV_ and _REFACTOR_.
+1. Switch to Tag/File View (`Ctrl+Shift+V`)
+2. Refresh Explorer (`Ctrl+R`)
+3. Complete All Memos
+4. Toggle Fold
 
-> The final colors used may differ from the expected colors, this is _intended_
-> to maintain a higher level of color contrast.
+##### Context
 
-### Available Actions
+File Item
 
-#### Actions/Title Bar
+- Navigate to File
+- Complete All Memos
 
-The title bar provides the following actions, from left to right:
+Tag Item
 
-1. Switch to Tag/File View (`Ctrl+Shift+V`);
-2. Refresh Explorer (`Ctrl+R`);
-3. Mark All Memos as Completed;
-4. Expand Explorer;
-5. Collapse Explorer;
+- Complete All Memos
 
-#### Actions/Context
-
-_File Item_:
-
-- Navigate to File;
-- Mark All Memos in File as Completed;
-
-_Tag Item_:
-
-- Mark All Memos Under Tag as Completed;
-
-_Memo Item_:
+Memo Item
 
 - **Click** - Navigate to Memo;
-- Mark Memo as Completed;
+- Complete Memo;
 
-> The behavior of Better Memo when you try to mark Memo(s) as completed could be
-> configured in the `better-memo.actions` settings section.
+### Commands
 
-> `Mark Memo(s) as Completed` from the right-click context-menu will _always_
-> ignore the _`Ask For Confirmation ...`_ settings.
+Better Memo provides several utility commands to help users work more
+efficiently:
 
-## Editor Commands
+- (`Alt+M`) New Memo on Line ([details](#new-memo))
+- (`Alt+Shift+M`) Complete Memo Near Cursor
 
-Better Memo provides several commands to help users work more efficiently in
-editors.
+> The above commands support multiple cursors.
 
-- (`Alt+M`) New Memo on Line (_[details](#new-memo-command)_);
-- (`Alt+Shift+M`) Complete Memo(s) Next to Selection(s);
-
-- (`Ctrl+Alt+M Ctrl+Alt+<`) Navigate to Last Memo;
-- (`Ctrl+Alt+M Ctrl+Alt+>`) Navigate to Next Memo;
-
-> Action behaviors could be configured in the `better-memo.actions` settings
-> section.
+- (`Ctrl+Alt+M` + `Ctrl+Alt+<`) Navigate to Prev Memo
+- (`Ctrl+Alt+M` + `Ctrl+Alt+>`) Navigate to Next Memo
 
 ---
-
-<p>
 
 _&emsp;The palest ink is better than the most retentive memory._

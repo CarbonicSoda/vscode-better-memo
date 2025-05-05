@@ -64,7 +64,7 @@ export namespace EditorCommands {
 		const picker = window.createQuickPick();
 		picker.items = items;
 		picker.canSelectMany = false;
-		picker.placeholder = "Pick/Enter a Tag.";
+		picker.placeholder = "Pick/Enter Tag";
 
 		const runtime: {
 			picked: string | undefined;

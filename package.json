@@ -2,7 +2,7 @@
 	"name": "better-memo",
 	"displayName": "Better Memo",
 	"description": "Automatic Comment Curation for Developers",
-	"version": "2.0.3",
+	"version": "3.0.0",
 	"publisher": "carbonsoda",
 	"author": {
 		"name": "David W."
@@ -21,14 +21,12 @@
 		"vscode": "^1.80.0"
 	},
 	"keywords": [
-		"memo",
+		"todo",
 		"comment",
-		"explorer",
-		"manage",
+		"memo",
 		"tag",
-		"file",
-		"reminder",
-		"tree"
+		"manage",
+		"explorer"
 	],
 	"categories": [
 		"Other"
@@ -296,11 +294,9 @@
 						},
 						"markdownDescription": "Defines custom colors for specified tags.\nAccepted formats are **#FFFFFF** & **#FFF**, case insensitive and **#** could be omitted.\n\nSpecified tags will always be in the *New Memo on Line* tag picker.",
 						"default": {
-							"TODO": "#090",
-							"FIX": "#C00",
-							"TEST": "#FD5",
-							"DEV": "#72F",
-							"REFACTOR": "#6CE"
+							"TODO": "#0F0",
+							"FIX": "#F00",
+							"DEV": "#70F"
 						},
 						"scope": "application"
 					},
