@@ -2,8 +2,11 @@
 .vscode
 *.cpuprofile
 **/*.map
+esbuild.cjs
+esbuild.web.cjs
 eslint.config.mjs
 media/usage-guide
+pnpm-lock.yaml
 src
 tools
 tsconfig.json
