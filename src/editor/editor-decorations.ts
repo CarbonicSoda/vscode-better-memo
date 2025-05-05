@@ -36,7 +36,7 @@ export namespace EditorDecorations {
 		disposeDecorations();
 
 		decorations.memo = window.createTextEditorDecorationType({
-			fontWeight: "600",
+			fontWeight: "800",
 		});
 
 		for (const editor of editors) {

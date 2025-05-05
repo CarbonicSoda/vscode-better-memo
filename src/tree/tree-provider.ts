@@ -128,7 +128,7 @@ export class TreeProvider implements TreeDataProvider<TreeItem.ItemType> {
 				fileItem.children = memos.map((memo) => {
 					return new TreeItem.MemoItem(
 						memo,
-						memo.priority / maxPriority,
+						maxPriority === 0 ? 0 : memo.priority / maxPriority,
 						fileItem,
 					);
 				});
@@ -204,7 +204,7 @@ export class TreeProvider implements TreeDataProvider<TreeItem.ItemType> {
 				tagItem.children = memos.map((memo) => {
 					return new TreeItem.MemoItem(
 						memo,
-						memo.priority / maxPriority,
+						maxPriority === 0 ? 0 : memo.priority / maxPriority,
 						tagItem,
 					);
 				});

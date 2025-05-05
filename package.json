@@ -159,23 +159,27 @@
 			},
 			{
 				"command": "better-memo.refresh",
-				"when": "focusedView == 'better-memo.memoExplorer' && better-memo.init",
+				"when": "better-memo.init && focusedView == 'better-memo.memoExplorer'",
 				"key": "Ctrl+R"
 			},
 			{
 				"command": "better-memo.newMemoOnLine",
+				"when": "better-memo.init && editorIsOpen",
 				"key": "Alt+M"
 			},
 			{
 				"command": "better-memo.completeMemoNearCursor",
+				"when": "better-memo.init && editorIsOpen",
 				"key": "Alt+Shift+M"
 			},
 			{
 				"command": "better-memo.navigateToPrevMemo",
+				"when": "better-memo.init && editorIsOpen",
 				"key": "Ctrl+Alt+M Ctrl+Alt+,"
 			},
 			{
 				"command": "better-memo.navigateToNextMemo",
+				"when": "better-memo.init && editorIsOpen",
 				"key": "Ctrl+Alt+M Ctrl+Alt+."
 			}
 		],
@@ -273,7 +277,7 @@
 			},
 			{
 				"view": "better-memo.memoExplorer",
-				"contents": "Oops, cannot spot any memos throughout the universe.\nConsider spicing up the place with some memos!\nIf this is not intended, \n[Reload Explorer](command:better-memo.refresh)\nor [inspect fetcher configurations](command:workbench.action.openSettings?[\"better-memo.fetcher\"]).",
+				"contents": "Oops, cannot spot any memos throughout the universe.\nConsider spicing up the place with some memos!\nIf this is not intended, \n[Refresh Explorer](command:better-memo.refresh)\nor [inspect fetcher configurations](command:workbench.action.openSettings?[\"better-memo.fetcher\"]).",
 				"when": "workspaceFolderCount != 0 && better-memo.init && better-memo.noMemos"
 			}
 		],

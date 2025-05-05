@@ -1,4 +1,4 @@
-import { Position, Range, TextDocument, workspace } from "vscode";
+import { Position, Range, TextDocument, window, workspace } from "vscode";
 
 /**
  * Handles complicated logic of hybrid file editing with Node.fs and {@link workspace.fs},
@@ -63,8 +63,16 @@ export namespace FileEdit {
 		}
 
 		private async editDoc(doc: TextDocument, edits: Edits): Promise<void> {
-			let text = doc.getText();
+			if (doc.isDirty) {
+				await window.showInformationMessage(
+					`Document ${workspace.asRelativePath(
+						doc.uri,
+					)} was dirty, edits not applied.`,
+				);
+				return;
+			}
 
+			let text = doc.getText();
 			let delta = 0;
 
 			for (let { range, replace: edit } of edits) {

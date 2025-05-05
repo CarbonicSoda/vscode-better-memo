@@ -1,5 +1,3 @@
-// import { EditorCommands } from "./editor-commands";
-// import { EditorDecorations } from "./editor-decorations";
 import { initEditor } from "./editor";
 import { initEngine } from "./engine";
 import { initTree } from "./tree";
@@ -12,7 +10,6 @@ export async function activate(): Promise<void> {
 	await initEngine();
 	initTree();
 	initEditor();
-	// EditorDecorations.initEditorDecorations();
 }
 
 /**

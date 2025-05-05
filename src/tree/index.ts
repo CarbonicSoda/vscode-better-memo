@@ -163,7 +163,6 @@ export function initTree() {
 			);
 
 			let active = editor.selection.active;
-			if (!active) return;
 			if (Format.getTemplate(doc.languageId).tail) {
 				active = active.translate(0, -1);
 			}
@@ -174,10 +173,9 @@ export function initTree() {
 				(item) => item.memo.meta.start,
 				(a, b) => a.compareTo(b),
 			);
-			if (i === undefined) return;
 			if (i === -1) i = 0;
 
-			explorer.reveal(memos[i]);
+			explorer.reveal(memos[i!]);
 		}),
 	);
 

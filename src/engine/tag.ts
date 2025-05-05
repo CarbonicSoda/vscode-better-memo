@@ -14,6 +14,10 @@ export namespace Tag {
 		return !!data.colors[tag];
 	}
 
+	export function isValid(tag: string): boolean {
+		return RegExp(`^[^\\s${Lang.data.closersRE}!]+$`).test(tag);
+	}
+
 	export function getData(): typeof data {
 		const colors: (typeof data)["colors"] = {};
 
@@ -26,7 +30,7 @@ export namespace Tag {
 		for (let [tag, hex] of Object.entries(customTags)) {
 			[tag, hex] = [tag.trim().toUpperCase(), hex.trim()];
 
-			if (!RegExp(`^[^\\r\\n\t ${Lang.data.closersRE}]+$`).test(tag)) continue;
+			if (!isValid(tag)) continue;
 
 			colors[tag] = Colors.interpolate(hex);
 		}

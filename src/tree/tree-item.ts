@@ -160,10 +160,9 @@ export namespace TreeItem {
 				}`,
 			);
 
-			const color = Tag.data.colors[memo.tag];
 			this.iconPath =
 				urgency === 0
-					? new ThemeIcon("circle-filled", color)
+					? new ThemeIcon("circle-filled", Tag.data.colors[memo.tag])
 					: new ThemeIcon(
 							"circle-outline",
 							Colors.interpolate([255, (1 - urgency) * 255, 0]),
