@@ -21,9 +21,9 @@ export namespace Format {
 	function toFormatted(memo: Memo.Memo): string {
 		const template = getTemplate(memo.meta.lang);
 
-		return `${template.head}${memo.tag}${memo.content ? " " : ""}${"!".repeat(
-			memo.priority,
-		)}${memo.content}${template.tail}`;
+		return `${template.head}${memo.tag}${
+			memo.priority !== 0 || memo.content ? " " : ""
+		}${"!".repeat(memo.priority)}${memo.content}${template.tail}`;
 	}
 
 	export function getTemplate(lang: string): { head: string; tail: string } {

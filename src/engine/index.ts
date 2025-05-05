@@ -66,18 +66,12 @@ export async function initEngine(): Promise<void> {
 			updateView();
 		}),
 
-		window.tabGroups.onDidChangeTabGroups(async (ev) => {
-			for (const tab of ev.changed) {
-				const activeTab = tab.activeTab;
-
-				if (!tab.isActive || !activeTab || !activeTab?.isActive) {
-					continue;
-				}
-
+		window.tabGroups.onDidChangeTabs(async (ev) => {
+			for (const tab of ev.closed) {
 				let doc;
 				try {
 					doc = await workspace.openTextDocument(
-						(activeTab.input as { uri: Uri }).uri,
+						(tab.input as { uri: Uri }).uri,
 					);
 				} catch {
 					continue;
@@ -92,5 +86,5 @@ export async function initEngine(): Promise<void> {
 }
 
 function updateView(): void {
-	EventEmitter.emit("UpdateView");
+	EventEmitter.emit("Update");
 }

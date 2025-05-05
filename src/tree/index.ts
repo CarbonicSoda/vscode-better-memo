@@ -47,7 +47,7 @@ export function initTree() {
 	Janitor.add(
 		explorer,
 
-		EventEmitter.subscribe("UpdateView", updateView),
+		EventEmitter.subscribe("Update", updateView),
 
 		commands.registerCommand("better-memo.toggleFold", () => {
 			[expand.primary, expand.secondary] = [

@@ -9,24 +9,19 @@ export namespace Doc {
 
 	export let data: {
 		docs: TextDocument[];
-		metas: Map<TextDocument, DocMeta>;
+		metas: Map<string, DocMeta>;
 	} = { docs: [], metas: new Map() };
 
 	export function includes(doc: TextDocument): boolean {
-		if (data.metas.has(doc)) return true;
-
-		for (const watched of data.docs) {
-			if (watched.fileName === doc.fileName) return true;
-		}
-		return false;
+		return data.metas.has(doc.fileName);
 	}
 
 	export function isChanged(doc: TextDocument): boolean {
-		const meta = data.metas.get(doc);
+		const meta = data.metas.get(doc.fileName);
 		if (!meta) return false;
 
 		const { version, languageId: lang } = doc;
-		data.metas.set(doc, { version, lang });
+		data.metas.set(doc.fileName, { version, lang });
 
 		const isChanged = version !== meta.version || lang !== meta.lang;
 
@@ -50,7 +45,7 @@ export namespace Doc {
 
 		const metas: (typeof data)["metas"] = new Map();
 		for (const doc of docs) {
-			metas.set(doc, { version: doc.version, lang: doc.languageId });
+			metas.set(doc.fileName, { version: doc.version, lang: doc.languageId });
 		}
 
 		return { docs, metas };

@@ -24,7 +24,7 @@ export namespace Memo {
 		meta: MemoMeta;
 	};
 
-	export let data: { memos: Memo[]; docmap: Map<TextDocument, Memo[]> } = {
+	export let data: { memos: Memo[]; docmap: Map<string, Memo[]> } = {
 		memos: [],
 		docmap: new Map(),
 	};
@@ -34,7 +34,7 @@ export namespace Memo {
 	}
 
 	export function inDoc(doc: TextDocument): Memo[] {
-		return data.docmap.get(doc) ?? [];
+		return data.docmap.get(doc.fileName) ?? [];
 	}
 
 	export async function getData(options?: {
@@ -46,8 +46,8 @@ export namespace Memo {
 			: new Map();
 
 		await Aux.async.map(options?.rescan ?? Doc.data.docs, async (doc) => {
-			if (options?.rescan && !Doc.includes(doc)) docmap.delete(doc);
-			else docmap.set(doc, await getDocMemos(doc, options));
+			if (options?.rescan && !Doc.includes(doc)) docmap.delete(doc.fileName);
+			else docmap.set(doc.fileName, await getDocMemos(doc, options));
 		});
 
 		const memos = Array.from(docmap.values()).flat();
@@ -115,9 +115,9 @@ export namespace Memo {
 		const open = Aux.re.escape(delimiters.open);
 		const close = delimiters.close ? Aux.re.escape(delimiters.close) : "";
 
-		const matchPattern = `(?<![${open}])${open}[\\t ]*mo[\\t ]+(?<tag>[^\\r\\n\\t ${
+		const matchPattern = `(?<![${open}])${open}[\\t ]*mo[\\t ]+(?<tag>[^\\s${
 			Lang.data.closersRE
-		}]+)[\\t ]*(?<priority>!*)(?<content>.*${close ? "?" : ""})${close}`;
+		}!]+)[\\t ]*(?<priority>!*)(?<content>.*${close ? "?" : ""})${close}`;
 
 		return RegExp(matchPattern, "gi");
 	}
