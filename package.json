@@ -2,7 +2,7 @@
 	"name": "better-memo",
 	"displayName": "Better Memo",
 	"description": "Automatic Comment Curation for Developers",
-	"version": "3.0.4",
+	"version": "3.0.5",
 	"publisher": "carbonsoda",
 	"author": {
 		"name": "David W."
@@ -194,7 +194,8 @@
 			"memoExplorer": [
 				{
 					"id": "better-memo.memoExplorer",
-					"name": "Memo Explorer"
+					"name": "Memo Explorer",
+					"icon": "$(output)"
 				}
 			]
 		},
@@ -396,22 +397,23 @@
 		"run-in-browser": "vscode-test-web --browserType=chromium --extensionDevelopmentPath=. ."
 	},
 	"devDependencies": {
-		"@types/node": "~20.17.11",
+		"@types/node": "~20.17.57",
 		"@types/vscode": "^1.80.0",
-		"@typescript-eslint/eslint-plugin": "^8.19.0",
-		"@typescript-eslint/parser": "^8.19.0",
+		"@typescript-eslint/eslint-plugin": "^8.33.1",
+		"@typescript-eslint/parser": "^8.33.1",
 		"@vscode/test-cli": "^0.0.10",
-		"@vscode/test-electron": "^2.4.1",
+		"@vscode/test-electron": "^2.5.2",
 		"@vscode/test-web": "^0.0.65",
-		"esbuild": "^0.25.1",
-		"eslint": "^9.17.0",
+		"esbuild": "^0.25.5",
+		"eslint": "^9.28.0",
 		"npm-run-all": "^4.1.5",
-		"typescript": "^5.7.2"
+		"typescript": "^5.8.3"
 	},
 	"pnpm": {
 		"onlyBuiltDependencies": [
 			"@playwright/browser-chromium",
 			"esbuild"
 		]
-	}
+	},
+	"packageManager": "pnpm@10.11.0+sha512.6540583f41cc5f628eb3d9773ecee802f4f9ef9923cc45b69890fb47991d4b092964694ec3a4f738a420c918a333062c8b925d312f42e4f0c263eb603551f977"
 }

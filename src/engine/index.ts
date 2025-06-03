@@ -56,8 +56,8 @@ export async function initEngine(): Promise<void> {
 			updateView();
 		}),
 
-		workspace.onDidSaveTextDocument(async () => {
-			const scanned = await Scan.activeDoc();
+		workspace.onDidSaveTextDocument(async (doc) => {
+			const scanned = await Scan.doc(doc);
 			if (scanned) updateView();
 		}),
 
