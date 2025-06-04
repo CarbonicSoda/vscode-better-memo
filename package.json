@@ -2,7 +2,7 @@
 	"name": "better-memo",
 	"displayName": "Better Memo",
 	"description": "Automatic Comment Curation for Developers",
-	"version": "3.0.7",
+	"version": "3.0.8",
 	"publisher": "carbonsoda",
 	"author": {
 		"name": "David W."
@@ -365,19 +365,10 @@
 						"order": 7,
 						"title": "Clean Scan Delay",
 						"type": "integer",
-						"minimum": 1000,
-						"maximum": 100000,
+						"minimum": 10000,
+						"maximum": 1000000,
 						"description": "Configures the delay between clean rescans, which prevents potential event listener failures, in ms.",
-						"default": 10000
-					},
-					"better-memo.batchSize": {
-						"order": 8,
-						"title": "Batch Size",
-						"type": "integer",
-						"minimum": 1,
-						"maximum": 256,
-						"description": "Configures the parallel processing batch size.",
-						"default": 32
+						"default": 30000
 					}
 				}
 			}

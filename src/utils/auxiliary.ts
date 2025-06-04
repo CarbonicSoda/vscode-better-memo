@@ -1,5 +1,3 @@
-import { Config } from "./config";
-
 export namespace Aux.object {
 	/**
 	 * Similar to Object.groupBy()
@@ -31,22 +29,8 @@ export namespace Aux.async {
 	export async function map<T, C>(
 		iterable: Iterable<T>,
 		callback: (value: T, index: number, array: T[]) => Promise<C>,
-
-		batchSize = Config.get("batchSize"),
 	): Promise<Awaited<C>[]> {
-		const array = Array.from(iterable);
-
-		const result = [];
-
-		for (let i = 0; i < array.length; i += batchSize) {
-			const batch = array.slice(i, i + batchSize);
-
-			const res = await Promise.all(batch.map(callback));
-
-			result.push(...res);
-		}
-
-		return result;
+		return await Promise.all(Array.from(iterable).map(callback));
 	}
 }
 
