@@ -2,7 +2,7 @@
 	"name": "better-memo",
 	"displayName": "Better Memo",
 	"description": "Automatic Comment Curation for Developers",
-	"version": "3.0.6",
+	"version": "3.0.7",
 	"publisher": "carbonsoda",
 	"author": {
 		"name": "David W."
@@ -298,8 +298,7 @@
 							"TODO": "#0F0",
 							"FIX": "#F00",
 							"DEV": "#70F"
-						},
-						"scope": "application"
+						}
 					},
 					"better-memo.customLangs": {
 						"order": 2,
@@ -308,8 +307,7 @@
 						"additionalProperties": {
 							"type": "object"
 						},
-						"markdownDescription": "Defines custom languages to support.\n\nThe key being the languageid (via status-bar language mode picker e.g. `bat` and `csharp`), with values being the comment format in it e.g. `{ \"open\": \"//\" }` and `{ \"open\": \"/*\", \"close\": \"*/\" }`.",
-						"scope": "application"
+						"markdownDescription": "Defines custom languages to support.\n\nThe key being the languageid (via status-bar language mode picker e.g. `bat` and `csharp`), with values being the comment format in it e.g. `{ \"open\": \"//\" }` and `{ \"open\": \"/*\", \"close\": \"*/\" }`."
 					},
 					"better-memo.defaultView": {
 						"order": 3,
@@ -324,8 +322,7 @@
 							"Group primarily with memo files."
 						],
 						"description": "Determines how items are grouped in the explorer by default.",
-						"default": "tag",
-						"scope": "application"
+						"default": "tag"
 					},
 					"better-memo.watch": {
 						"order": 4,
@@ -338,8 +335,7 @@
 						"default": [
 							"**/*"
 						],
-						"uniqueItems": true,
-						"scope": "application"
+						"uniqueItems": true
 					},
 					"better-memo.ignore": {
 						"order": 5,
@@ -354,8 +350,7 @@
 							"**/out",
 							"**/dist"
 						],
-						"uniqueItems": true,
-						"scope": "application"
+						"uniqueItems": true
 					},
 					"better-memo.scanDelay": {
 						"order": 6,
@@ -364,8 +359,7 @@
 						"minimum": 100,
 						"maximum": 10000,
 						"description": "Configures the delay between document scans, which scans the current active document, in ms.",
-						"default": 500,
-						"scope": "application"
+						"default": 500
 					},
 					"better-memo.cleanScanDelay": {
 						"order": 7,
@@ -374,8 +368,16 @@
 						"minimum": 1000,
 						"maximum": 100000,
 						"description": "Configures the delay between clean rescans, which prevents potential event listener failures, in ms.",
-						"default": 10000,
-						"scope": "application"
+						"default": 10000
+					},
+					"better-memo.batchSize": {
+						"order": 8,
+						"title": "Batch Size",
+						"type": "integer",
+						"minimum": 1,
+						"maximum": 256,
+						"description": "Configures the parallel processing batch size.",
+						"default": 32
 					}
 				}
 			}
