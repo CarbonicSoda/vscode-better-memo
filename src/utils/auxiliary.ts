@@ -26,14 +26,18 @@ export namespace Aux.object {
 }
 
 export namespace Aux.async {
-	/**
-	 * Sugar for Promise.all(`iterable`.map(`async (ele) => {...}`))
-	 */
 	export async function map<T, C>(
 		iterable: Iterable<T>,
 		callback: (value: T, index: number, array: T[]) => Promise<C>,
 	): Promise<Awaited<C>[]> {
-		return await Promise.all([...iterable].map(callback));
+		const result = [];
+
+		const array = Array.from(iterable);
+		for (let i = 0; i < array.length; i++) {
+			result.push(await callback(array[i], i, array));
+		}
+
+		return result;
 	}
 }
 
