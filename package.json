@@ -2,7 +2,7 @@
 	"name": "better-memo",
 	"displayName": "Better Memo",
 	"description": "Automatic Comment Curation for Developers",
-	"version": "3.0.8",
+	"version": "3.0.9",
 	"publisher": "carbonsoda",
 	"author": {
 		"name": "David W."
@@ -368,7 +368,7 @@
 						"minimum": 10000,
 						"maximum": 1000000,
 						"description": "Configures the delay between clean rescans, which prevents potential event listener failures, in ms.",
-						"default": 30000
+						"default": 60000
 					}
 				}
 			}
