@@ -3,19 +3,16 @@ export namespace Aux.object {
 	 * Similar to Object.groupBy()
 	 *
 	 * @param grouper callback for group keys
-	 * @returns ``grouper(obj)` as keys and corresponding objects as values
+	 * @returns `grouper(obj)` as keys and corresponding objects as values
 	 */
 	export function group<O extends { [key: string]: any }, V>(
 		objs: O[],
 		grouper: (obj: O, i: number) => V,
 	): Map<V, O[]> {
-		const groups: Map<V, O[]> = new Map();
+		const groups = new Map<V, O[]>();
 
 		objs.forEach((obj, i) => {
-			const group =
-				typeof grouper === "function"
-					? grouper(obj, i)
-					: obj[grouper as keyof O];
+			const group = grouper(obj, i);
 
 			if (!groups.has(group)) groups.set(group, []);
 			groups.get(group)!.push(obj);
