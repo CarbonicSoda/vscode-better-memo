@@ -68,8 +68,8 @@ export async function initEngine(): Promise<void> {
 
 		window.tabGroups.onDidChangeTabs(async (ev) => {
 			for (const tab of ev.closed) {
-				const uri = (tab.input as { uri: Uri }).uri;
-				if (uri.scheme === "untitled") continue;
+				const uri = (tab.input as { uri: Uri } | undefined)?.uri;
+				if (!uri || uri.scheme === "untitled") continue;
 
 				let doc;
 				try {
