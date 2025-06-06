@@ -2,7 +2,7 @@
 	"name": "better-memo",
 	"displayName": "Better Memo",
 	"description": "Automatic Comment Curation for Developers",
-	"version": "3.0.14",
+	"version": "3.0.15",
 	"publisher": "carbonsoda",
 	"author": {
 		"name": "David W."
@@ -109,7 +109,7 @@
 			{
 				"command": "better-memo.navigateToMemo",
 				"title": "Navigate to Memo",
-				"enablement": "focusedView == 'better-memo.memoExplorer'",
+				"enablement": "focusedView == better-memo.memoExplorer",
 				"category": "Better Memo"
 			},
 			{
@@ -147,17 +147,17 @@
 		"keybindings": [
 			{
 				"command": "better-memo.switchToTagView",
-				"when": "focusedView == 'better-memo.memoExplorer' && better-memo.explorerView == file && !better-memo.noMemos",
+				"when": "focusedView == better-memo.memoExplorer && better-memo.explorerView == file && !better-memo.noMemos",
 				"key": "Ctrl+Shift+V"
 			},
 			{
 				"command": "better-memo.switchToFileView",
-				"when": "focusedView == 'better-memo.memoExplorer' && better-memo.explorerView == tag && !better-memo.noMemos",
+				"when": "focusedView == better-memo.memoExplorer && better-memo.explorerView == tag && !better-memo.noMemos",
 				"key": "Ctrl+Shift+V"
 			},
 			{
 				"command": "better-memo.refresh",
-				"when": "better-memo.init && focusedView == 'better-memo.memoExplorer'",
+				"when": "better-memo.init && focusedView == better-memo.memoExplorer",
 				"key": "Ctrl+R"
 			},
 			{
