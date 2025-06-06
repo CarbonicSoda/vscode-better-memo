@@ -2,7 +2,7 @@
 	"name": "better-memo",
 	"displayName": "Better Memo",
 	"description": "Automatic Comment Curation for Developers",
-	"version": "3.0.15",
+	"version": "3.0.16",
 	"publisher": "carbonsoda",
 	"author": {
 		"name": "David W."
@@ -42,68 +42,69 @@
 			{
 				"command": "better-memo.switchToTagView",
 				"title": "Switch to Tag View",
-				"enablement": "better-memo.init && view.better-memo.memoExplorer.visible && better-memo.explorerView == file && !better-memo.noMemos",
+				"enablement": "better-memo.init && view == better-memo.memoExplorer && better-memo.explorerView == file && !better-memo.noMemos",
 				"icon": "$(symbol-parameter)",
 				"category": "Better Memo"
 			},
 			{
 				"command": "better-memo.switchToFileView",
 				"title": "Switch to File View",
-				"enablement": "better-memo.init && view.better-memo.memoExplorer.visible && better-memo.explorerView == tag && !better-memo.noMemos",
+				"enablement": "better-memo.init && view == better-memo.memoExplorer && better-memo.explorerView == tag && !better-memo.noMemos",
 				"icon": "$(folder-library)",
 				"category": "Better Memo"
 			},
 			{
 				"command": "better-memo.refresh",
 				"title": "Refresh Explorer",
-				"enablement": "better-memo.init && view.better-memo.memoExplorer.visible",
+				"enablement": "better-memo.init && view == better-memo.memoExplorer",
 				"icon": "$(refresh)",
 				"category": "Better Memo"
 			},
 			{
 				"command": "better-memo.completeAllMemos",
 				"title": "Complete All Memos",
+				"enablement": "better-memo.init && !better-memo.noMemos",
 				"icon": "$(checklist)",
 				"category": "Better Memo"
 			},
 			{
 				"command": "better-memo.toggleFold",
 				"title": "Toggle Fold",
-				"enablement": "view.better-memo.memoExplorer.visible && better-memo.init && !better-memo.noMemos",
+				"enablement": "better-memo.init && view == better-memo.memoExplorer && !better-memo.noMemos",
 				"icon": "$(fold)",
 				"category": "Better Memo"
 			},
 			{
 				"command": "better-memo.navigateToFile",
 				"title": "Navigate to File",
-				"enablement": "view.better-memo.memoExplorer.visible && viewItem == file",
+				"enablement": "view == better-memo.memoExplorer && viewItem == file",
 				"icon": "$(go-to-file)",
 				"category": "Better Memo"
 			},
 			{
 				"command": "better-memo.completeTag",
 				"title": "Complete All Memos of Tag",
-				"enablement": "view.better-memo.memoExplorer.visible && better-memo.explorerView == tag && viewItem == tag",
+				"enablement": "view == better-memo.memoExplorer && better-memo.explorerView == tag && viewItem == tag",
 				"icon": "$(check-all)",
 				"category": "Better Memo"
 			},
 			{
 				"command": "better-memo.completeTagNoConfirm",
 				"title": "Complete All Memos of Tag",
-				"enablement": "view.better-memo.memoExplorer.visible && better-memo.explorerView == tag && viewItem == tag",
+				"enablement": "view == better-memo.memoExplorer && better-memo.explorerView == tag && viewItem == tag",
 				"category": "Better Memo"
 			},
 			{
 				"command": "better-memo.completeFile",
 				"title": "Complete All Memos in File",
-				"enablement": "view.better-memo.memoExplorer.visible && better-memo.explorerView == file && viewItem == file",
+				"enablement": "view == better-memo.memoExplorer && better-memo.explorerView == file && viewItem == file",
 				"icon": "$(check-all)",
 				"category": "Better Memo"
 			},
 			{
 				"command": "better-memo.completeFileNoConfirm",
 				"title": "Complete All Memos in File",
-				"enablement": "view.better-memo.memoExplorer.visible && better-memo.explorerView == file && viewItem == file",
+				"enablement": "view == better-memo.memoExplorer && better-memo.explorerView == file && viewItem == file",
 				"category": "Better Memo"
 			},
 			{
@@ -115,7 +116,7 @@
 			{
 				"command": "better-memo.completeMemo",
 				"title": "Complete Memo",
-				"enablement": "view.better-memo.memoExplorer.visible && viewItem == memo",
+				"enablement": "view == better-memo.memoExplorer && viewItem == memo",
 				"icon": "$(check)",
 				"category": "Better Memo"
 			},
@@ -203,27 +204,27 @@
 			"view/title": [
 				{
 					"command": "better-memo.switchToTagView",
-					"when": "view == better-memo.memoExplorer && better-memo.init && better-memo.explorerView == file && !better-memo.noMemos",
+					"when": "better-memo.init && view == better-memo.memoExplorer && better-memo.explorerView == file && !better-memo.noMemos",
 					"group": "navigation@1"
 				},
 				{
 					"command": "better-memo.switchToFileView",
-					"when": "view == better-memo.memoExplorer && better-memo.init && better-memo.explorerView == tag && !better-memo.noMemos",
+					"when": "better-memo.init && view == better-memo.memoExplorer && better-memo.explorerView == tag && !better-memo.noMemos",
 					"group": "navigation@1"
 				},
 				{
 					"command": "better-memo.refresh",
-					"when": "view == better-memo.memoExplorer && better-memo.init",
+					"when": "better-memo.init && view == better-memo.memoExplorer",
 					"group": "navigation@2"
 				},
 				{
 					"command": "better-memo.completeAllMemos",
-					"when": "view == better-memo.memoExplorer && better-memo.init && !better-memo.noMemos",
+					"when": "better-memo.init && view == better-memo.memoExplorer && !better-memo.noMemos",
 					"group": "navigation@3"
 				},
 				{
 					"command": "better-memo.toggleFold",
-					"when": "view == better-memo.memoExplorer && better-memo.init && !better-memo.noMemos",
+					"when": "better-memo.init && view == better-memo.memoExplorer && !better-memo.noMemos",
 					"group": "navigation@4"
 				}
 			],
