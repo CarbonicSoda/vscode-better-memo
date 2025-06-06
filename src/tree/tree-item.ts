@@ -140,7 +140,6 @@ export namespace TreeItem {
 		command = {
 			title: "Navigate to Memo",
 			command: "better-memo.navigateToMemo",
-			tooltip: "Navigate to Memo",
 			arguments: [() => this.navigate()],
 		};
 
