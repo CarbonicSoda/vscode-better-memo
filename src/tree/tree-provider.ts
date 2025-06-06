@@ -138,7 +138,7 @@ export class TreeProvider implements TreeDataProvider<TreeItem.ItemType> {
 				)}`;
 
 				fileItem.tooltip = new MarkdownString(
-					`File: ${fileItem.label} - ${memos.length} $(pencil)`,
+					`$(file) ${fileItem.label} $(dash) ${memos.length} $(pencil)`,
 					true,
 				);
 
@@ -150,7 +150,7 @@ export class TreeProvider implements TreeDataProvider<TreeItem.ItemType> {
 			)} > ${memoCount} Memo${Aux.string.plural(memoCount)}`;
 
 			tagItem.tooltip = new MarkdownString(
-				`Tag: ${tagItem.label} - ${fileGroups.length} $(file) ${memoCount} $(pencil)`,
+				`$(bookmark) ${tagItem.label} $(dash) ${fileGroups.length} $(file) ${memoCount} $(pencil)`,
 				true,
 			);
 
@@ -212,7 +212,7 @@ export class TreeProvider implements TreeDataProvider<TreeItem.ItemType> {
 				tagItem.description = `${memos.length} Memo${Aux.string.plural(memos)}`;
 
 				tagItem.tooltip = new MarkdownString(
-					`Tag: ${tagItem.label} - ${memos.length} $(pencil)`,
+					`$(bookmark) ${tagItem.label} $(dash) ${memos.length} $(pencil)`,
 					true,
 				);
 
@@ -224,7 +224,7 @@ export class TreeProvider implements TreeDataProvider<TreeItem.ItemType> {
 			)} > ${memoCount} Memo${Aux.string.plural(memoCount)}`;
 
 			fileItem.tooltip = new MarkdownString(
-				`File: ${fileItem.label} - ${tagGroups.length} $(bookmark) ${memoCount} $(pencil)`,
+				`$(file) ${fileItem.label} $(dash) ${tagGroups.length} $(bookmark) ${memoCount} $(pencil)`,
 				true,
 			);
 

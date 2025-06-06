@@ -155,9 +155,10 @@ export namespace TreeItem {
 			this.description = `Ln ${memo.meta.line + 1}`;
 
 			this.tooltip = new MarkdownString(
-				`${memo.tag} - ${memo.meta.path} - Ln ${memo.meta.line + 1}\n***\n${
-					memo.content === "" ? "Placeholder" : memo.content
-				}`,
+				`$(bookmark) ${memo.tag} $(file) ${memo.meta.path} $(dash) Ln ${
+					memo.meta.line + 1
+				}\n\n---\n${memo.content === "" ? "Placeholder" : memo.content}`,
+				true,
 			);
 
 			this.iconPath =
