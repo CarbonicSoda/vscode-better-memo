@@ -68,11 +68,12 @@ export async function initEngine(): Promise<void> {
 
 		window.tabGroups.onDidChangeTabs(async (ev) => {
 			for (const tab of ev.closed) {
+				const uri = (tab.input as { uri: Uri }).uri;
+				if (uri.scheme === "untitled") continue;
+
 				let doc;
 				try {
-					doc = await workspace.openTextDocument(
-						(tab.input as { uri: Uri }).uri,
-					);
+					doc = await workspace.openTextDocument(uri);
 				} catch {
 					continue;
 				}
