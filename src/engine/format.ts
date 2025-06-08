@@ -30,11 +30,13 @@ export namespace Format {
 		if (!Lang.includes(lang)) return { head: "", tail: "" };
 
 		const delimiters = Lang.data.delimiters[lang];
-		const padding = delimiters.close ? " " : "";
+
+		const headPad = delimiters.open.endsWith(" ") ? "" : " ";
+		const tailPad = delimiters.close ? " " : "";
 
 		return {
-			head: `${delimiters.open}${padding}MO `,
-			tail: `${padding}${delimiters.close ?? ""}`,
+			head: `${delimiters.open}${headPad}MO `,
+			tail: `${tailPad}${delimiters.close ?? ""}`,
 		};
 	}
 }
